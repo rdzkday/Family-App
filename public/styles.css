@@ -161,6 +161,19 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   padding: 0 14px; outline: none; font-size: 15px; font-weight: 600; }
 .input:focus { border-color: var(--accent); background: var(--surface); }
 textarea.input { padding: 12px 14px; min-height: 90px; resize: vertical; }
+/* Safari/iOS tidak mewarisi font ke input tanggal, jadi disamakan manual dengan field lain */
+/* jangan pakai appearance:none di sini: itu mematikan color-scheme, ikon kalender jadi hitam di tema gelap */
+input[type="date"].input {
+  height: 48px; line-height: normal; font-size: 15px; font-weight: 600; font-family: inherit; text-align: left;
+}
+input[type="date"].input::-webkit-date-and-time-value {
+  text-align: left; font-size: 15px; font-weight: 600; margin: 0; padding: 0; min-height: 20px;
+}
+input[type="date"].input::-webkit-datetime-edit { padding: 0; font-size: 15px; font-weight: 600; }
+input[type="date"].input::-webkit-calendar-picker-indicator {
+  opacity: .55; cursor: pointer; width: 20px; height: 20px; padding: 0; margin-left: 4px;
+}
+input[type="date"].input::-webkit-calendar-picker-indicator:hover { opacity: .9; }
 .toggle { width: 100%; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
 .toggle .sw { position: relative; width: 48px; height: 30px; border-radius: 999px; background: var(--surface-3); flex: none; transition: background .15s; }
 .toggle .sw::after { content: ''; position: absolute; top: 4px; left: 4px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
@@ -328,9 +341,35 @@ textarea.input { padding: 12px 14px; min-height: 90px; resize: vertical; }
 .hint { font-size: 12.5px; color: var(--text-2); font-weight: 600; margin: 12px 4px 0; line-height: 1.5; }
 .hint:empty { display: none; }
 
-.card.utang { padding-bottom: 8px; }
-.utang-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px dashed var(--line); flex-wrap: wrap; }
-.utang-row .main { flex: 1 1 160px; min-width: 0; }
-.utang-row .t1 { font-weight: 800; }
-.utang-row .t2 { font-size: 12px; color: var(--text-3); font-weight: 600; }
-.utang-row .amt { font-weight: 900; }
+/* talangan Rumah Tangga: daftar per transaksi dengan centang */
+.card.tal { padding-bottom: 10px; }
+.tal-head { display: flex; align-items: flex-start; gap: 12px; }
+.tal-head .main { flex: 1; min-width: 0; }
+.tal-head h2 { font-size: 15px; font-weight: 900; margin: 0 0 4px; }
+.tal-head .t2 { display: block; font-size: 12.5px; color: var(--text-2); font-weight: 600; line-height: 1.45; }
+.tal-head .amt { text-align: right; font-weight: 900; font-size: 15px; flex: none; }
+.tal-head .amt .t2 { display: block; font-size: 11px; color: var(--text-3); font-weight: 600; margin-top: 2px; }
+.tal-list { margin-top: 12px; border-top: 1px dashed var(--line); }
+.tal-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px dashed var(--line);
+  cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tal-row:last-child { border-bottom: 0; }
+.tal-row input[type="checkbox"] { flex: none; width: 22px; height: 22px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.tal-row input[type="checkbox"]:disabled { cursor: default; opacity: .4; }
+.tal-row .main { flex: 1; min-width: 0; }
+.tal-row .t1 { display: block; font-weight: 800; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tal-row .t2 { display: block; font-size: 11.5px; color: var(--text-3); font-weight: 600; margin-top: 2px; }
+.tal-row .amt { flex: none; font-weight: 800; font-size: 14px; }
+.tal-row.on .t1 { color: var(--text-2); text-decoration: line-through; text-decoration-thickness: 1px; }
+.tal-row.on .amt { color: var(--text-2); }
+.tal-more { width: 100%; min-height: 40px; margin-top: 4px; font-size: 13px; font-weight: 800; color: var(--accent); background: none; }
+.tal-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px;
+  padding-top: 12px; border-top: 1px solid var(--line); }
+.tal-foot .main { flex: 1 1 120px; min-width: 0; }
+.tal-foot b { display: block; font-size: 14px; font-weight: 900; }
+.tal-foot .t2 { display: block; font-size: 12px; color: var(--text-2); font-weight: 600; margin-top: 1px; }
+
+/* baris kecil di bawah donut untuk sembunyikan/tampilkan setoran */
+.setoran-note { display: block; width: 100%; text-align: left; margin-top: 10px; padding: 10px 12px;
+  background: var(--surface-2); border-radius: 12px; font-size: 12px; font-weight: 600; color: var(--text-2); line-height: 1.5; }
+.setoran-note b { font-weight: 800; color: var(--text); }
+.setoran-note .lnk { color: var(--accent); font-weight: 800; white-space: nowrap; }

@@ -16,9 +16,11 @@ var KantongCore = (function () {
       'keterangan', 'reimburse', 'oleh', 'sumber', 'dibuat', 'diubah', 'dihapus', 'terbayar', 'tx_balik']
   };
   var KAT_REIMBURSE = 'reimburse-masuk';   // kategori pemasukan otomatis, tidak dihitung sebagai pendapatan
+  var KAT_SETORAN = 'setoran-rt';          // pengeluaran otomatis: topup dari kantong pribadi ke dompet bersama
+  var KAT_SETORAN_MASUK = 'setoran-rt-in'; // pemasukan otomatis di sisi dompet bersama
   var TIPE_TX = ['Pengeluaran', 'Pemasukan', 'Transfer'];
   var JENIS_KANTONG = ['Cash', 'Debit', 'E-wallet', 'Kredit'];
-  var VERSION = '1.1.0';
+  var VERSION = '1.2.0';
 
   // ---------- util ----------
   function err(msg) { var e = new Error(msg); e.userFacing = true; return e; }
@@ -92,6 +94,22 @@ var KantongCore = (function () {
 
   function bukuOfKantong(db, kantongId) { var k = byId(db.Kantong)[kantongId]; return k ? k.buku : ''; }
 
+  // Arah transfer antar buku:
+  //  'topup' = kantong pribadi -> kantong dompet bersama (setoran bulanan)
+  //  'ganti' = kantong dompet bersama -> kantong pribadi (penggantian talangan)
+  //  ''      = pindah dalam buku yang sama atau antar buku pribadi
+  function arahTransfer(db, t) {
+    if (t.tipe !== 'Transfer') return '';
+    var bmap = byId(db.Buku), kmap = byId(db.Kantong);
+    var ks = kmap[t.kantong], kt = kmap[t.kantong_tujuan];
+    if (!ks || !kt || ks.buku === kt.buku) return '';
+    var bs = bmap[ks.buku], bt = bmap[kt.buku];
+    if (!bs || !bt) return '';
+    if (bs.tipe === 'Pribadi' && bt.tipe === 'Bersama') return 'topup';
+    if (bs.tipe === 'Bersama' && bt.tipe === 'Pribadi') return 'ganti';
+    return '';
+  }
+
   // apakah transaksi relevan untuk tampilan buku tertentu ('all' = semua)
   function txInBuku(db, t, bukuSel) {
     if (bukuSel === 'all') return true;
@@ -99,11 +117,18 @@ var KantongCore = (function () {
     return t.tipe === 'Transfer' && bukuOfKantong(db, t.kantong_tujuan) === bukuSel;
   }
 
+  // nama cadangan kalau baris kategori otomatis belum ada di Sheet
+  function katBawaan(kid) {
+    if (kid === KAT_SETORAN) return { id: kid, nama: 'Setoran RT', warna: '#A8B6D9' };
+    if (kid === KAT_SETORAN_MASUK) return { id: kid, nama: 'Setoran dari pribadi', warna: '#A8B6D9' };
+    return { id: kid, nama: kid || 'Tanpa kategori', warna: '#94A3B8' };
+  }
+
   function summarize(db, monthTx, budgets, bukuSel) {
     var inSet = function (b) { return bukuSel === 'all' || b === bukuSel; };
     var kmap = byId(db.Kategori);
     var s = { pemasukan: 0, pengeluaran: 0, reimburse: 0, reimburseMenunggu: 0, transferMasuk: 0, transferKeluar: 0,
-      budgetTotal: 0, perKategori: [], perMasuk: [] };
+      setoran: 0, setoranMasuk: 0, budgetTotal: 0, perKategori: [], perMasuk: [] };
     var spend = {}, inc = {};
     monthTx.forEach(function (t) {
       if (t.dihapus) return;
@@ -119,8 +144,17 @@ var KantongCore = (function () {
         s.pemasukan += n; inc[t.kategori] = (inc[t.kategori] || 0) + n;
       } else if (t.tipe === 'Transfer') {
         var src = inSet(t.buku), dst = inSet(bukuOfKantong(db, t.kantong_tujuan));
-        if (src && !dst) s.transferKeluar += n;
-        if (dst && !src) s.transferMasuk += n;
+        // src && dst berarti kedua sisi ada di tampilan ini (mis. buku 'all' atau pindah dalam buku):
+        // sengaja tidak dihitung supaya satu rupiah tidak kehitung dua kali.
+        if (arahTransfer(db, t) === 'topup') {
+          // setoran ke dompet bersama = pengeluaran di buku pribadi, pemasukan di buku bersama
+          if (src && !dst) { s.pengeluaran += n; s.setoran += n; spend[KAT_SETORAN] = (spend[KAT_SETORAN] || 0) + n; }
+          else if (dst && !src) { s.pemasukan += n; s.setoranMasuk += n; inc[KAT_SETORAN_MASUK] = (inc[KAT_SETORAN_MASUK] || 0) + n; }
+        } else {
+          // penggantian talangan dan pindah antar kantong: bukan pengeluaran/pemasukan baru
+          if (src && !dst) s.transferKeluar += n;
+          if (dst && !src) s.transferMasuk += n;
+        }
       }
     });
     var bud = {};
@@ -133,14 +167,14 @@ var KantongCore = (function () {
     Object.keys(spend).forEach(function (k) { ids[k] = 1; });
     Object.keys(bud).forEach(function (k) { if (bud[k] > 0) ids[k] = 1; });
     s.perKategori = Object.keys(ids).map(function (kid) {
-      var k = kmap[kid] || { id: kid, nama: kid || 'Tanpa kategori', warna: '#94A3B8' };
+      var k = kmap[kid] || katBawaan(kid);
       var total = spend[kid] || 0, b = bud[kid] || 0;
       s.budgetTotal += b;
       return { id: kid, nama: k.nama, warna: k.warna, total: total, budget: b, sisa: b - total,
         pct: s.pengeluaran > 0 ? total / s.pengeluaran : 0 };
     }).sort(function (a, b) { return b.total - a.total || b.budget - a.budget; });
     s.perMasuk = Object.keys(inc).map(function (kid) {
-      var k = kmap[kid] || { nama: kid, warna: '#94A3B8' };
+      var k = kmap[kid] || katBawaan(kid);
       return { id: kid, nama: k.nama, warna: k.warna, total: inc[kid] };
     }).sort(function (a, b) { return b.total - a.total; });
     s.selisih = s.pemasukan - s.pengeluaran;
@@ -219,6 +253,41 @@ var KantongCore = (function () {
     });
   }
 
+  // ---------- talangan: belanja buku bersama yang dibayar pakai kantong pribadi ----------
+  // Daftar per transaksi (bukan total), hanya yang belum ditandai lunas.
+  function computeTalangan(db) {
+    var kmap = byId(db.Kantong), bmap = byId(db.Buku), out = [];
+    liveTx(db).forEach(function (t) {
+      if (t.tipe !== 'Pengeluaran' || bool(t.reimburse) || t.terbayar) return;
+      var tb = bmap[t.buku];
+      if (!tb || tb.tipe !== 'Bersama') return;
+      var k = kmap[t.kantong];
+      if (!k) return;
+      var pb = bmap[k.buku];
+      if (!pb || pb.tipe !== 'Pribadi') return;
+      out.push({ id: t.id, tanggal: String(t.tanggal), nominal: num(t.nominal),
+        keterangan: String(t.keterangan || ''), kategori: String(t.kategori || ''),
+        buku: tb.id, pemilik: pb.id, kantong: t.kantong, oleh: String(t.oleh || '') });
+    });
+    return out.sort(function (a, b) { return a.tanggal < b.tanggal ? -1 : (a.tanggal > b.tanggal ? 1 : 0); });
+  }
+
+  function ensureKategoriSetoran(store, db) {
+    var semua = db.Buku.map(function (b) { return b.id; }).join(',');
+    var perlu = [
+      { id: KAT_SETORAN, nama: 'Setoran RT', tipe: 'Pengeluaran', urutan: 97 },
+      { id: KAT_SETORAN_MASUK, nama: 'Setoran dari pribadi', tipe: 'Pemasukan', urutan: 98 }
+    ];
+    var kmap = byId(db.Kategori), dibuat = false;
+    perlu.forEach(function (p) {
+      if (kmap[p.id]) return;
+      store.upsert('Kategori', { id: p.id, nama: p.nama, tipe: p.tipe, buku: semua,
+        warna: '#A8B6D9', hitung: true, aktif: true, urutan: p.urutan });
+      dibuat = true;
+    });
+    if (dibuat) db.Kategori = store.all('Kategori');
+  }
+
   function ensureKategoriReimburse(store, db) {
     var ada = byId(db.Kategori)[KAT_REIMBURSE];
     if (ada) return ada;
@@ -245,12 +314,14 @@ var KantongCore = (function () {
         var months = {};
         liveTx(db).forEach(function (t) { months[String(t.tanggal).slice(0, 7)] = 1; });
         months[today.slice(0, 7)] = 1;
+        // kategori setoran dibuat sekali; kalau Sheet sedang tidak bisa ditulis, bootstrap tetap jalan
+        try { ensureKategoriSetoran(store, db); } catch (eSet) { /* pakai nama cadangan */ }
         return {
           version: VERSION, user: user, today: today,
           buku: sortBy(db.Buku, 'urutan'), users: db.Users,
           kategori: sortBy(db.Kategori, 'urutan'), kantong: sortBy(db.Kantong, 'urutan'),
           saldo: computeSaldo(db).saldo, bulan: Object.keys(months).sort().reverse(),
-          utang: computeUtang(db)
+          utang: computeUtang(db), talangan: computeTalangan(db)
         };
       }
       case 'month': {
@@ -271,7 +342,12 @@ var KantongCore = (function () {
         // jika transaksi reimburse yang sudah terbayar diubah, catatan pemasukan otomatisnya ikut
         var linked = ex && ex.tx_balik ? byId(db.Transaksi)[ex.tx_balik] : null;
         if (linked && !linked.dihapus) {
-          if (!t.reimburse || t.tipe !== 'Pengeluaran') {
+          if (linked.tipe === 'Transfer') {
+            // pelunasan talangan: 1 transfer bisa menutup beberapa transaksi, jadi jangan diubah di sini.
+            // Kalau transaksi ini tidak lagi berupa talangan, cukup lepas tandanya.
+            var masihTalangan = t.tipe === 'Pengeluaran' && !t.reimburse && t.buku === linked.buku;
+            if (!masihTalangan) { t.terbayar = ''; t.tx_balik = ''; }
+          } else if (!t.reimburse || t.tipe !== 'Pengeluaran') {
             softDelete(store, linked, nowIso); t.terbayar = ''; t.tx_balik = '';
           } else {
             var lk = clone(linked);
@@ -316,12 +392,70 @@ var KantongCore = (function () {
         store.upsert('Transaksi', upd);
         return { tx: upd };
       }
+      case 'talangan.lunas': {
+        var ids = payload.ids || [];
+        if (!ids.length) throw err('Pilih dulu transaksi yang mau dilunasi');
+        if (ids.length > 100) throw err('Maksimal 100 transaksi sekaligus');
+        var kanL = byId(db.Kantong), bmapL = byId(db.Buku);
+        var srcK = kanL[payload.kantong], dstK = kanL[payload.kantong_tujuan];
+        if (!srcK) throw err('Pilih kantong dompet bersama');
+        if (!dstK) throw err('Pilih kantong tujuan');
+        if (srcK.id === dstK.id) throw err('Kantong asal dan tujuan sama');
+        if (!bool(srcK.aktif)) throw err('Kantong "' + srcK.nama + '" nonaktif');
+        if (!bool(dstK.aktif)) throw err('Kantong "' + dstK.nama + '" nonaktif');
+        var bSrc = bmapL[srcK.buku], bDst = bmapL[dstK.buku];
+        if (!bSrc || bSrc.tipe !== 'Bersama') throw err('Kantong asal harus kantong dompet bersama');
+        if (!bDst || bDst.tipe !== 'Pribadi') throw err('Kantong tujuan harus kantong pribadi');
+        if (!canWrite(db, user, bSrc.id)) throw err('Kamu tidak bisa memakai kantong "' + srcK.nama + '"');
+        var nomL = Math.round(num(payload.nominal));
+        if (!(nomL > 0) || nomL > 1e12) throw err('Nominal harus lebih dari 0');
+        var tglL = isDate(payload.tanggal) ? payload.tanggal : today;
+        var txmapL = byId(db.Transaksi), pilih = [], totalPilih = 0;
+        for (var iL = 0; iL < ids.length; iL++) {
+          var p = txmapL[String(ids[iL])];
+          if (!p || p.dihapus) throw err('Ada transaksi yang sudah tidak ada. Muat ulang dulu.');
+          if (p.terbayar) throw err('Ada transaksi yang sudah dilunasi. Muat ulang dulu.');
+          if (p.tipe !== 'Pengeluaran' || bool(p.reimburse)) throw err('Ada transaksi yang bukan talangan');
+          if (p.buku !== bSrc.id) throw err('Ada transaksi yang bukan milik buku ' + bSrc.nama);
+          var pk = kanL[p.kantong];
+          if (!pk || pk.buku !== bDst.id) throw err('Ada transaksi yang tidak dibayar pakai kantong ' + bDst.nama);
+          pilih.push(p); totalPilih += num(p.nominal);
+        }
+        var tidL = 'ln-' + tglL.replace(/-/g, '') + '-' + Math.random().toString(36).slice(2, 8);
+        var ketL = String(payload.keterangan || '').trim().slice(0, 200) ||
+          ('Ganti talangan ' + bDst.nama + ' (' + pilih.length + ' transaksi)');
+        var trf = { id: tidL, tanggal: tglL, tipe: 'Transfer', nominal: nomL, buku: bSrc.id,
+          kategori: '', kantong: srcK.id, kantong_tujuan: dstK.id, keterangan: ketL,
+          reimburse: false, oleh: user.id, sumber: 'app', dibuat: nowIso, diubah: nowIso, dihapus: '',
+          terbayar: '', tx_balik: '' };
+        store.upsert('Transaksi', trf);
+        pilih.forEach(function (p2) {
+          var up = clone(p2); up.terbayar = tglL; up.tx_balik = tidL; up.diubah = nowIso;
+          store.upsert('Transaksi', up);
+        });
+        // selisih lebih/kurang tidak disimpan terpisah: computeUtang sudah menghitungnya
+        // dari (total pengeluaran talangan - total transfer penggantian), jadi otomatis jalan ke bulan depan.
+        return { tx: trf, ids: pilih.map(function (p3) { return p3.id; }), total: totalPilih, selisih: nomL - totalPilih };
+      }
       case 'tx.delete': {
         var d = byId(db.Transaksi)[payload.id];
         if (!d || d.dihapus) return { id: payload.id };        // idempoten
         if (!canWrite(db, user, d.buku)) throw err('Kamu hanya bisa melihat transaksi ini');
         if (d.sumber === 'auto') throw err('Catatan otomatis. Batalkan lewat transaksi reimburse aslinya.');
-        if (d.tx_balik) { var dl = byId(db.Transaksi)[d.tx_balik]; if (dl && !dl.dihapus) softDelete(store, dl, nowIso); }
+        if (d.tx_balik) {
+          var dl = byId(db.Transaksi)[d.tx_balik];
+          // transfer pelunasan talangan dibiarkan: bisa dipakai transaksi lain.
+          // Selisihnya otomatis muncul sebagai titipan di kartu utang antar dompet.
+          if (dl && !dl.dihapus && dl.tipe !== 'Transfer') softDelete(store, dl, nowIso);
+        }
+        if (d.tipe === 'Transfer') {
+          // hapus transfer pelunasan = batalkan pelunasannya, transaksi balik ke daftar talangan
+          db.Transaksi.forEach(function (x) {
+            if (x.dihapus || x.tx_balik !== d.id) return;
+            var ub = clone(x); ub.terbayar = ''; ub.tx_balik = ''; ub.diubah = nowIso;
+            store.upsert('Transaksi', ub);
+          });
+        }
         softDelete(store, d, nowIso);
         return { id: d.id };
       }
@@ -428,7 +562,8 @@ var KantongCore = (function () {
     effectiveBudget: effectiveBudget, summarize: summarize, txInBuku: txInBuku,
     bukuOfKantong: bukuOfKantong, scopeOf: scopeOf, bool: bool, num: num, byId: byId,
     addDays: addDays, slug: slug, handle: handle, memoryStore: memoryStore, cleanTx: cleanTx,
-    computeUtang: computeUtang, KAT_REIMBURSE: KAT_REIMBURSE
+    computeUtang: computeUtang, computeTalangan: computeTalangan, arahTransfer: arahTransfer,
+    KAT_REIMBURSE: KAT_REIMBURSE, KAT_SETORAN: KAT_SETORAN, KAT_SETORAN_MASUK: KAT_SETORAN_MASUK
   };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = KantongCore;

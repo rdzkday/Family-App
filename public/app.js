@@ -181,6 +181,28 @@
     } else if (op.action === 'tx.reimburse') {
       var rt = findTx(op.payload.id);
       if (rt) { rt.terbayar = op.payload.bayar ? (op.payload.tanggal || todayISO()) : ''; rt._pending = true; }
+    } else if (op.action === 'talangan.lunas') {
+      var p = op.payload, ids = p.ids || [], tgl = p.tanggal || todayISO();
+      var daftar = (S.boot && S.boot.talangan) || [];
+      var kena = daftar.filter(function (t) { return ids.indexOf(t.id) >= 0; });
+      var bersama = kena.length ? kena[0].buku : '', pemilik = kena.length ? kena[0].pemilik : '';
+      ids.forEach(function (id) { var x = findTx(id); if (x) { x.terbayar = tgl; x._pending = true; } });
+      if (S.boot) {
+        S.boot.talangan = daftar.filter(function (t) { return ids.indexOf(t.id) < 0; });
+        if (bersama) {
+          var ada = false;
+          S.boot.utang = (S.boot.utang || []).map(function (u) {
+            if (u.dari !== bersama || u.ke !== pemilik) return u;
+            ada = true; return { dari: u.dari, ke: u.ke, jumlah: u.jumlah - p.nominal };
+          }).filter(function (u) { return u.jumlah !== 0; });
+          if (!ada) S.boot.utang.push({ dari: bersama, ke: pemilik, jumlah: -p.nominal });
+        }
+      }
+      var ml = S.months[tgl.slice(0, 7)];
+      if (ml) ml.transaksi.push({ id: 'ln-local-' + uid(), tanggal: tgl, tipe: 'Transfer', nominal: p.nominal,
+        buku: bersama, kategori: '', kantong: p.kantong, kantong_tujuan: p.kantong_tujuan,
+        keterangan: 'Ganti talangan', reimburse: false, oleh: me().id, sumber: 'app',
+        dibuat: nowIso(), diubah: '', dihapus: '', terbayar: '', tx_balik: '', _pending: true });
     }
   }
   function sync(extraMonths) {
@@ -285,6 +307,10 @@
   function kategoriOf(id) { return C.byId(db().Kategori)[id]; }
   // pengeluaran dihitung kecuali reimburse yang sudah terbayar
   function isCounted(t) { return t.tipe === 'Pengeluaran' && !(C.bool(t.reimburse) && t.terbayar); }
+  // setoran ke dompet bersama ikut dihitung ke pengeluaran & budget,
+  // tapi porsinya biasanya jauh lebih besar dari pos lain sehingga donut jadi susah dibaca
+  function showSetoran() { return !!S.prefs.showSetoran; }
+  function setSetoran(v) { S.prefs.showSetoran = !!v; persist(); }
   function reimStatus(t) { if (t.tipe !== 'Pengeluaran' || !C.bool(t.reimburse)) return ''; return t.terbayar ? 'paid' : 'wait'; }
   function shortDate(iso) { var p = String(iso).split('-'); return p.length === 3 ? (+p[2]) + ' ' + BULAN[+p[1] - 1].slice(0, 3) : iso; }
 
@@ -344,7 +370,9 @@
   // ================= pemilih kategori =================
   function katChoices(buku, tipe, keepId) {
     return db().Kategori.filter(function (k) {
-      return k.id !== C.KAT_REIMBURSE && k.tipe === tipe && (C.bool(k.aktif) || k.id === keepId) && C.scopeOf(k).indexOf(buku) >= 0;
+      // kategori otomatis (reimburse masuk, setoran dompet bersama) tidak dipilih manual
+      if (k.id === C.KAT_REIMBURSE || k.id === C.KAT_SETORAN || k.id === C.KAT_SETORAN_MASUK) return false;
+      return k.tipe === tipe && (C.bool(k.aktif) || k.id === keepId) && C.scopeOf(k).indexOf(buku) >= 0;
     }).sort(function (a, b) { return a.urutan - b.urutan; });
   }
   function katFreq(buku, tipe) {            // pemakaian 60 hari terakhir
@@ -440,34 +468,190 @@
     });
   }
 
-  // ================= utang Rumah Tangga =================
-  function utangHtml(sel) {
-    var us = ((S.boot && S.boot.utang) || []).filter(function (u) { return !sel || sel === 'all' || u.dari === sel || u.ke === sel; });
-    var rows = us.map(function (u) {
-      var dari = bukuById(u.dari), ke = bukuById(u.ke); if (!dari || !ke) return '';
-      var pos = u.jumlah > 0, n = Math.abs(u.jumlah);
-      return '<div class="utang-row"><div class="main"><div class="t1">' + (pos ? esc(dari.nama) + ' berutang ke ' + esc(ke.nama) : esc(ke.nama) + ' berutang ke ' + esc(dari.nama)) + '</div>' +
-        '<div class="t2">' + (pos ? 'Belanja ' + esc(dari.nama) + ' dibayar pakai uang ' + esc(ke.nama) : 'Penggantian lebih besar dari talangan') + '</div></div>' +
-        '<div class="amt num">' + rp(n) + '</div>' +
-        (pos ? '<button type="button" class="btn small" data-ganti="' + esc(u.dari + '|' + u.ke) + '">Tandai diganti</button>' : '') + '</div>';
+  // ================= talangan Rumah Tangga =================
+  // Belanja buku bersama yang dibayar pakai kantong pribadi, didaftar per transaksi.
+  // Saldo berjalan (lebih/kurang bayar) ikut dari S.boot.utang.
+  var TAL_MAX = 6;
+  function talPilih() { S.pilihTalangan = S.pilihTalangan || {}; return S.pilihTalangan; }
+  function talBuka() { S.talanganBuka = S.talanganBuka || {}; return S.talanganBuka; }
+
+  function talanganGrup(sel) {
+    var cocok = function (bersama, pemilik) { return !sel || sel === 'all' || sel === bersama || sel === pemilik; };
+    var grup = {}, urut = [];
+    function slot(bersama, pemilik) {
+      var k = bersama + '|' + pemilik;
+      if (!grup[k]) { grup[k] = { key: k, bersama: bersama, pemilik: pemilik, items: [], saldo: 0 }; urut.push(k); }
+      return grup[k];
+    }
+    ((S.boot && S.boot.talangan) || []).forEach(function (t) {
+      if (!cocok(t.buku, t.pemilik)) return;
+      slot(t.buku, t.pemilik).items.push(t);
+    });
+    ((S.boot && S.boot.utang) || []).forEach(function (u) {
+      if (!cocok(u.dari, u.ke)) return;
+      slot(u.dari, u.ke).saldo = u.jumlah;
+    });
+    return urut.map(function (k) { return grup[k]; })
+      .filter(function (g) { return g.items.length || g.saldo; });
+  }
+
+  function talanganHtml(sel) {
+    var pilih = talPilih(), buka = talBuka();
+    var gs = talanganGrup(sel);
+    if (!gs.length) return '';
+    return gs.map(function (g) {
+      var bersama = bukuById(g.bersama), pemilik = bukuById(g.pemilik);
+      if (!bersama || !pemilik) return '';
+      var bisa = canWrite(g.bersama);
+      var dipilih = g.items.filter(function (t) { return pilih[t.id]; });
+      var nDipilih = dipilih.reduce(function (s, t) { return s + t.nominal; }, 0);
+      var totalSemua = g.items.reduce(function (s, t) { return s + t.nominal; }, 0);
+      var semuaTercentang = g.items.length > 0 && dipilih.length === g.items.length;
+      var terbuka = !!buka[g.key];
+      var tampil = terbuka ? g.items : g.items.slice(0, TAL_MAX);
+
+      var status = g.saldo > 0
+        ? '<span class="t2">' + esc(bersama.nama) + ' masih harus ganti <b class="num">' + rp(g.saldo) + '</b> ke ' + esc(pemilik.nama) + '</span>'
+        : g.saldo < 0
+          ? '<span class="t2">' + esc(pemilik.nama) + ' pegang titipan ' + esc(bersama.nama) + ' <b class="num">' + rp(-g.saldo) + '</b>, otomatis dipakai buat belanja berikutnya</span>'
+          : '<span class="t2">Sudah seimbang</span>';
+
+      var rows = tampil.map(function (t) {
+        var k = kategoriOf(t.kategori);
+        var meta = [shortDate(t.tanggal)];
+        if (k) meta.push(k.nama);
+        if (t.oleh) meta.push(userName(t.oleh));
+        return '<label class="tal-row' + (pilih[t.id] ? ' on' : '') + '">' +
+          '<input type="checkbox" data-tal="' + esc(t.id) + '"' + (pilih[t.id] ? ' checked' : '') + (bisa ? '' : ' disabled') + '>' +
+          '<span class="main"><span class="t1">' + esc(t.keterangan || (k ? k.nama : 'Belanja')) + '</span>' +
+          '<span class="t2">' + esc(meta.join(' · ')) + '</span></span>' +
+          '<span class="amt num">' + rp(t.nominal) + '</span></label>';
+      }).join('');
+
+      var sisa = g.items.length - tampil.length;
+      var lebih = sisa > 0 ? '<button type="button" class="tal-more" data-tal-buka="' + esc(g.key) + '">Lihat ' + sisa + ' lainnya</button>'
+        : (terbuka && g.items.length > TAL_MAX ? '<button type="button" class="tal-more" data-tal-buka="' + esc(g.key) + '">Ringkas lagi</button>' : '');
+
+      var foot = '';
+      if (g.items.length && bisa) {
+        var kiri = dipilih.length
+          ? '<span class="main"><b>' + dipilih.length + ' dipilih</b><span class="t2 num">' + rp(nDipilih) + '</span></span>'
+          : '<span class="main"><span class="t2">Centang yang sudah ditransfer</span></span>';
+        var tombolAll = '<button type="button" class="btn small ghost" data-tal-all="' + esc(g.key) + '">' +
+          (semuaTercentang ? 'Batal pilih' : 'Pilih semua') + '</button>';
+        var tombolLunas = dipilih.length
+          ? '<button type="button" class="btn small" data-tal-lunas="' + esc(g.key) + '">Catat transfer</button>' : '';
+        foot = '<div class="tal-foot">' + kiri + tombolAll + tombolLunas + '</div>';
+      } else if (g.items.length) {
+        foot = '<div class="tal-foot"><span class="main"><span class="t2">Hanya bisa kamu lihat</span></span></div>';
+      }
+
+      return '<section class="section"><div class="card tal">' +
+        '<div class="tal-head"><div class="main"><h2>Talangan ' + esc(pemilik.nama) + ' buat ' + esc(bersama.nama) + '</h2>' + status + '</div>' +
+        (g.items.length ? '<div class="amt num">' + rp(totalSemua) + '<span class="t2">' + g.items.length + ' belum ditandai</span></div>' : '') +
+        '</div>' + (rows ? '<div class="tal-list">' + rows + '</div>' : '') + lebih + foot + '</div></section>';
     }).join('');
-    return rows ? '<section class="section"><div class="card utang"><div class="section-h" style="margin:0 0 6px"><h2>Utang antar dompet</h2></div>' + rows + '</div></section>' : '';
   }
-  function bindUtang(root) {
-    $$('[data-ganti]', root).forEach(function (b) { b.addEventListener('click', function () { openGanti(b.getAttribute('data-ganti')); }); });
+
+  function renderTalangan(root, sel) {
+    if (!root) return;
+    root.innerHTML = talanganHtml(sel);
+    var ulang = function () { renderTalangan(root, sel); };
+    var pilih = talPilih();
+    $$('[data-tal]', root).forEach(function (c) {
+      c.addEventListener('change', function () {
+        var id = c.getAttribute('data-tal');
+        if (c.checked) pilih[id] = true; else delete pilih[id];
+        ulang();
+      });
+    });
+    $$('[data-tal-buka]', root).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var k = b.getAttribute('data-tal-buka'), buka = talBuka();
+        buka[k] = !buka[k]; ulang();
+      });
+    });
+    $$('[data-tal-all]', root).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var g = talanganGrup(sel).filter(function (x) { return x.key === b.getAttribute('data-tal-all'); })[0];
+        if (!g) return;
+        var semua = g.items.every(function (t) { return pilih[t.id]; });
+        g.items.forEach(function (t) { if (semua) delete pilih[t.id]; else pilih[t.id] = true; });
+        ulang();
+      });
+    });
+    $$('[data-tal-lunas]', root).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var g = talanganGrup(sel).filter(function (x) { return x.key === b.getAttribute('data-tal-lunas'); })[0];
+        if (g) openLunasSheet(g, ulang);
+      });
+    });
   }
-  function openGanti(key) {
-    var p = key.split('|'), d = db();
-    var u = ((S.boot && S.boot.utang) || []).filter(function (x) { return x.dari === p[0] && x.ke === p[1]; })[0];
-    if (!u || u.jumlah <= 0) return;
-    var dari = bukuById(p[0]), ke = bukuById(p[1]);
-    var from = d.Kantong.filter(function (k) { return k.buku === p[0] && C.bool(k.aktif) && canWrite(k.buku); })[0];
-    var to = d.Kantong.filter(function (k) { return k.buku === p[1] && C.bool(k.aktif); });
-    var last = S.prefs.lastKantong && S.prefs.lastKantong[p[1]];
-    var toId = (to.filter(function (k) { return k.id === last; })[0] || to[0] || {}).id || '';
-    openSheet('Ganti belanja ke ' + ke.nama, function (sh) {
-      txForm(sh.el, { tipe: 'Transfer', nominal: u.jumlah, kantong: from ? from.id : '', kantong_tujuan: toId, buku: p[0],
-        keterangan: 'Ganti belanja ' + dari.nama }, { onDone: function () { sh.close(); } });
+
+  function openLunasSheet(g, onDone) {
+    var d = db(), pilih = talPilih();
+    var items = g.items.filter(function (t) { return pilih[t.id]; });
+    if (!items.length) { toast('Centang dulu transaksinya', true); return; }
+    var total = items.reduce(function (s, t) { return s + t.nominal; }, 0);
+    var bersama = bukuById(g.bersama), pemilik = bukuById(g.pemilik);
+    var froms = d.Kantong.filter(function (k) { return k.buku === g.bersama && C.bool(k.aktif); });
+    var tos = d.Kantong.filter(function (k) { return k.buku === g.pemilik && C.bool(k.aktif); });
+    if (!froms.length) { toast('Buku ' + bersama.nama + ' belum punya kantong aktif', true); return; }
+    if (!tos.length) { toast('Buku ' + pemilik.nama + ' belum punya kantong aktif', true); return; }
+    var kantongTerakhir = items[items.length - 1].kantong;
+    var f = {
+      nominal: total,
+      kantong: froms[0].id,
+      kantong_tujuan: (tos.filter(function (k) { return k.id === kantongTerakhir; })[0] || tos[0]).id,
+      tanggal: todayISO()
+    };
+    openSheet('Transfer ke ' + pemilik.nama, function (sh) {
+      function draw() {
+        var selisih = f.nominal - total;
+        var chip = function (k, sel, attr) {
+          return '<button type="button" class="chip" ' + attr + '="' + esc(k.id) + '" aria-pressed="' + (sel === k.id) + '" style="--c:' + bukuColor(k.buku) + '">' +
+            '<span class="dot" style="background:' + bukuColor(k.buku) + '"></span>' + esc(k.nama) + '</button>';
+        };
+        sh.el.innerHTML =
+          '<div class="reim-sum"><div class="t1">' + items.length + ' transaksi dicentang</div><div class="num big">' + rp(total) + '</div></div>' +
+          '<label class="amount tf"><span>Rp</span><input id="ln-amt" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Nominal transfer" value="' + (f.nominal ? fmt(f.nominal) : '') + '"></label>' +
+          '<div class="field"><span class="lbl">Uang keluar dari</span><div class="chips wrap">' + froms.map(function (k) { return chip(k, f.kantong, 'data-lf'); }).join('') + '</div></div>' +
+          '<div class="field"><span class="lbl">Masuk ke kantong ' + esc(pemilik.nama) + '</span><div class="chips wrap">' + tos.map(function (k) { return chip(k, f.kantong_tujuan, 'data-lt'); }).join('') + '</div></div>' +
+          '<div class="field"><label for="ln-tgl">Tanggal transfer</label><input id="ln-tgl" class="input" type="date" value="' + esc(f.tanggal) + '"></div>' +
+          '<div class="hint">' + (
+            selisih === 0 ? 'Nominal pas. Setelah dicatat, ' + items.length + ' transaksi ini hilang dari daftar talangan.'
+            : selisih > 0 ? 'Lebih ' + rp(selisih) + ' dari total yang dicentang. Kelebihannya tercatat sebagai titipan ' + esc(bersama.nama) + ' di kantong ' + esc(pemilik.nama) + ', otomatis dipakai buat belanja berikutnya.'
+            : 'Kurang ' + rp(-selisih) + ' dari total yang dicentang. Transaksinya tetap hilang dari daftar, sisanya jalan terus sebagai utang ' + esc(bersama.nama) + '.'
+          ) + '</div>' +
+          '<div class="err" id="ln-err" role="alert"></div>' +
+          '<button type="button" class="btn" id="ln-save">Catat transfer</button>';
+
+        var amt = $('#ln-amt', sh.el);
+        amt.addEventListener('input', function () {
+          f.nominal = parseNum(amt.value);
+          amt.value = f.nominal ? fmt(f.nominal) : '';
+          var h = $('.hint', sh.el), s2 = f.nominal - total;
+          if (h) h.textContent = s2 === 0 ? 'Nominal pas. Setelah dicatat, ' + items.length + ' transaksi ini hilang dari daftar talangan.'
+            : s2 > 0 ? 'Lebih ' + rp(s2) + ' dari total yang dicentang. Kelebihannya tercatat sebagai titipan ' + bersama.nama + ' di kantong ' + pemilik.nama + ', otomatis dipakai buat belanja berikutnya.'
+            : 'Kurang ' + rp(-s2) + ' dari total yang dicentang. Transaksinya tetap hilang dari daftar, sisanya jalan terus sebagai utang ' + bersama.nama + '.';
+        });
+        $$('[data-lf]', sh.el).forEach(function (b) { b.addEventListener('click', function () { f.kantong = b.getAttribute('data-lf'); draw(); }); });
+        $$('[data-lt]', sh.el).forEach(function (b) { b.addEventListener('click', function () { f.kantong_tujuan = b.getAttribute('data-lt'); draw(); }); });
+        $('#ln-tgl', sh.el).addEventListener('change', function (e) { f.tanggal = e.target.value || todayISO(); });
+        $('#ln-save', sh.el).addEventListener('click', function () {
+          var errEl = $('#ln-err', sh.el);
+          if (!(f.nominal > 0)) { errEl.textContent = 'Isi nominal transfernya dulu'; return; }
+          if (f.kantong === f.kantong_tujuan) { errEl.textContent = 'Kantong asal dan tujuan tidak boleh sama'; return; }
+          enqueue('talangan.lunas', {
+            ids: items.map(function (t) { return t.id; }), nominal: f.nominal,
+            kantong: f.kantong, kantong_tujuan: f.kantong_tujuan, tanggal: f.tanggal
+          });
+          items.forEach(function (t) { delete pilih[t.id]; });
+          toast('Transfer dicatat: ' + rp(f.nominal));
+          sh.close(); if (onDone) onDone();
+        });
+      }
+      draw();
     });
   }
 
@@ -605,7 +789,7 @@
         if (kb && kb.tipe === 'Pribadi') msg = 'Dibayar pakai uang ' + kb.nama + '. ' + b.nama + ' tercatat berutang ke ' + kb.nama + ' sampai diganti.';
       } else if (f.tipe === 'Transfer') {
         var a = kmap[f.kantong], z = kmap[f.kantong_tujuan], ab = a ? bukuById(a.buku) : null, zb = z ? bukuById(z.buku) : null;
-        if (ab && zb && ab.tipe === 'Pribadi' && zb.tipe === 'Bersama') msg = 'Ini topup, bukan pengeluaran.';
+        if (ab && zb && ab.tipe === 'Pribadi' && zb.tipe === 'Bersama') msg = 'Setoran ke ' + zb.nama + '. Dihitung sebagai pengeluaran ' + ab.nama + ' dan pemasukan ' + zb.nama + '. Di tampilan semua buku tidak dihitung dua kali.';
         else if (ab && zb && ab.tipe === 'Bersama' && zb.tipe === 'Pribadi') msg = 'Penggantian ke ' + zb.nama + '. Bukan pengeluaran baru, jadi tidak dobel.';
       }
       el.textContent = msg; el.style.display = msg ? '' : 'none';
@@ -720,7 +904,7 @@
       todayEl.innerHTML = list.length ? '<div class="list">' + list.sort(function (a, b) { return String(b.dibuat || '9').localeCompare(String(a.dibuat || '9')); })
         .map(function (x) { return txRow(x, null); }).join('') + '</div>' : '<div class="list"><div class="empty">Hari ini masih bersih. Catat jajan pertamamu di atas.</div></div>';
       bindTxRows(todayEl);
-      var ue = $('#home-utang', el); ue.innerHTML = utangHtml(null); bindUtang(ue);
+      renderTalangan($('#home-utang', el), null);
       var waits = [];
       Object.keys(S.months).forEach(function (b) { (S.months[b].transaksi || []).forEach(function (x) { if (reimStatus(x) === 'wait' && canWrite(x.buku)) waits.push(x); }); });
       waits.sort(function (a, b) { return String(a.tanggal).localeCompare(String(b.tanggal)); });
@@ -732,7 +916,7 @@
   };
 
   // ---------- Ringkasan ----------
-  function donut(items, total) {
+  function donut(items, total, label) {
     var r = 15.915, off = 0, segs = '';
     var top = items.filter(function (x) { return x.total > 0; });
     if (top.length > 7) { var rest = top.slice(6).reduce(function (s, x) { return s + x.total; }, 0); top = top.slice(0, 6).concat([{ total: rest, warna: '#D5DCE6' }]); }
@@ -742,7 +926,7 @@
       off += p;
     });
     return '<div class="donut"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="' + r + '" fill="none" stroke="var(--surface-2)" stroke-width="4.2"/>' + segs + '</svg>' +
-      '<div class="center"><small>Pengeluaran</small><b class="num">' + compact(total) + '</b></div></div>';
+      '<div class="center"><small>' + esc(label || 'Pengeluaran') + '</small><b class="num">' + compact(total) + '</b></div></div>';
   }
   function compact(n) {
     var a = Math.abs(n);
@@ -788,13 +972,25 @@
       if (!m) { box.innerHTML = skeleton(5); return; }
       var d = db(), s = C.summarize(d, m.transaksi, m.budget, S.bukuView);
       var used = s.budgetTotal ? Math.min(1, s.pengeluaran / s.budgetTotal) : 0;
+      // setoran boleh disembunyikan dari grafik saja; rincian kategori dan angka total tetap utuh
+      var sembunyiSetoran = s.setoran > 0 && !showSetoran();
+      var donutItems = sembunyiSetoran
+        ? s.perKategori.filter(function (k) { return k.id !== C.KAT_SETORAN; }) : s.perKategori;
+      var donutTotal = sembunyiSetoran ? s.pengeluaran - s.setoran : s.pengeluaran;
+      var donutLabel = sembunyiSetoran ? 'Di luar setoran' : 'Pengeluaran';
+      var setoranNote = s.setoran > 0
+        ? '<button type="button" class="setoran-note" data-setoran>' +
+          (sembunyiSetoran
+            ? 'Setoran ke dompet bersama <b class="num">' + rp(s.setoran) + '</b> tidak ikut grafik, tapi tetap masuk total dan budget. <span class="lnk">Tampilkan</span>'
+            : 'Setoran ke dompet bersama <b class="num">' + rp(s.setoran) + '</b> ikut grafik. <span class="lnk">Sembunyikan</span>') +
+          '</button>' : '';
       var extra = [];
       if (s.transferMasuk) extra.push(['Transfer masuk', '+' + fmt(s.transferMasuk)]);
       if (s.transferKeluar) extra.push(['Transfer keluar', '−' + fmt(s.transferKeluar)]);
       if (s.reimburseMenunggu) extra.push(['Menunggu reimburse (sudah dihitung)', fmt(s.reimburseMenunggu)]);
       if (s.reimburse) extra.push(['Sudah terbayar (tidak dihitung)', fmt(s.reimburse)]);
-      box.innerHTML = readonlyNote() + utangHtml(S.bukuView) +
-        '<div class="card overview">' + donut(s.perKategori, s.pengeluaran) +
+      box.innerHTML = readonlyNote() + '<div id="rk-tal"></div>' +
+        '<div class="card overview">' + donut(donutItems, donutTotal, donutLabel) + setoranNote +
         '<div class="stats"><div class="stat"><small>Pemasukan</small><b class="num in">' + rp(s.pemasukan) + '</b></div>' +
         '<div class="stat"><small>Pengeluaran</small><b class="num">' + rp(s.pengeluaran) + '</b></div>' +
         '<div class="stat"><small>Selisih</small><b class="num' + (s.selisih < 0 ? ' over' : '') + '">' + rp(s.selisih) + '</b></div></div></div>' +
@@ -815,7 +1011,11 @@
           return '<button class="cat" data-cat="' + esc(k.id) + '" style="--c:' + k.warna + '"><span class="cat-top" style="margin:0"><span class="dot"></span><span class="name">' + esc(k.nama) + '</span><span class="val num" style="color:var(--in)">' + rp(k.total) + '</span></span></button>';
         }).join('') + '</div></section>' : '') +
         '<section class="section"><div class="section-h"><h2>Saldo kantong</h2><span class="aside">saat ini</span></div>' + walletsHtml(S.bukuView) + '</section>';
-      bindUtang(box);
+      renderTalangan($('#rk-tal', box), S.bukuView);
+      var self2 = this;
+      $$('[data-setoran]', box).forEach(function (b) {
+        b.addEventListener('click', function () { setSetoran(!showSetoran()); self2.update(el); });
+      });
       $$('[data-cat]', box).forEach(function (b) { b.addEventListener('click', function () { goSub({ type: 'cat', id: b.getAttribute('data-cat') }); }); });
       $$('[data-kantong]', box).forEach(function (b) { b.addEventListener('click', function () { openKantongSheet(C.byId(db().Kantong)[b.getAttribute('data-kantong')]); }); });
     }
@@ -1123,8 +1323,8 @@
       ['cash-istri', 'Cash', 'Cash', 'istri', 200000, 0], ['rek-istri', 'Rekening', 'Debit', 'istri', 2500000, 0], ['kas-rt', 'Dompet RT', 'Debit', 'rt', 600000, 0]]
       .map(function (k, i) { return { id: k[0], nama: k[1], jenis: k[2], buku: k[3], saldo_awal: k[4], per_tanggal: per, limit: k[5], aktif: true, urutan: i + 1 }; });
     var bm = thisMonth(), bud = [];
-    [['riki', { 'makan-jajan': 600000, 'ojol-taxi': 300000, 'kendaraan-pribadi': 200000, 'paket-data': 150000, 'subscription': 250000, 'work': 400000 }],
-      ['istri', { 'makan-jajan': 500000, 'personal-care': 300000, 'kesehatan': 200000 }],
+    [['riki', { 'makan-jajan': 600000, 'ojol-taxi': 300000, 'kendaraan-pribadi': 200000, 'paket-data': 150000, 'subscription': 250000, 'work': 400000, 'setoran-rt': 5300000 }],
+      ['istri', { 'makan-jajan': 500000, 'personal-care': 300000, 'kesehatan': 200000, 'setoran-rt': 1000000 }],
       ['rt', { 'belanja-dapur': 3000000, 'listrik-air': 800000, 'kebutuhan-rumah': 700000 }]].forEach(function (x) {
       Object.keys(x[1]).forEach(function (k) { bud.push({ id: bm + '|' + x[0] + '|' + k, bulan: bm, buku: x[0], kategori: k, nominal: x[1][k] }); });
     });
@@ -1144,9 +1344,12 @@
       if (rnd() < 0.4) { var q = Math.floor(rnd() * 2); add(dday, 'Pengeluaran', Math.round((10 + rnd() * 50)) * 1000, 'istri', ['makan-jajan', 'personal-care'][q], 'rek-istri', ['jajan', 'skincare'][q], 'istri'); }
     }
     add(Math.min(today, 5), 'Pengeluaran', 420000, 'rt', 'listrik-air', 'kas-rt', 'token listrik', 'istri');
-    // talangan: belanja RT dibayar pakai uang pribadi (muncul sebagai utang Rumah Tangga)
-    add(Math.min(today, 4), 'Pengeluaran', 85000, 'rt', 'kebutuhan-rumah', 'bca', 'galon & sabun (talangan)', 'riki');
-    add(Math.min(today, 5), 'Pengeluaran', 60000, 'rt', 'belanja-dapur', 'rek-istri', 'sayur pasar (talangan)', 'istri');
+    // talangan: belanja RT dibayar pakai uang pribadi (muncul di daftar talangan, per transaksi)
+    add(Math.min(today, 4), 'Pengeluaran', 85000, 'rt', 'kebutuhan-rumah', 'bca', 'galon & sabun', 'riki');
+    add(Math.min(today, 6), 'Pengeluaran', 132500, 'rt', 'belanja-dapur', 'bca', 'superindo mingguan', 'riki');
+    add(Math.min(today, 8), 'Pengeluaran', 47000, 'rt', 'belanja-dapur', 'cash-riki', 'buah tukang sayur', 'riki');
+    add(Math.min(today, 9), 'Pengeluaran', 215000, 'rt', 'kebutuhan-rumah', 'bca', 'lampu & colokan', 'riki');
+    add(Math.min(today, 5), 'Pengeluaran', 60000, 'rt', 'belanja-dapur', 'rek-istri', 'sayur pasar', 'istri');
     // reimburse kantor: satu menunggu, satu sudah terbayar
     add(Math.min(today, 3), 'Pengeluaran', 828000, 'riki', 'work', 'bca', 'hotel dinas Purwokerto', 'riki');
     tx[tx.length - 1].reimburse = true;
@@ -1166,13 +1369,13 @@
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') sync(); });
   setInterval(function () { if (document.visibilityState === 'visible' && (S.outbox.length || !S.lastSync || Date.now() - S.lastSync > 120000)) sync(); }, 30000);
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
-  // data demo versi lama (tanpa fitur terbayar/utang) dibuang sekali supaya tidak bentrok
-  if (LS.get('k_ver', null) !== 'v3') {
+  // data demo versi lama (sebelum daftar talangan & setoran) dibuang sekali supaya tidak bentrok
+  if (LS.get('k_ver', null) !== 'v4') {
     if (S.conn && S.conn.mode === 'demo') {
       ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo'].forEach(LS.del);
       S.conn = null; S.boot = null; S.months = {}; S.outbox = [];
     }
-    LS.set('k_ver', 'v3');
+    LS.set('k_ver', 'v4');
   }
   if (!S.conn && window.KANTONG_PREVIEW) S.conn = { mode: 'demo' };   // file preview
   renderShell();
