@@ -1031,16 +1031,36 @@
       var m = ensureMonth(S.bulan), box = $('#cd', el);
       if (!m) { box.innerHTML = skeleton(4); return; }
       var d = db();
-      var list = m.transaksi.filter(function (t) { return t.kategori === id && (S.bukuView === 'all' || t.buku === S.bukuView); });
-      var counted = list.filter(function (t) { return t.tipe === 'Pengeluaran' ? isCounted(t) : t.tipe === 'Pemasukan'; });
-      var total = counted.reduce(function (s, t) { return s + t.nominal; }, 0);
+      var semua = m.transaksi.filter(function (t) { return t.kategori === id && (S.bukuView === 'all' || t.buku === S.bukuView); });
+      var dihitung = function (t) { return t.tipe === 'Pengeluaran' ? isCounted(t) : t.tipe === 'Pemasukan'; };
+      // filter per dompet: hanya dompet yang punya transaksi di kategori ini bulan ini
+      var perDompet = {}, urutDompet = [];
+      semua.forEach(function (t) {
+        if (!perDompet.hasOwnProperty(t.kantong)) { perDompet[t.kantong] = 0; urutDompet.push(t.kantong); }
+        if (dihitung(t)) perDompet[t.kantong] += t.nominal;
+      });
+      urutDompet.sort(function (a, b) { return perDompet[b] - perDompet[a]; });
+      var fk = S.sub.kantong && perDompet.hasOwnProperty(S.sub.kantong) ? S.sub.kantong : '';
+      var list = fk ? semua.filter(function (t) { return t.kantong === fk; }) : semua;
+      var total = list.filter(dihitung).reduce(function (s, t) { return s + t.nominal; }, 0);
+      var totalSemua = semua.filter(dihitung).reduce(function (s, t) { return s + t.nominal; }, 0);
       var bud = 0;
-      Object.keys(m.budget || {}).forEach(function (b) { if (S.bukuView === 'all' || b === S.bukuView) bud += (m.budget[b].items || {})[id] || 0; });
+      // budget berlaku per kategori, bukan per dompet: meter hanya tampil tanpa filter
+      if (!fk) Object.keys(m.budget || {}).forEach(function (b) { if (S.bukuView === 'all' || b === S.bukuView) bud += (m.budget[b].items || {})[id] || 0; });
       var over = bud && total > bud;
-      box.innerHTML = '<div class="card"><div class="budget-head"><span class="muted">' + (k.tipe === 'Pemasukan' ? 'Total masuk' : 'Total keluar') + '</span><span class="big num">' + rp(total) + '</span></div>' +
+      var chips = urutDompet.length > 1 ? '<div class="chips" style="margin-bottom:12px" role="group" aria-label="Filter dompet">' +
+        '<button type="button" class="chip" data-fk="" aria-pressed="' + !fk + '">Semua dompet</button>' +
+        urutDompet.map(function (kid) {
+          return '<button type="button" class="chip" data-fk="' + esc(kid) + '" aria-pressed="' + (fk === kid) + '">' + esc(kantongLabel(kid)) + ' <span class="num" style="opacity:.7">' + compact(perDompet[kid]) + '</span></button>';
+        }).join('') + '</div>' : '';
+      box.innerHTML = chips + '<div class="card"><div class="budget-head"><span class="muted">' + (k.tipe === 'Pemasukan' ? 'Total masuk' : 'Total keluar') + '</span><span class="big num">' + rp(total) + '</span></div>' +
         (bud ? '<div class="meter' + (over ? ' over' : '') + '" style="--c:' + k.warna + '"><i style="width:' + (Math.min(1, total / bud) * 100).toFixed(1) + '%"></i></div>' +
           '<div class="budget-foot"><span>Budget ' + rp(bud) + '</span><span style="' + (over ? 'color:var(--over)' : '') + '">' + (over ? 'Lewat ' + rp(total - bud) : 'Sisa ' + rp(bud - total)) + '</span></div>' : '') +
-        '<div class="budget-foot"><span>' + list.length + ' transaksi</span><span></span></div></div>' + txGroups(list, S.bukuView);
+        '<div class="budget-foot"><span>' + list.length + ' transaksi' + (fk ? ' di ' + esc(kantongLabel(fk)) : '') + '</span><span>' +
+          (fk && totalSemua ? Math.round(total / totalSemua * 100) + '% dari ' + rp(totalSemua) : '') + '</span></div></div>' + txGroups(list, S.bukuView);
+      $$('[data-fk]', box).forEach(function (b) {
+        b.addEventListener('click', function () { S.sub.kantong = b.getAttribute('data-fk'); CatDetail.render(el); });
+      });
       bindTxRows(box);
     }
   };
