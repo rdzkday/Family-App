@@ -1,0 +1,7 @@
+# Konfigurasi Supabase CLI untuk project Kantong.
+# project_id diisi otomatis oleh `supabase link`. Yang penting: fungsi kantong tanpa verifikasi JWT,
+# karena autentikasinya memakai kode akses di body request (lihat functions/kantong/index.ts).
+project_id = "kantong"
+
+[functions.kantong]
+verify_jwt = false

@@ -28,9 +28,20 @@ function mkSheet(name, head, rows) {
 }
 const ctx = {
   console,
-  SpreadsheetApp: { getActive: () => ({ getSheetByName: n => sheets[n], getId: () => 'SHEET', setSpreadsheetTimeZone() {} }) },
+  SpreadsheetApp: { getActive: () => ({ getSheetByName: n => sheets[n], getId: () => 'SHEET', setSpreadsheetTimeZone() {},
+    insertSheet: (n) => { mkSheet(n, ctx.KantongCore.SCHEMA[n], []); return sheets[n]; } }) },
   PropertiesService: { getScriptProperties: () => ({ getProperties: () => ({ ...props }), getProperty: k => props[k], setProperty: (k, v) => { props[k] = v; } }) },
   LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
+  CalendarApp: (() => {   // mock kalender: cukup untuk upsert/remove event to-do
+    const events = {}; let n = 0;
+    const mkEv = (id) => ({ getId: () => id, setTitle() { return this; }, setTime() { return this; }, setAllDayDate() { return this; },
+      setDescription() { return this; }, setColor() { return this; }, deleteEvent() { delete events[id]; } });
+    const cal = { getId: () => 'cal-1', getName: () => 'Rumah Kita', getEventById: (id) => events[id] || null,
+      createEvent: () => { const id = 'ev-' + (++n); return (events[id] = mkEv(id)); },
+      createAllDayEvent: () => { const id = 'ev-' + (++n); return (events[id] = mkEv(id)); } };
+    return { EventColor: { BLUE: 1, PALE_RED: 2, GREEN: 3, ORANGE: 4, YELLOW: 5, GRAY: 6 },
+      getCalendarById: () => cal, getCalendarsByName: () => [cal], createCalendar: () => cal, events };
+  })(),
   ContentService: { MimeType: { JSON: 'json' }, createTextOutput: s => ({ s, setMimeType() { return this; } }) },
   Utilities: {
     formatDate(d, tz, f) {
@@ -52,6 +63,7 @@ const S = ctx.KantongCore.SCHEMA;
 mkSheet('Buku', S.Buku, seed.buku); mkSheet('Users', S.Users, seed.users);
 mkSheet('Kategori', S.Kategori, seed.kategori); mkSheet('Kantong', S.Kantong, seed.kantong);
 mkSheet('Budget', S.Budget, seed.budget); mkSheet('Transaksi', S.Transaksi, seed.transaksi);
+mkSheet('Todo', S.Todo, []);
 
 const R = props.token_riki, I = props.token_istri;
 function call(token, action, payload) {

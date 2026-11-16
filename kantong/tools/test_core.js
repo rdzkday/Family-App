@@ -83,8 +83,16 @@ function utangAntara(store, bersama, pribadi) {
   return f ? f.jumlah : 0;
 }
 
-// ---------------------------------------------------------------- versi
-eq('versi core naik ke 1.2.0', C.VERSION, '1.2.0');
+// ---------------------------------------------------------------- versi & salinan core
+eq('versi core naik ke 1.3.0', C.VERSION, '1.3.0');
+(function () {
+  // core.mjs (Supabase) dan Core.gs (Apps Script) harus persis hasil build_core.js
+  var fs = require('fs'), build = require(path.join(__dirname, 'build_core.js'));
+  Object.keys(build.targets).forEach(function (f) {
+    var ada = fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');
+    ok('salinan core sinkron: ' + f + ' (jalankan node kantong/tools/build_core.js)', ada === build.targets[f]);
+  });
+})();
 
 // ---------------------------------------------------------------- arah transfer
 (function () {
@@ -355,6 +363,169 @@ eq('versi core naik ke 1.2.0', C.VERSION, '1.2.0');
     tx({ id: 'n2', tipe: 'Pengeluaran', nominal: 50000, buku: 'riki', kategori: 'makan', kantong: 'bca' })
   ]);
   eq('kategori hitung=false tidak masuk total', ringkas(store, 'riki').pengeluaran, 50000);
+})();
+
+// ================================================================ todo.*
+function todoStore() { var st = setup([]); return st; }
+function todoCall(store, uid, action, payload, now) { return C.handle(store, usr(store, uid), action, payload, now || NOW); }
+function todoById(store, id) { return C.byId(store.all('Todo'))[id]; }
+
+// ---------------------------------------------------------------- todo: tanpa waktu tidak membuat event
+(function () {
+  var st = todoStore();
+  var r = todoCall(st, 'u-riki', 'todo.save', { id: 'td1', judul: '  Beli   galon ' });
+  eq('todo.judul dirapikan', r.todo.judul, 'Beli galon');
+  eq('todo.pemilik default diri sendiri', r.todo.pemilik, 'u-riki');
+  eq('todo.tanpa waktu: tidak ada event', r.todo.gcal_event_id, '');
+  eq('todo.tanpa waktu: status kosong', r.todo.gcal_status, '');
+  eq('todo.tanpa waktu: kalender tidak disentuh', Object.keys(st.calendar.events).length, 0);
+  eq('todo.durasi default 30', r.todo.durasi, 30);
+  eq('todo.oleh tercatat', r.todo.oleh, 'u-riki');
+})();
+
+// ---------------------------------------------------------------- todo: dengan waktu masuk kalender
+(function () {
+  var st = todoStore();
+  var r = todoCall(st, 'u-febie', 'todo.save', { id: 'td2', judul: 'Jemput paket', tanggal: '2026-11-18', jam: '14:00', durasi: 45 });
+  eq('todo.event dibuat', r.todo.gcal_status, 'ok');
+  ok('todo.id event tersimpan', !!r.todo.gcal_event_id);
+  var ev = st.calendar.events[r.todo.gcal_event_id];
+  eq('todo.judul event pakai prefix inisial', ev.judul, '[F] Jemput paket');
+  eq('todo.event mulai', ev.mulai, '2026-11-18T14:00');
+  eq('todo.event akhir ikut durasi', ev.akhir, '2026-11-18T14:45');
+  eq('todo.event bukan seharian', ev.seharian, false);
+  eq('todo.warna per pemilik (user kedua)', ev.warna, 1);
+  var b = todoCall(st, 'u-riki', 'todo.save', { id: 'td3', judul: 'Bayar listrik', pemilik: 'bersama', tanggal: '2026-11-20' });
+  var evb = st.calendar.events[b.todo.gcal_event_id];
+  eq('todo.bersama pakai prefix [B]', evb.judul, '[B] Bayar listrik');
+  eq('todo.tanggal tanpa jam = seharian', evb.seharian, true);
+  eq('todo.warna bersama', evb.warna, 'bersama');
+  eq('todo.jam kosong tidak menghasilkan mulai', evb.mulai, undefined);
+})();
+
+// ---------------------------------------------------------------- todo: ubah waktu, hapus waktu, hapus to-do
+(function () {
+  var st = todoStore();
+  var r = todoCall(st, 'u-riki', 'todo.save', { id: 'td4', judul: 'Servis AC', tanggal: '2026-11-18', jam: '09:00' });
+  var evId = r.todo.gcal_event_id;
+  r = todoCall(st, 'u-riki', 'todo.save', { id: 'td4', judul: 'Servis AC', tanggal: '2026-11-19', jam: '10:30', durasi: 60 });
+  eq('todo.ubah waktu: event yang sama dipakai', r.todo.gcal_event_id, evId);
+  eq('todo.ubah waktu: event pindah', st.calendar.events[evId].mulai, '2026-11-19T10:30');
+  eq('todo.ubah waktu: hanya 1 event', Object.keys(st.calendar.events).length, 1);
+  r = todoCall(st, 'u-riki', 'todo.save', { id: 'td4', judul: 'Servis AC', tanggal: '' });
+  eq('todo.hapus waktu: event dihapus', Object.keys(st.calendar.events).length, 0);
+  eq('todo.hapus waktu: id event dikosongkan', r.todo.gcal_event_id, '');
+  eq('todo.hapus waktu: to-do tetap ada', todoById(st, 'td4').dihapus, '');
+  r = todoCall(st, 'u-riki', 'todo.save', { id: 'td4', judul: 'Servis AC', tanggal: '2026-11-21', jam: '08:00' });
+  ok('todo.pasang waktu lagi: event baru', !!r.todo.gcal_event_id && Object.keys(st.calendar.events).length === 1);
+  todoCall(st, 'u-riki', 'todo.delete', { id: 'td4' });
+  eq('todo.hapus to-do: event ikut terhapus', Object.keys(st.calendar.events).length, 0);
+  ok('todo.hapus to-do: soft delete', !!todoById(st, 'td4').dihapus);
+  ok('todo.hapus kedua kali idempoten', !!todoCall(st, 'u-riki', 'todo.delete', { id: 'td4' }).id);
+  eq('todo.list tidak memuat yang dihapus', todoCall(st, 'u-riki', 'todo.list', {}).todos.length, 0);
+  lempar('todo.simpan ulang yang sudah dihapus ditolak', function () { todoCall(st, 'u-riki', 'todo.save', { id: 'td4', judul: 'X' }); });
+})();
+
+// ---------------------------------------------------------------- todo: selesai
+(function () {
+  var st = todoStore();
+  todoCall(st, 'u-riki', 'todo.save', { id: 'td5', judul: 'Bayar listrik', pemilik: 'bersama', tanggal: '2026-11-18', jam: '19:00' });
+  var r = todoCall(st, 'u-febie', 'todo.done', { id: 'td5', selesai: true });
+  eq('todo.selesai tercatat', r.todo.selesai, true);
+  eq('todo.siapa yang menyelesaikan', r.todo.selesai_oleh, 'u-febie');
+  var ev = st.calendar.events[r.todo.gcal_event_id];
+  eq('todo.selesai: event dibiarkan, judul diberi centang', ev.judul, '[B] ✓ Bayar listrik');
+  eq('todo.selesai: event tidak dihapus', Object.keys(st.calendar.events).length, 1);
+  r = todoCall(st, 'u-riki', 'todo.done', { id: 'td5', selesai: false });
+  eq('todo.batal selesai: centang hilang', st.calendar.events[r.todo.gcal_event_id].judul, '[B] Bayar listrik');
+  eq('todo.batal selesai: selesai_oleh kosong', r.todo.selesai_oleh, '');
+})();
+
+// ---------------------------------------------------------------- todo: izin
+(function () {
+  var st = todoStore();
+  todoCall(st, 'u-riki', 'todo.save', { id: 'tr', judul: 'Punya Riki' });
+  todoCall(st, 'u-febie', 'todo.save', { id: 'tf', judul: 'Punya Febie', tanggal: '2026-11-18' });
+  todoCall(st, 'u-riki', 'todo.save', { id: 'tb', judul: 'Bersama', pemilik: 'bersama' });
+  var semua = todoCall(st, 'u-febie', 'todo.list', {}).todos;
+  eq('todo.semua orang bisa lihat semua', semua.length, 3);
+  var untukku = semua.filter(function (t) { return C.canWriteTodo(usr(st, 'u-febie'), t); }).map(function (t) { return t.id; }).sort();
+  eq('todo.filter Untukku Febie = milik Febie + bersama', untukku.join(','), 'tb,tf');
+  lempar('todo.Febie tidak bisa ubah milik Riki', function () { todoCall(st, 'u-febie', 'todo.save', { id: 'tr', judul: 'Diubah' }); });
+  lempar('todo.Febie tidak bisa centang milik Riki', function () { todoCall(st, 'u-febie', 'todo.done', { id: 'tr', selesai: true }); });
+  lempar('todo.Febie tidak bisa hapus milik Riki', function () { todoCall(st, 'u-febie', 'todo.delete', { id: 'tr' }); });
+  lempar('todo.Riki tidak bisa ubah milik Febie', function () { todoCall(st, 'u-riki', 'todo.save', { id: 'tf', judul: 'Diubah' }); });
+  eq('todo.milik Riki tidak berubah', todoById(st, 'tr').judul, 'Punya Riki');
+  ok('todo.Febie bisa ubah bersama', !!todoCall(st, 'u-febie', 'todo.save', { id: 'tb', judul: 'Bersama diubah' }).todo);
+  ok('todo.Riki bisa buat to-do untuk Febie', !!todoCall(st, 'u-riki', 'todo.save', { id: 'tf2', judul: 'Untuk Febie', pemilik: 'u-febie' }).todo);
+  lempar('todo.setelah dibuat untuk Febie, Riki tidak bisa ubah lagi', function () { todoCall(st, 'u-riki', 'todo.save', { id: 'tf2', judul: 'X' }); });
+  lempar('todo.pemilik tidak dikenal ditolak', function () { todoCall(st, 'u-riki', 'todo.save', { id: 'tx', judul: 'X', pemilik: 'orang-lain' }); });
+})();
+
+// ---------------------------------------------------------------- todo: validasi
+(function () {
+  var st = todoStore();
+  lempar('todo.judul kosong ditolak', function () { todoCall(st, 'u-riki', 'todo.save', { id: 'v1', judul: '   ' }); });
+  lempar('todo.tanggal salah ditolak', function () { todoCall(st, 'u-riki', 'todo.save', { id: 'v1', judul: 'X', tanggal: '18-11-2026' }); });
+  lempar('todo.jam salah ditolak', function () { todoCall(st, 'u-riki', 'todo.save', { id: 'v1', judul: 'X', tanggal: '2026-11-18', jam: '25:00' }); });
+  lempar('todo.durasi terlalu kecil ditolak', function () { todoCall(st, 'u-riki', 'todo.save', { id: 'v1', judul: 'X', tanggal: '2026-11-18', jam: '10:00', durasi: 1 }); });
+  lempar('todo.id kosong ditolak', function () { todoCall(st, 'u-riki', 'todo.save', { judul: 'X' }); });
+  var r = todoCall(st, 'u-riki', 'todo.save', { id: 'v2', judul: 'X', jam: '10:00' });
+  eq('todo.jam tanpa tanggal diabaikan', r.todo.jam, '');
+  var panjang = new Array(200).join('a');
+  eq('todo.judul dipotong 120', todoCall(st, 'u-riki', 'todo.save', { id: 'v3', judul: panjang }).todo.judul.length, 120);
+  eq('todo.event lewat tengah malam', C.todoEventSpec({ id: 'x', judul: 'X', pemilik: 'u-riki', tanggal: '2026-12-31', jam: '23:50', durasi: 30 }, dbOf(st)).akhir, '2027-01-01T00:20');
+})();
+
+// ---------------------------------------------------------------- todo: kalender gagal -> to-do tetap tersimpan, bisa coba lagi
+(function () {
+  var st = todoStore();
+  st.calendar.gagal = 'Kalender tidak bisa diakses';
+  var r = todoCall(st, 'u-riki', 'todo.save', { id: 'g1', judul: 'Dokter gigi', tanggal: '2026-11-18', jam: '15:00' });
+  eq('todo.gagal: to-do tetap tersimpan', todoById(st, 'g1').judul, 'Dokter gigi');
+  eq('todo.gagal: status gagal', r.todo.gcal_status, 'gagal');
+  eq('todo.gagal: pesan tersimpan', r.todo.gcal_error, 'Kalender tidak bisa diakses');
+  eq('todo.gagal: tidak ada event', r.todo.gcal_event_id, '');
+  st.calendar.gagal = '';
+  r = todoCall(st, 'u-riki', 'todo.sync', { id: 'g1' });
+  eq('todo.coba lagi: berhasil', r.todo.gcal_status, 'ok');
+  ok('todo.coba lagi: event dibuat', !!st.calendar.events[r.todo.gcal_event_id]);
+  lempar('todo.coba lagi milik orang lain ditolak', function () { todoCall(st, 'u-febie', 'todo.sync', { id: 'g1' }); });
+  // tanpa adapter kalender sama sekali (server belum setup)
+  var st2 = todoStore(); st2.calendar = null;
+  var r2 = todoCall(st2, 'u-riki', 'todo.save', { id: 'g2', judul: 'X', tanggal: '2026-11-18' });
+  eq('todo.tanpa kalender: status gagal jelas', r2.todo.gcal_status, 'gagal');
+  eq('todo.tanpa kalender: to-do tanpa waktu tetap bersih', todoCall(st2, 'u-riki', 'todo.save', { id: 'g3', judul: 'Y' }).todo.gcal_status, '');
+})();
+
+// ---------------------------------------------------------------- todo: request ulang (offline/retry) tidak bikin event dobel
+(function () {
+  var st = todoStore();
+  var p = { id: 'd1', judul: 'Arisan', tanggal: '2026-11-22', jam: '16:00', durasi: 30 };
+  var a = todoCall(st, 'u-riki', 'todo.save', p);
+  var b = todoCall(st, 'u-riki', 'todo.save', p);
+  eq('todo.ulang: event sama', b.todo.gcal_event_id, a.todo.gcal_event_id);
+  eq('todo.ulang: tetap 1 event', Object.keys(st.calendar.events).length, 1);
+  var r = todoCall(st, 'u-riki', 'batch', { ops: [
+    { opId: 'a', action: 'todo.save', payload: p },
+    { opId: 'b', action: 'todo.done', payload: { id: 'd1', selesai: true } },
+    { opId: 'c', action: 'todo.list' }
+  ] });
+  eq('todo.batch semua ok', r.results.map(function (x) { return x.ok; }).join(','), 'true,true,true');
+  eq('todo.batch list memuat hasil terbaru', r.results[2].data.todos[0].selesai, true);
+  eq('todo.batch tetap 1 event', Object.keys(st.calendar.events).length, 1);
+})();
+
+// ---------------------------------------------------------------- todo: list membuang yang selesai lama
+(function () {
+  var st = todoStore();
+  todoCall(st, 'u-riki', 'todo.save', { id: 'l1', judul: 'Lama' }, '2026-09-01T10:00:00+07:00');
+  todoCall(st, 'u-riki', 'todo.done', { id: 'l1', selesai: true }, '2026-09-02T10:00:00+07:00');
+  todoCall(st, 'u-riki', 'todo.save', { id: 'l2', judul: 'Baru selesai' });
+  todoCall(st, 'u-riki', 'todo.done', { id: 'l2', selesai: true });
+  todoCall(st, 'u-riki', 'todo.save', { id: 'l3', judul: 'Belum selesai' }, '2026-09-01T10:00:00+07:00');
+  var ids = todoCall(st, 'u-riki', 'todo.list', {}).todos.map(function (t) { return t.id; }).sort().join(',');
+  eq('todo.list: selesai lama disembunyikan, yang belum selesai tetap', ids, 'l2,l3');
 })();
 
 console.log('\n' + lulus + ' cek lulus, ' + gagal + ' gagal.');
