@@ -59,7 +59,10 @@
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="6"/><path d="M8 12.5l3 3 5.5-6.5"/></svg>',
     cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="4"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
     calx: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="4"/><path d="M3 10h18M8 3v4M16 3v4M9.5 13.5l5 5M14.5 13.5l-5 5"/></svg>',
-    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    agenda: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><circle cx="8.5" cy="14.5" r="1" fill="currentColor"/><circle cx="12" cy="14.5" r="1" fill="currentColor"/><circle cx="15.5" cy="14.5" r="1" fill="currentColor"/></svg>',
+    star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
   };
 
   // ================= tema =================
@@ -84,8 +87,12 @@
     months: LS.get('k_months', {}),
     outbox: LS.get('k_outbox', []),
     todos: LS.get('k_todos', null),        // null = belum pernah dimuat
+    agenda: LS.get('k_agenda', {}),        // { 'YYYY-MM': { todos, momen } } dari agenda.month
+    momenCache: LS.get('k_momen', {}),     // hasil simpan/hapus momen terakhir (sampai bulan itu dimuat ulang)
+    momenPending: {},                      // perubahan momen yang belum terkirim (dibangun ulang dari outbox)
     prefs: LS.get('k_prefs', { lastKantong: {}, demoUser: 'riki' }),
-    tab: 'home', sub: null, bukuView: null, bulan: thisMonth(),
+    tab: /^#agenda/.test(location.hash) ? 'agenda' : 'home', sub: null, bukuView: null, bulan: thisMonth(),
+    agBulan: thisMonth(), agTgl: todayISO(),
     syncing: false, again: false, lastError: null, catTab: 'Pengeluaran'
   };
   function persist() {
@@ -93,10 +100,13 @@
     var keys = Object.keys(S.months).sort().reverse();
     var keep = {}; keys.slice(0, 8).forEach(function (k) { keep[k] = S.months[k]; });
     S.months = keep; LS.set('k_months', keep);
+    var ak = Object.keys(S.agenda).sort().reverse(), keepA = {};
+    ak.slice(0, 6).forEach(function (k) { keepA[k] = S.agenda[k]; });
+    S.agenda = keepA; LS.set('k_agenda', keepA); LS.set('k_momen', S.momenCache);
   }
   function db() {
     var b = S.boot || {};
-    return { Buku: b.buku || [], Users: b.users || [], Kategori: b.kategori || [], Kantong: b.kantong || [], Budget: [], Transaksi: [], Todo: S.todos || [] };
+    return { Buku: b.buku || [], Users: b.users || [], Kategori: b.kategori || [], Kantong: b.kantong || [], Budget: [], Transaksi: [], Todo: S.todos || [], Momen: [] };
   }
   function me() { return S.boot ? S.boot.user : null; }
   function bukuById(id) { return C.byId(db().Buku)[id]; }
@@ -108,19 +118,22 @@
   }
   function userName(id) { var u = db().Users.find(function (x) { return x.id === id; }); return u ? u.nama : id; }
   function canWrite(bukuId) { return C.canWrite(db(), me(), bukuId); }
+  // fitur yang didukung backend (bootstrap.fitur). Backend lama tanpa daftar ini = hanya keuangan + to-do.
+  function fitur(f) { var x = (S.boot && S.boot.fitur) || []; return x.indexOf(f) >= 0; }
 
   // ================= API =================
   function demoTables() {
     var saved = LS.get('k_demo', null);
     if (saved) return saved;
     var seed = window.KANTONG_DEMO_SEED || makeDemoSeed();
-    return { Buku: seed.buku, Users: seed.users, Kategori: seed.kategori, Kantong: seed.kantong, Budget: seed.budget, Transaksi: seed.transaksi, Todo: seed.todo || [] };
+    return { Buku: seed.buku, Users: seed.users, Kategori: seed.kategori, Kantong: seed.kantong, Budget: seed.budget, Transaksi: seed.transaksi, Todo: seed.todo || [], Momen: seed.momen || [] };
   }
   var demoStore = null;
   function demoRpc(action, payload) {
     if (!demoStore) demoStore = C.memoryStore(demoTables());
     var users = demoStore.all('Users');
-    var u = users.find(function (x) { return x.id === S.prefs.demoUser; }) || users[0];
+    var du = S.prefs.demoUser === 'istri' ? 'febie' : S.prefs.demoUser;
+    var u = users.find(function (x) { return x.id === du; }) || users[0];
     return new Promise(function (res, rej) {
       setTimeout(function () {
         try {
@@ -214,9 +227,23 @@
         oleh: me() ? me().id : '', dibuat: op.at }, exT || {}, op.payload, { diubah: op.at, dihapus: '', _pending: true }));
     } else if (op.action === 'todo.done') {
       var tdn = findTodo(op.payload.id);
-      if (tdn) { tdn.selesai = !!op.payload.selesai; tdn.selesai_oleh = tdn.selesai && me() ? me().id : ''; tdn.diubah = op.at; tdn._pending = true; }
+      if (tdn) {
+        if (!todos().some(function (x) { return x.id === tdn.id; })) upsertTodoLocal(tdn);   // to-do lama dari Agenda
+        tdn.selesai = !!op.payload.selesai; tdn.selesai_oleh = tdn.selesai && me() ? me().id : ''; tdn.diubah = op.at; tdn._pending = true;
+        tdn.selesai_at = tdn.selesai ? (tdn.selesai_at || op.at) : '';
+      }
     } else if (op.action === 'todo.delete') {
       S.todos = todos().filter(function (t) { return t.id !== op.payload.id; });
+      Object.keys(S.agenda).forEach(function (b) { var a = S.agenda[b]; a.todos = (a.todos || []).filter(function (t) { return t.id !== op.payload.id; }); });
+    } else if (op.action === 'momen.save') {
+      var exM = findMomen(op.payload.id);
+      S.momenPending[op.payload.id] = Object.assign({ gcal_event_id: '', gcal_status: '', gcal_error: '', oleh: me() ? me().id : '', dibuat: op.at },
+        exM || {}, op.payload, { diubah: op.at, dihapus: '', _pending: true });
+    } else if (op.action === 'momen.delete') {
+      S.momenPending[op.payload.id] = { id: op.payload.id, dihapus: op.at, diubah: op.at };
+    } else if (op.action === 'momen.sync') {
+      var mSy = findMomen(op.payload.id);
+      if (mSy) S.momenPending[mSy.id] = Object.assign({}, mSy, { _pending: true });
     } else if (op.action === 'todo.sync') {
       var tsy = findTodo(op.payload.id);
       if (tsy) tsy._pending = true;
@@ -230,21 +257,30 @@
     var want = {}; want[thisMonth()] = 1; want[S.bulan] = 1;
     (extraMonths || []).concat(S.wantMonths || []).forEach(function (b) { want[b] = 1; });
     S.wantMonths = [];
+    var agWant = {};
+    if (fitur('agenda') || (S.conn.mode === 'demo')) { agWant[thisMonth()] = 1; if (S.tab === 'agenda') agWant[S.agBulan] = 1; }
     var batch = ops.map(function (o) { return { opId: o.opId, action: o.action, payload: o.payload }; })
       .concat([{ opId: '_boot', action: 'bootstrap' }, { opId: '_todo', action: 'todo.list' }])
-      .concat(Object.keys(want).map(function (b) { return { opId: '_m_' + b, action: 'month', payload: { bulan: b } }; }));
+      .concat(Object.keys(want).map(function (b) { return { opId: '_m_' + b, action: 'month', payload: { bulan: b } }; }))
+      .concat(Object.keys(agWant).map(function (b) { return { opId: '_ag_' + b, action: 'agenda.month', payload: { bulan: b } }; }));
+    var opById = {}; ops.forEach(function (o) { opById[o.opId] = o; });
     return rpc('batch', { ops: batch }).then(function (d) {
       var sent = {}; ops.forEach(function (o) { sent[o.opId] = 1; });
       d.results.forEach(function (r) {
         if (r.opId === '_boot') { if (r.ok) S.boot = r.data; }
         else if (r.opId === '_todo') { if (r.ok) S.todos = r.data.todos || []; }
         else if (String(r.opId).indexOf('_m_') === 0) { if (r.ok) S.months[r.data.bulan] = r.data; }
+        else if (String(r.opId).indexOf('_ag_') === 0) { if (r.ok) S.agenda[r.data.bulan] = r.data; }
         else if (!r.ok) toast('Tidak tersimpan: ' + r.error, true);
+        else if (r.data && r.data.momen && !Array.isArray(r.data.momen)) S.momenCache[r.data.momen.id] = r.data.momen;
+        else if (opById[r.opId] && opById[r.opId].action === 'momen.delete') S.momenCache[r.data.id] = { id: r.data.id, dihapus: nowIso(), diubah: nowIso() };
       });
       S.outbox = S.outbox.filter(function (o) { return !sent[o.opId]; });
+      S.momenPending = {};
       S.outbox.forEach(applyLocal);           // operasi yang masuk selama request
       S.lastError = null; S.lastSync = Date.now();
       persist();
+      pindahkanTodoBrowser();
     }).catch(function (e) {
       S.lastError = e.message;
       if (e.code === 'AUTH') { toast('Kode akses tidak berlaku. Hubungkan ulang.', true); }
@@ -862,7 +898,13 @@
   // ================= to-do rumah tangga =================
   // Sumber kebenaran: S.todos (dari server, aksi todo.list). Perubahan lewat outbox, sama seperti transaksi.
   function todos() { return S.todos || []; }
-  function findTodo(id) { return todos().filter(function (t) { return t.id === id; })[0] || null; }
+  function findTodo(id) {
+    var t = todos().filter(function (x) { return x.id === id; })[0];
+    if (t) return t;
+    var hit = null;
+    Object.keys(S.agenda).forEach(function (b) { (S.agenda[b].todos || []).forEach(function (x) { if (x.id === id) hit = x; }); });
+    return hit;
+  }
   function upsertTodoLocal(t) {
     var list = todos(), i = -1;
     for (var k = 0; k < list.length; k++) if (list[k].id === t.id) i = k;
@@ -1054,15 +1096,14 @@
     root.innerHTML = list.length
       ? '<section class="section"><div class="section-h"><h2>To-do hari ini</h2><button type="button" class="aside lnk" data-act="goto-todo">Lihat semua</button></div>' +
         '<div class="list todo-list">' + list.slice(0, 3).map(todoRow).join('') + '</div>' +
-        (list.length > 3 ? '<p class="faint" style="font-size:12px;text-align:center;margin:8px 0 0">+' + (list.length - 3) + ' lainnya di tab To-do</p>' : '') + '</section>'
+        (list.length > 3 ? '<p class="faint" style="font-size:12px;text-align:center;margin:8px 0 0">+' + (list.length - 3) + ' lainnya di Agenda</p>' : '') + '</section>'
       : '';
     bindTodoRows(root);
   }
   var TodoView = {
     render: function (el) {
       var self = this;
-      el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>To-do</h1></div><div class="top-actions">' + syncPill() + '</div></div>' +
-        '<div class="seg" role="group" aria-label="Filter to-do">' + [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) {
+      el.innerHTML = '<div class="seg" role="group" aria-label="Filter to-do">' + [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) {
           return '<button type="button" data-tf="' + x[0] + '" aria-pressed="' + (todoFilter() === x[0]) + '">' + x[1] + '</button>';
         }).join('') + '</div>' +
         '<div class="todo-add"><input id="td-new" class="input" type="text" maxlength="120" placeholder="Tulis to-do, lalu Enter" autocomplete="off" enterkeyhint="done" aria-label="To-do baru">' +
@@ -1105,14 +1146,273 @@
     }
   };
 
+
+  // ================= agenda: kalender bulanan (to-do + momen + siklus) =================
+  // Sumber: agenda.month per bulan (S.agenda) + to-do terbaru (S.todos) + perubahan yang belum terkirim.
+  var MOMEN_KAT = { kita: 'Kita', keluarga: 'Keluarga', pekerjaan: 'Pekerjaan', lainnya: 'Lainnya' };
+  var HARI_SEN = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+  function agMode() { return S.prefs.agendaMode || 'kalender'; }
+  function lapisOn(id) { var l = S.prefs.lapis || {}; return l[id] !== false; }
+  function setLapis(id, v) { S.prefs.lapis = S.prefs.lapis || {}; S.prefs.lapis[id] = !!v; persist(); }
+  function semuaMomen() {
+    var map = {};
+    var taruh = function (m) { var ex = map[m.id]; if (!ex || String(m.diubah || '') >= String(ex.diubah || '')) map[m.id] = m; };
+    ((S.boot && S.boot.kenangan) || []).forEach(taruh);
+    Object.keys(S.agenda).forEach(function (b) { (S.agenda[b].momen || []).forEach(taruh); });
+    Object.keys(S.momenCache).forEach(function (id) { taruh(S.momenCache[id]); });
+    Object.keys(S.momenPending).forEach(function (id) { map[id] = S.momenPending[id]; });
+    return Object.keys(map).map(function (k) { return map[k]; }).filter(function (m) { return !m.dihapus; });
+  }
+  function findMomen(id) { return semuaMomen().filter(function (m) { return m.id === id; })[0] || null; }
+  function momenMatch(m, f) {
+    if (f === 'semua') return true;
+    if (f === 'bersama') return m.pemilik === C.TODO_BERSAMA;
+    return m.pemilik === C.TODO_BERSAMA || m.pemilik === me().id;
+  }
+  // momen yang jatuh di tanggal d: di dalam rentangnya, atau tanggal ulang momen tahunan
+  function momenDiTanggal(list, d) {
+    var y = +d.slice(0, 4), out = [];
+    list.forEach(function (m) {
+      var mulai = String(m.tanggal), akhir = String(m.tanggal_selesai || m.tanggal);
+      if (d >= mulai && d <= akhir) out.push({ m: m, ulang: 0 });
+      else if (C.bool(m.tahunan) && +mulai.slice(0, 4) < y && C.tanggalUlang(mulai, y) === d) out.push({ m: m, ulang: y - +mulai.slice(0, 4) });
+    });
+    return out;
+  }
+  function agendaTodos(b) {
+    var map = {}, awal = b + '-01', akhir = C.akhirBulan(b);
+    var a = S.agenda[b];
+    (a ? a.todos || [] : []).forEach(function (t) { map[t.id] = t; });
+    todos().forEach(function (t) { map[t.id] = t; });              // versi terbaru menang
+    return Object.keys(map).map(function (k) { return map[k]; }).filter(function (t) {
+      if (t.dihapus) return false;
+      var tg = C.agendaTanggalTodo(t);
+      return tg >= awal && tg <= akhir;
+    });
+  }
+  function rentangLabel(m) {
+    if (!m.tanggal_selesai) return '';
+    var a = dateObj(m.tanggal), z = dateObj(m.tanggal_selesai);
+    var n = Math.round((z - a) / 86400000) + 1;
+    return a.getDate() + (a.getMonth() !== z.getMonth() ? ' ' + BULAN[a.getMonth()].slice(0, 3) : '') + '–' + z.getDate() + ' ' + BULAN[z.getMonth()].slice(0, 3) + ' · ' + n + ' hari';
+  }
+  function tanggalPanjang(iso) { var d = dateObj(iso); return HARI_P[d.getDay()] + ', ' + d.getDate() + ' ' + BULAN[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''); }
+  function momenRow(x) {
+    var m = x.m, p = todoPemilikInfo(m.pemilik), sub = [];
+    if (x.ulang) sub.push(x.ulang + ' tahun lalu');
+    else if (m.tanggal_selesai) sub.push(rentangLabel(m));
+    sub.push(MOMEN_KAT[m.kategori] || m.kategori);
+    var gagal = !m._pending && m.gcal_status === 'gagal' && C.bool(m.tahunan);
+    return '<button type="button" class="momen-row" data-momen="' + esc(m.id) + '"><span class="mi" aria-hidden="true">' + ICON.star + '</span>' +
+      '<span class="main"><span class="t1">' + esc(m.judul) + '</span><span class="t2">' + esc(sub.join(' · ')) +
+      ' <span class="tag" style="--c:' + p.warna + '"><i></i>' + esc(p.nama) + '</span>' +
+      (C.bool(m.tahunan) ? ' <span class="tag">' + (gagal ? 'Gagal masuk kalender' : 'Tiap tahun') + '</span>' : '') +
+      (m._pending ? ' <span class="tag">Menunggu koneksi</span>' : '') + '</span></span></button>';
+  }
+  function bindMomenRows(root) {
+    $$('[data-momen]', root).forEach(function (b) { b.addEventListener('click', function () {
+      var m = findMomen(b.getAttribute('data-momen')); if (m) openMomenSheet(m);
+    }); });
+  }
+  var KalenderView = {
+    render: function (el) {
+      var self = this, b = S.agBulan, f = todoFilter();
+      var siklusOk = typeof Siklus !== 'undefined' && Siklus.lapisTersedia();
+      var lapis = [['todo', 'To-do', 'var(--l-todo)'], ['momen', 'Momen', 'var(--l-momen)']];
+      if (siklusOk) lapis.push(['siklus', 'Siklus', 'var(--l-siklus)']);
+      el.innerHTML = '<div class="seg" role="group" aria-label="Filter orang" style="margin-top:14px">' + [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) {
+          return '<button type="button" data-tf="' + x[0] + '" aria-pressed="' + (f === x[0]) + '">' + x[1] + '</button>';
+        }).join('') + '</div>' +
+        '<div class="monthbar ag-month" style="margin-top:14px"><button class="iconbtn" data-agm="-1" aria-label="Bulan sebelumnya">' + ICON.left + '</button>' +
+        '<strong aria-live="polite">' + monthName(b) + '</strong>' +
+        '<span class="ag-right"><button type="button" class="ag-today" data-agtoday' + (b === thisMonth() && S.agTgl === todayISO() ? ' hidden' : '') + '>Hari ini</button>' +
+        '<button class="iconbtn" data-agm="1" aria-label="Bulan berikutnya">' + ICON.right + '</button></span></div>' +
+        '<div class="chips lapis" role="group" aria-label="Lapisan kalender">' + lapis.map(function (x) {
+          return '<button type="button" class="chip" data-lapis="' + x[0] + '" aria-pressed="' + lapisOn(x[0]) + '" style="--c:' + x[2] + '"><span class="ldot l-' + x[0] + '"></span>' + x[1] + '</button>';
+        }).join('') + '</div>' +
+        (fitur('agenda') ? '' : '<div class="readonly-note" style="margin-top:12px">' + ICON.lock + '<span>Riwayat lengkap & Momen aktif setelah backend diperbarui (lihat PANDUAN). Sementara ini kalender hanya berisi to-do terbaru.</span></div>') +
+        '<div id="ag-grid"></div><div id="ag-day"></div>';
+      $$('[data-tf]', el).forEach(function (x) { x.addEventListener('click', function () { S.prefs.todoFilter = x.getAttribute('data-tf'); persist(); self.render(el); }); });
+      $$('[data-agm]', el).forEach(function (x) { x.addEventListener('click', function () {
+        S.agBulan = shiftMonth(S.agBulan, +x.getAttribute('data-agm'));
+        S.agTgl = S.agBulan === thisMonth() ? todayISO() : S.agBulan + '-01';
+        self.render(el); if (!S.agenda[S.agBulan]) sync();
+      }); });
+      $('[data-agtoday]', el).addEventListener('click', function () { S.agBulan = thisMonth(); S.agTgl = todayISO(); self.render(el); });
+      $$('[data-lapis]', el).forEach(function (x) { x.addEventListener('click', function () {
+        var id = x.getAttribute('data-lapis'); setLapis(id, !lapisOn(id)); x.setAttribute('aria-pressed', String(lapisOn(id))); self.update(el);
+      }); });
+      this.update(el);
+    },
+    update: function (el) {
+      var grid = $('#ag-grid', el); if (!grid) return this.render(el);
+      var b = S.agBulan, f = todoFilter(), today = todayISO();
+      var tds = lapisOn('todo') ? agendaTodos(b).filter(function (t) { return todoMatch(t, f); }) : [];
+      var mos = lapisOn('momen') ? semuaMomen().filter(function (m) { return momenMatch(m, f); }) : [];
+      var sik = (typeof Siklus !== 'undefined' && Siklus.lapisTersedia() && lapisOn('siklus')) ? Siklus.tandaBulan(b) : {};
+      var perTgl = {};
+      tds.forEach(function (t) { var d = C.agendaTanggalTodo(t); (perTgl[d] = perTgl[d] || { t: 0, m: 0 }).t++; });
+      var p = b.split('-'), y = +p[0], mo = +p[1] - 1;
+      var lead = (new Date(y, mo, 1).getDay() + 6) % 7, n = new Date(y, mo + 1, 0).getDate();
+      var html = '<div class="cal" role="grid" aria-label="Kalender ' + monthName(b) + '"><div class="cal-head" role="row">' +
+        HARI_SEN.map(function (h) { return '<span role="columnheader">' + h + '</span>'; }).join('') + '</div><div class="cal-body">';
+      for (var i = 0; i < lead; i++) html += '<span class="cal-blank" aria-hidden="true"></span>';
+      for (var d = 1; d <= n; d++) {
+        var iso = b + '-' + pad(d), c = perTgl[iso] || { t: 0 };
+        var nm = momenDiTanggal(mos, iso).length, sk = sik[iso] || '';
+        var label = tanggalPanjang(iso) + (c.t ? ', ' + c.t + ' to-do' : '') + (nm ? ', ' + nm + ' momen' : '') + (sk ? ', ' + (sk === 'catat' ? 'siklus' : 'perkiraan siklus') : '');
+        html += '<button type="button" class="cal-day' + (iso === today ? ' today' : '') + (sk ? ' sk-' + sk : '') + '" data-tgl="' + iso + '" aria-pressed="' + (iso === S.agTgl) + '" aria-label="' + esc(label) + '"' + (iso === today ? ' aria-current="date"' : '') + '>' +
+          '<span class="n">' + d + '</span><span class="dots" aria-hidden="true">' + (c.t ? '<i class="l-todo"></i>' : '') + (nm ? '<i class="l-momen"></i>' : '') + (sk ? '<i class="l-siklus' + (sk === 'kira' ? ' kira' : '') + '"></i>' : '') + '</span></button>';
+      }
+      grid.innerHTML = html + '</div></div>';
+      var self = this;
+      $$('[data-tgl]', grid).forEach(function (x) { x.addEventListener('click', function () {
+        S.agTgl = x.getAttribute('data-tgl');
+        $$('[data-tgl]', grid).forEach(function (z) { z.setAttribute('aria-pressed', String(z === x)); });
+        var tb = $('[data-agtoday]', el); if (tb) tb.hidden = S.agBulan === thisMonth() && S.agTgl === todayISO();
+        self.renderHari(el, tds, mos);
+      }); });
+      if (S.agTgl.slice(0, 7) !== b) S.agTgl = b === thisMonth() ? today : b + '-01';
+      this.renderHari(el, tds, mos);
+    },
+    renderHari: function (el, tds, mos) {
+      var box = $('#ag-day', el), d = S.agTgl;
+      var ms = momenDiTanggal(mos, d);
+      var ts = todoSorted(tds.filter(function (t) { return C.agendaTanggalTodo(t) === d; }));
+      var sk = (typeof Siklus !== 'undefined' && Siklus.lapisTersedia() && lapisOn('siklus')) ? Siklus.panelHari(d) : '';
+      var kosong = !ms.length && !ts.length && !sk;
+      box.innerHTML = '<section class="section ag-hari" aria-live="polite"><div class="section-h"><h2>' + esc(tanggalPanjang(d)) + '</h2><span class="aside">' + (d === todayISO() ? 'Hari ini' : '') + '</span></div>' +
+        (ms.length ? '<div class="list momen-list">' + ms.map(momenRow).join('') + '</div>' : '') +
+        (ts.length ? '<div class="list todo-list"' + (ms.length ? ' style="margin-top:10px"' : '') + '>' + ts.map(todoRow).join('') + '</div>' : '') +
+        sk + (kosong ? '<div class="list"><div class="empty">Belum ada apa-apa di tanggal ini.</div></div>' : '') +
+        '<div class="ag-add">' + (fitur('momen') ? '<button type="button" class="btn small ghost" data-addmomen>' + ICON.star + 'Tandai momen</button>' : '') +
+        '<button type="button" class="btn small ghost" data-addtodo>' + ICON.plus + 'To-do</button>' +
+        (typeof Siklus !== 'undefined' && Siklus.bisaCatat() && lapisOn('siklus') ? Siklus.tombolHari(d) : '') + '</div></section>';
+      bindMomenRows(box); bindTodoRows(box);
+      var am = $('[data-addmomen]', box); if (am) am.addEventListener('click', function () { openMomenSheet(null, { tanggal: d }); });
+      $('[data-addtodo]', box).addEventListener('click', function () { openTodoSheet(null, { aturWaktu: true, tanggal: d, seharian: true }); });
+      if (typeof Siklus !== 'undefined') Siklus.bindHari(box, d);
+    }
+  };
+  var AgendaView = {
+    render: function (el) {
+      var self = this, mode = agMode();
+      el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Agenda</h1></div><div class="top-actions">' + syncPill() + '</div></div>' +
+        '<div class="seg" role="group" aria-label="Tampilan agenda">' + [['kalender', 'Kalender'], ['daftar', 'Daftar']].map(function (x) {
+          return '<button type="button" data-agmode="' + x[0] + '" aria-pressed="' + (mode === x[0]) + '">' + x[1] + '</button>';
+        }).join('') + '</div><div id="ag-body"></div>';
+      $$('[data-agmode]', el).forEach(function (b) { b.addEventListener('click', function () { S.prefs.agendaMode = b.getAttribute('data-agmode'); persist(); self.render(el); }); });
+      var body = $('#ag-body', el);
+      if (mode === 'daftar') { TodoView.render(body); body.firstChild.style.marginTop = '14px'; }
+      else KalenderView.render(body);
+    },
+    update: function (el) {
+      if (!$('#ag-body', el)) return this.render(el);
+      if (agMode() === 'daftar') TodoView.update(el); else KalenderView.update(el);
+    }
+  };
+
+  // ---------- form momen ----------
+  function openMomenSheet(m, init) {
+    var f = m
+      ? { id: m.id, judul: m.judul, cerita: m.cerita || '', tanggal: m.tanggal, satuHari: !m.tanggal_selesai, tanggal_selesai: m.tanggal_selesai || m.tanggal,
+        kategori: m.kategori || 'kita', pemilik: C.aliasUser(db(), m.pemilik), tahunan: C.bool(m.tahunan) }
+      : Object.assign({ id: '', judul: '', cerita: '', tanggal: todayISO(), satuHari: true, tanggal_selesai: '', kategori: 'kita', pemilik: C.TODO_BERSAMA, tahunan: false }, init || {});
+    if (!f.tanggal_selesai) f.tanggal_selesai = f.tanggal;
+    openSheet(m ? 'Ubah momen' : 'Tandai momen', function (sh) {
+      function draw() {
+        sh.el.innerHTML = '<div class="field" style="margin-top:4px"><label for="mo-judul">Judul</label><input id="mo-judul" class="input" maxlength="80" placeholder="mis. Hari pertama di rumah baru" autocomplete="off" value="' + esc(f.judul) + '"></div>' +
+          '<div class="field row2"><div><label for="mo-tgl">' + (f.satuHari ? 'Tanggal' : 'Mulai') + '</label><input id="mo-tgl" class="input" type="date" value="' + esc(f.tanggal) + '"></div>' +
+          (f.satuHari ? '' : '<div><label for="mo-sampai">Sampai</label><input id="mo-sampai" class="input" type="date" min="' + esc(f.tanggal) + '" value="' + esc(f.tanggal_selesai) + '"></div>') + '</div>' +
+          '<label class="cek"><input type="checkbox" id="mo-satu"' + (f.satuHari ? ' checked' : '') + '><span>Hanya satu hari</span></label>' +
+          '<div class="field"><label for="mo-cerita">Cerita singkat <span class="faint" id="mo-n">(' + f.cerita.length + '/500)</span></label><textarea id="mo-cerita" class="input" maxlength="500" rows="3" placeholder="Opsional">' + esc(f.cerita) + '</textarea></div>' +
+          '<div class="field"><span class="lbl">Kategori</span><div class="chips wrap" role="group" aria-label="Kategori momen">' + C.MOMEN_KATEGORI.map(function (k) {
+            return '<button type="button" class="chip" data-mk="' + k + '" aria-pressed="' + (f.kategori === k) + '" style="--c:var(--l-momen)">' + MOMEN_KAT[k] + '</button>';
+          }).join('') + '</div></div>' +
+          '<div class="field"><span class="lbl">Milik</span><div class="chips wrap" role="group" aria-label="Pemilik momen">' + todoPemilikList().map(function (p) {
+            return '<button type="button" class="chip" data-mp="' + esc(p.id) + '" aria-pressed="' + (f.pemilik === p.id) + '" style="--c:' + p.warna + '"><span class="dot" style="background:' + p.warna + '"></span>' + esc(p.nama) + '</button>';
+          }).join('') + '</div></div>' +
+          toggleHtml('mo-tahunan', 'Ingatkan tiap tahun', 'Jadi event tahunan di Google Calendar "Rumah Kita"', f.tahunan) +
+          '<div class="hint">' + (f.tahunan ? 'Pengingatnya ikut setelan notifikasi "Rumah Kita" di HP masing-masing (atur sekali: 1 hari sebelumnya).' : 'Tanpa pengingat: momen hanya tersimpan di Agenda sebagai kenangan.') + '</div>' +
+          (m && m.gcal_status === 'gagal' && C.bool(m.tahunan) && !m._pending ? '<div class="hint" style="color:var(--todo-bad)">Terakhir gagal masuk kalender: ' + esc(m.gcal_error || 'tidak diketahui') + ' <button type="button" class="lnk" id="mo-retry">Coba lagi</button></div>' : '') +
+          '<div class="err" id="mo-err" role="alert"></div>' +
+          '<button type="button" class="btn" id="mo-save">' + (m ? 'Simpan perubahan' : 'Simpan momen') + '</button>' +
+          (m ? '<button type="button" class="btn danger" id="mo-del">Hapus momen</button>' : '');
+        var j = $('#mo-judul', sh.el); j.addEventListener('input', function () { f.judul = j.value; });
+        $('#mo-tgl', sh.el).addEventListener('change', function (e) { f.tanggal = e.target.value || f.tanggal; if (f.tanggal_selesai < f.tanggal) f.tanggal_selesai = f.tanggal; if (!f.satuHari) draw(); });
+        var sp = $('#mo-sampai', sh.el); if (sp) sp.addEventListener('change', function () { f.tanggal_selesai = sp.value || f.tanggal; });
+        $('#mo-satu', sh.el).addEventListener('change', function (e) { f.satuHari = e.target.checked; draw(); });
+        var ce = $('#mo-cerita', sh.el); ce.addEventListener('input', function () { f.cerita = ce.value; $('#mo-n', sh.el).textContent = '(' + ce.value.length + '/500)'; });
+        $$('[data-mk]', sh.el).forEach(function (b) { b.addEventListener('click', function () { f.kategori = b.getAttribute('data-mk'); $$('[data-mk]', sh.el).forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); });
+        $$('[data-mp]', sh.el).forEach(function (b) { b.addEventListener('click', function () { f.pemilik = b.getAttribute('data-mp'); $$('[data-mp]', sh.el).forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); });
+        $('#mo-tahunan', sh.el).addEventListener('click', function () { f.tahunan = !f.tahunan; draw(); });
+        $('#mo-save', sh.el).addEventListener('click', simpan);
+        var rt = $('#mo-retry', sh.el); if (rt) rt.addEventListener('click', function () { enqueue('momen.sync', { id: m.id }); toast('Mencoba masuk ke kalender lagi…'); sh.close(); });
+        var del = $('#mo-del', sh.el);
+        if (del) del.addEventListener('click', function () {
+          if (!confirm('Hapus momen ini?' + (m.gcal_event_id ? ' Event tahunannya di Google Calendar ikut dihapus.' : ''))) return;
+          enqueue('momen.delete', { id: m.id }); toast('Momen dihapus'); sh.close();
+        });
+      }
+      function simpan() {
+        var payload = { id: f.id || uid(), judul: f.judul, cerita: f.cerita, tanggal: f.tanggal,
+          tanggal_selesai: f.satuHari ? '' : f.tanggal_selesai, kategori: f.kategori, pemilik: f.pemilik, tahunan: f.tahunan };
+        try { payload = C.cleanMomen(payload, db(), me(), m); }
+        catch (e) { $('#mo-err', sh.el).textContent = e.message; return; }
+        enqueue('momen.save', payload);
+        toast(payload.tahunan ? 'Momen tersimpan. Masuk ke Google Calendar tiap tahun.' : 'Momen tersimpan');
+        sh.close();
+      }
+      draw();
+      if (!m) setTimeout(function () { var j = $('#mo-judul', sh.el); if (j) j.focus(); }, 300);
+    });
+  }
+
+  // ---------- kartu kenangan di Catat ----------
+  function renderKenangan(root) {
+    if (!root) return;
+    var list = ((S.boot && S.boot.kenangan) || []).filter(function (m) { return !findMomen(m.id) || !findMomen(m.id).dihapus; });
+    if (!list.length || S.prefs.kenanganTampil === false || LS.get('k_kenangan_tutup', '') === todayISO()) { root.innerHTML = ''; return; }
+    var m = list[0];
+    root.innerHTML = '<section class="section"><div class="kenangan"><span class="mi" aria-hidden="true">' + ICON.star + '</span><div class="main">' +
+      '<span class="eyebrow">Kenangan</span><p><b>' + m.tahunLalu + ' tahun lalu hari ini:</b> ' + esc(m.judul) + '</p>' +
+      (list.length > 1 ? '<span class="t2">+' + (list.length - 1) + ' kenangan lain di tanggal ini</span>' : '') + '</div>' +
+      '<div class="act"><button type="button" class="btn small" data-kn="lihat">Lihat</button><button type="button" class="btn small ghost" data-kn="tutup">Tutup</button></div></div></section>';
+    $('[data-kn="lihat"]', root).addEventListener('click', function () {
+      if (list.length === 1) { openMomenSheet(findMomen(m.id) || m); return; }
+      S.agBulan = thisMonth(); S.agTgl = todayISO(); S.prefs.agendaMode = 'kalender'; persist(); goTab('agenda');
+    });
+    $('[data-kn="tutup"]', root).addEventListener('click', function () { LS.set('k_kenangan_tutup', todayISO()); root.innerHTML = ''; toast('Disembunyikan sampai besok'); });
+  }
+
+  // ---------- pindahkan to-do lama dari Beranda desktop (tersimpan di browser) ke server, sekali ----------
+  function pindahkanTodoBrowser() {
+    if (!S.boot || !me() || LS.get('k_dash_pindah', false)) return;
+    var D = LS.get('k_dash', null);
+    if (!D || !D.todos || !D.todos.length) { LS.set('k_dash_pindah', true); return; }
+    var n = 0;
+    D.todos.filter(function (t) { return !t.done; }).forEach(function (t) {
+      var when = String(t.when || ''), payload = { id: 'dash-' + String(t.id || uid()).slice(0, 50), judul: String(t.title || '').slice(0, 120),
+        pemilik: t.o === 'B' ? C.TODO_BERSAMA : C.aliasUser(db(), String(t.o || me().id)),
+        tanggal: /^\d{4}-\d{2}-\d{2}/.test(when) ? when.slice(0, 10) : '', jam: /T\d{2}:\d{2}/.test(when) ? when.slice(11, 16) : '' };
+      try { payload = C.cleanTodo(payload, db(), me(), null); }
+      catch (e) { try { payload.pemilik = me().id; payload = C.cleanTodo(payload, db(), me(), null); } catch (e2) { return; } }
+      if (!C.canWriteTodo(me(), payload)) payload.pemilik = C.TODO_BERSAMA;
+      S.outbox.push({ opId: uid(), action: 'todo.save', payload: payload, at: nowIso() }); n++;
+    });
+    D.todos = D.todos.filter(function (t) { return t.done; });
+    LS.set('k_dash', D); LS.set('k_dash_pindah', true);
+    if (n) { S.outbox.slice(-n).forEach(applyLocal); persist(); toast(n + ' to-do dari Beranda desktop dipindah ke Agenda'); setTimeout(sync, 50); }
+  }
+
   // ================= views =================
   var view = null;
   function renderShell() {
     var app = $('#app');
     if (!S.conn) { renderConnect(); return; }
-    app.innerHTML = (S.conn.mode === 'demo' ? '<div class="demo-bar">Ini versi demo dengan data contoh. <button data-act="leave-demo">Hubungkan Google Sheets</button></div>' : '') +
+    app.innerHTML = (S.conn.mode === 'demo' ? '<div class="demo-bar">Ini versi demo dengan data contoh. <button data-act="leave-demo">Hubungkan akun</button></div>' : '') +
       '<main id="view" class="view"></main>' +
-      '<footer class="tabbar"><nav>' + [['home', 'Catat', ICON.home], ['todo', 'To-do', ICON.check], ['ringkasan', 'Ringkasan', ICON.chart], ['riwayat', 'Riwayat', ICON.list], ['pengaturan', 'Pengaturan', ICON.gear]].map(function (x) {
+      '<footer class="tabbar"><nav>' + [['home', 'Catat', ICON.home], ['agenda', 'Agenda', ICON.agenda], ['ringkasan', 'Ringkasan', ICON.chart], ['riwayat', 'Riwayat', ICON.list], ['pengaturan', 'Pengaturan', ICON.gear]].map(function (x) {
         return '<button data-tab="' + x[0] + '" aria-current="' + (S.tab === x[0] ? 'page' : 'false') + '">' + x[2] + x[1] + '</button>';
       }).join('') + '</nav></footer>';
     $$('[data-tab]', app).forEach(function (b) { b.addEventListener('click', function () { goTab(b.getAttribute('data-tab')); }); });
@@ -1120,13 +1420,14 @@
   }
   function goTab(id) {
     S.tab = id; S.sub = null;
+    if (id === 'agenda' && !S.agenda[S.agBulan]) setTimeout(sync, 0);
     $$('[data-tab]').forEach(function (x) { x.setAttribute('aria-current', x.getAttribute('data-tab') === id ? 'page' : 'false'); });
     renderView(); window.scrollTo(0, 0);
   }
   function renderView() {
     if (!S.boot) { $('#view').innerHTML = '<div class="topbar"><div><h1>Memuat data…</h1></div>' + syncPill() + '</div>' + skeleton(5); return; }
     if (!S.bukuView) S.bukuView = me().buku;
-    var v = { home: HomeView, todo: TodoView, ringkasan: RingkasanView, riwayat: RiwayatView, pengaturan: SettingsView }[S.tab];
+    var v = { home: HomeView, agenda: AgendaView, todo: AgendaView, ringkasan: RingkasanView, riwayat: RiwayatView, pengaturan: SettingsView }[S.tab] || HomeView;
     view = v; v.render($('#view'));
   }
   function refresh() {
@@ -1140,7 +1441,7 @@
     if (a === 'sync') sync();
     if (a === 'theme') { setTheme(isDark() ? 'light' : 'dark'); t.outerHTML = themeBtn(); }
     if (a === 'leave-demo') { if (confirm('Keluar dari mode demo?')) disconnect(); }
-    if (a === 'goto-todo') goTab('todo');
+    if (a === 'goto-todo') { S.prefs.agendaMode = 'daftar'; persist(); goTab('agenda'); }
   });
 
   // ---------- Catat (home) ----------
@@ -1149,7 +1450,7 @@
       el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Halo, ' + esc(me().nama) + '!</h1></div><div class="top-actions">' + themeBtn() + syncPill() + '</div></div>' +
         '<div id="home-budget"></div>' +
         '<section class="section"><div class="entry" id="entry"></div></section>' +
-        '<div id="home-todo"></div><div id="home-utang"></div><div id="home-reim"></div>' +
+        '<div id="home-kenangan"></div><div id="home-todo"></div><div id="home-utang"></div><div id="home-reim"></div>' +
         '<section class="section"><div class="section-h"><h2>Catatan hari ini</h2><span class="aside" id="today-total"></span></div><div id="today"></div></section>';
       txForm($('#entry', el), null, { allowAdd: true });
       this.update(el);
@@ -1176,6 +1477,7 @@
       todayEl.innerHTML = list.length ? '<div class="list">' + list.sort(function (a, b) { return String(b.dibuat || '9').localeCompare(String(a.dibuat || '9')); })
         .map(function (x) { return txRow(x, null); }).join('') + '</div>' : '<div class="list"><div class="empty">Hari ini masih bersih. Catat jajan pertamamu di atas.</div></div>';
       bindTxRows(todayEl);
+      renderKenangan($('#home-kenangan', el));
       renderHomeTodo($('#home-todo', el));
       renderTalangan($('#home-utang', el), null);
       var waits = [];
@@ -1386,15 +1688,21 @@
         '<button data-s="kategori"><span class="main">Kategori<div class="t2">' + db().Kategori.filter(function (k) { return C.bool(k.aktif) && k.id !== C.KAT_REIMBURSE; }).length + ' kategori aktif</div></span>' + ICON.right + '</button>' +
         '<button data-s="kantong"><span class="main">Kantong<div class="t2">Cash, debit, e-wallet, kartu kredit</div></span>' + ICON.right + '</button>' +
         '</div></section>' +
+        '<section class="section"><div class="section-h"><h2>Agenda</h2></div><div class="menu">' +
+        toggleHtml('set-kenangan', 'Kartu kenangan di Catat', '"N tahun lalu hari ini" dari Momen', S.prefs.kenanganTampil !== false) +
+        '</div></section>' +
+        (typeof Siklus !== 'undefined' ? Siklus.pengaturanHtml() : '') +
         '<section class="section"><div class="menu"><button data-s="beranda"><span class="main">Beranda desktop<div class="t2">Ringkasan, to-do, dan mood dalam satu layar lebar</div></span>' + ICON.right + '</button></div></section>' +
         '<section class="section"><div class="menu"><button data-s="out"><span class="main" style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Putuskan koneksi di HP ini') + '</span></button></div>' +
         '<p class="faint" style="font-size:12px;text-align:center;margin-top:20px">Kantong v' + (S.boot.version || C.VERSION) + '</p></section>';
       $$('[data-theme-set]', el).forEach(function (b) { b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme-set')); SettingsView.render(el); }); });
+      $('#set-kenangan', el).addEventListener('click', function () { S.prefs.kenanganTampil = S.prefs.kenanganTampil === false; persist(); this.setAttribute('aria-checked', String(S.prefs.kenanganTampil)); });
+      if (typeof Siklus !== 'undefined') Siklus.bindPengaturan(el);
       $$('[data-s]', el).forEach(function (b) { b.addEventListener('click', function () {
         var a = b.getAttribute('data-s');
         if (a === 'sync') sync();
         else if (a === 'beranda') location.href = 'beranda.html';
-        else if (a === 'switch') { S.prefs.demoUser = S.prefs.demoUser === 'riki' ? 'istri' : 'riki'; S.bukuView = null; persist(); S.boot = null; renderView(); sync(); }
+        else if (a === 'switch') { S.prefs.demoUser = S.prefs.demoUser === 'riki' ? 'febie' : 'riki'; S.bukuView = null; persist(); S.boot = null; renderView(); sync(); }
         else if (a === 'out') { if (confirm(demo ? 'Keluar dari mode demo? Data demo dihapus.' : 'Putuskan koneksi? Transaksi yang belum terkirim akan hilang dari HP ini.')) disconnect(); }
         else goSub({ type: a });
       }); });
@@ -1587,20 +1895,21 @@
       } catch (e) { $('#c-err').textContent = 'Kode tidak dikenali. Salin ulang kode koneksi (Supabase: hasil kantong_buat_kode).'; return; }
       btn.disabled = true; btn.textContent = 'Menghubungkan…';
       rpc('bootstrap', {}, conn).then(function (boot) {
-        S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
+        S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; S.agenda = {}; S.momenCache = {}; persist(); renderShell(); sync();
       }, function (e) {
         btn.disabled = false; btn.textContent = 'Hubungkan';
         $('#c-err').textContent = e.code === 'AUTH' ? 'Kode akses ditolak server.' : e.message;
       });
     });
     $('#demo').addEventListener('click', function () {
-      S.conn = { mode: 'demo' }; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
+      S.conn = { mode: 'demo' }; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; S.agenda = {}; S.momenCache = {}; persist(); renderShell(); sync();
     });
   }
   function disconnect() {
-    ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos'].forEach(LS.del);
+    ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_agenda', 'k_momen'].forEach(LS.del);
     demoStore = null;
     S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.sub = null; S.tab = 'home'; S.bukuView = null;
+    S.agenda = {}; S.momenCache = {}; S.momenPending = {};
     renderConnect();
   }
 
@@ -1631,21 +1940,21 @@
         keterangan: ket, reimburse: false, oleh: oleh, sumber: 'demo', dibuat: bm + '-' + pad(day) + 'T0' + (tx.length % 9) + ':00:00+07:00', diubah: '', dihapus: '', terbayar: '', tx_balik: '' });
     };
     add(1, 'Transfer', 5300000, 'riki', '', 'bca', 'Topup rumah tangga', 'riki', 'kas-rt');
-    add(1, 'Transfer', 1000000, 'istri', '', 'rek-istri', 'Topup rumah tangga', 'istri', 'kas-rt');
+    add(1, 'Transfer', 1000000, 'istri', '', 'rek-istri', 'Topup rumah tangga', 'febie', 'kas-rt');
     add(1, 'Pengeluaran', 50000, 'riki', 'subscription', 'bca', 'Netflix', 'riki');
     for (var dday = 1; dday <= today; dday++) {
       if (rnd() < 0.8) add(dday, 'Pengeluaran', Math.round((15 + rnd() * 45)) * 1000, 'riki', 'makan-jajan', rnd() < .3 ? 'cash-riki' : 'bca', ['indomaret', 'bakso', 'kopi', 'nasi padang'][Math.floor(rnd() * 4)], 'riki');
       if (rnd() < 0.35) { var j = Math.floor(rnd() * 3); add(dday, 'Pengeluaran', Math.round((20 + rnd() * 40)) * 1000, 'riki', ['ojol-taxi', 'work', 'kendaraan-pribadi'][j], 'bca', ['gojek', 'fore', 'bensin'][j], 'riki'); }
-      if (rnd() < 0.5) add(dday, 'Pengeluaran', Math.round((40 + rnd() * 160)) * 1000, 'rt', 'belanja-dapur', 'kas-rt', ['pasar', 'sayur', 'superindo'][Math.floor(rnd() * 3)], rnd() < .7 ? 'istri' : 'riki');
-      if (rnd() < 0.4) { var q = Math.floor(rnd() * 2); add(dday, 'Pengeluaran', Math.round((10 + rnd() * 50)) * 1000, 'istri', ['makan-jajan', 'personal-care'][q], 'rek-istri', ['jajan', 'skincare'][q], 'istri'); }
+      if (rnd() < 0.5) add(dday, 'Pengeluaran', Math.round((40 + rnd() * 160)) * 1000, 'rt', 'belanja-dapur', 'kas-rt', ['pasar', 'sayur', 'superindo'][Math.floor(rnd() * 3)], rnd() < .7 ? 'febie' : 'riki');
+      if (rnd() < 0.4) { var q = Math.floor(rnd() * 2); add(dday, 'Pengeluaran', Math.round((10 + rnd() * 50)) * 1000, 'istri', ['makan-jajan', 'personal-care'][q], 'rek-istri', ['jajan', 'skincare'][q], 'febie'); }
     }
-    add(Math.min(today, 5), 'Pengeluaran', 420000, 'rt', 'listrik-air', 'kas-rt', 'token listrik', 'istri');
+    add(Math.min(today, 5), 'Pengeluaran', 420000, 'rt', 'listrik-air', 'kas-rt', 'token listrik', 'febie');
     // talangan: belanja RT dibayar pakai uang pribadi (muncul di daftar talangan, per transaksi)
     add(Math.min(today, 4), 'Pengeluaran', 85000, 'rt', 'kebutuhan-rumah', 'bca', 'galon & sabun', 'riki');
     add(Math.min(today, 6), 'Pengeluaran', 132500, 'rt', 'belanja-dapur', 'bca', 'superindo mingguan', 'riki');
     add(Math.min(today, 8), 'Pengeluaran', 47000, 'rt', 'belanja-dapur', 'cash-riki', 'buah tukang sayur', 'riki');
     add(Math.min(today, 9), 'Pengeluaran', 215000, 'rt', 'kebutuhan-rumah', 'bca', 'lampu & colokan', 'riki');
-    add(Math.min(today, 5), 'Pengeluaran', 60000, 'rt', 'belanja-dapur', 'rek-istri', 'sayur pasar', 'istri');
+    add(Math.min(today, 5), 'Pengeluaran', 60000, 'rt', 'belanja-dapur', 'rek-istri', 'sayur pasar', 'febie');
     // reimburse kantor: satu menunggu, satu sudah terbayar
     add(Math.min(today, 3), 'Pengeluaran', 828000, 'riki', 'work', 'bca', 'hotel dinas Purwokerto', 'riki');
     tx[tx.length - 1].reimburse = true;
@@ -1655,22 +1964,40 @@
       keterangan: 'Reimburse: kereta dinas', reimburse: false, oleh: 'riki', sumber: 'auto', dibuat: pd.terbayar + 'T09:00:00+07:00', diubah: '', dihapus: '', terbayar: '', tx_balik: '' });
     // to-do contoh: campuran dengan waktu, tanpa waktu, bersama, dan yang sudah selesai
     var t0 = todayISO(), td = [];
-    var tdAdd = function (n, judul, pemilik, tanggal, jam, selesai) {
-      var kapan = (tanggal || t0) + 'T08:0' + n + ':00+07:00';
+    var tdAdd = function (n, judul, pemilik, tanggal, jam, selesai, dibuatTgl, selesaiTgl) {
+      var kapan = (dibuatTgl || tanggal || t0) + 'T08:0' + (n % 10) + ':00+07:00';
+      var beres = selesai ? (selesaiTgl || tanggal || t0) + 'T19:00:00+07:00' : '';
       td.push({ id: 'demo-td-' + n, judul: judul, pemilik: pemilik, tanggal: tanggal, jam: jam, durasi: 30,
-        selesai: !!selesai, selesai_oleh: selesai ? 'istri' : '', gcal_event_id: tanggal ? 'demo-ev-' + n : '',
+        selesai: !!selesai, selesai_oleh: selesai ? (pemilik === 'riki' ? 'riki' : 'febie') : '', gcal_event_id: tanggal ? 'demo-ev-' + n : '',
         gcal_status: tanggal ? 'ok' : '', gcal_error: '', oleh: pemilik === 'bersama' ? 'riki' : pemilik,
-        dibuat: kapan, diubah: kapan, dihapus: '' });
+        dibuat: kapan, diubah: beres || kapan, dihapus: '', selesai_at: beres });
     };
     tdAdd(1, 'Bayar listrik & air', 'bersama', t0, '19:00');
     tdAdd(2, 'Beli galon', 'riki', '', '');
-    tdAdd(3, 'Jemput paket di agen', 'istri', C.addDays(t0, 1), '10:00');
+    tdAdd(3, 'Jemput paket di agen', 'febie', C.addDays(t0, 1), '10:00');
     tdAdd(4, 'Servis AC kamar', 'bersama', C.addDays(t0, 3), '');
-    tdAdd(5, 'Transfer arisan', 'istri', C.addDays(t0, -1), '16:00', true);
+    tdAdd(5, 'Transfer arisan', 'febie', C.addDays(t0, -1), '16:00', true);
+    // riwayat bulan-bulan lalu (muncul di kalender Agenda)
+    tdAdd(6, 'Ganti filter air', 'bersama', '', '', true, C.addDays(t0, -40), C.addDays(t0, -37));
+    tdAdd(7, 'Perpanjang STNK', 'riki', C.addDays(t0, -33), '09:00', true);
+    tdAdd(8, 'Cek gigi', 'febie', C.addDays(t0, -26), '15:30', true);
+    tdAdd(9, 'Cuci gorden', 'bersama', '', '', true, C.addDays(t0, -12), C.addDays(t0, -9));
+    var yNow = +t0.slice(0, 4), mdNow = t0.slice(5);
+    var mo = function (id, judul, tanggal, kategori, pemilik, tahunan, cerita, sampai) {
+      return { id: id, judul: judul, cerita: cerita || '', tanggal: tanggal, tanggal_selesai: sampai || '', kategori: kategori, pemilik: pemilik,
+        tahunan: !!tahunan, gcal_event_id: tahunan ? 'demo-ev-' + id : '', gcal_status: tahunan ? 'ok' : '', gcal_error: '',
+        oleh: 'riki', dibuat: tanggal + 'T20:00:00+07:00', diubah: tanggal + 'T20:00:00+07:00', dihapus: '' };
+    };
+    var momen = [
+      mo('demo-mo-1', 'Hari pertama di rumah baru', (yNow - 2) + '-' + mdNow, 'kita', 'bersama', true, 'Kardus di mana-mana, makan mi instan di lantai. Seru.'),
+      mo('demo-mo-2', 'Trip ke Malang', C.addDays(t0, -10), 'kita', 'bersama', false, 'Naik kereta malam, pulang bawa apel.', C.addDays(t0, -8)),
+      mo('demo-mo-3', 'Febie mulai kerja di kantor baru', C.addDays(t0, -18), 'pekerjaan', 'febie', false),
+      mo('demo-mo-4', 'Ulang tahun Ibu', (yNow - 30) + '-' + C.addDays(t0, 6).slice(5), 'keluarga', 'febie', true)
+    ];
     return {
-      buku: [{ id: 'riki', nama: 'Riki', tipe: 'Pribadi', pemilik: 'riki', urutan: 1 }, { id: 'istri', nama: 'Febie', tipe: 'Pribadi', pemilik: 'istri', urutan: 2 }, { id: 'rt', nama: 'Rumah Tangga', tipe: 'Bersama', pemilik: '', urutan: 3 }],
-      users: [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'istri', nama: 'Febie', buku: 'istri' }],
-      kategori: kat, kantong: kan, budget: bud, transaksi: tx, todo: td
+      buku: [{ id: 'riki', nama: 'Riki', tipe: 'Pribadi', pemilik: 'riki', urutan: 1 }, { id: 'istri', nama: 'Febie', tipe: 'Pribadi', pemilik: 'febie', urutan: 2 }, { id: 'rt', nama: 'Rumah Tangga', tipe: 'Bersama', pemilik: '', urutan: 3 }],
+      users: [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'febie', nama: 'Febie', buku: 'istri' }],
+      kategori: kat, kantong: kan, budget: bud, transaksi: tx, todo: td, momen: momen
     };
   }
 
@@ -1680,13 +2007,16 @@
   setInterval(function () { if (document.visibilityState === 'visible' && (S.outbox.length || !S.lastSync || Date.now() - S.lastSync > 120000)) sync(); }, 30000);
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
   // data demo versi lama (sebelum to-do) dibuang sekali supaya contoh to-do ikut muncul
-  if (LS.get('k_ver', null) !== 'v5') {
+  if (LS.get('k_ver', null) !== 'v6') {
     if (S.conn && S.conn.mode === 'demo') {
-      ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos'].forEach(LS.del);
-      S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null;
+      ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_agenda', 'k_momen'].forEach(LS.del);
+      S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.agenda = {}; S.momenCache = {};
     }
-    LS.set('k_ver', 'v5');
+    LS.set('k_ver', 'v6');
   }
+  // perubahan momen yang belum terkirim dari sesi sebelumnya (tidak disimpan terpisah, dibangun dari outbox)
+  S.outbox.forEach(function (op) { if (String(op.action).indexOf('momen.') === 0) applyLocal(op); });
+  window.addEventListener('hashchange', function () { if (/^#agenda/.test(location.hash) && S.conn) goTab('agenda'); });
   if (!S.conn && window.KANTONG_PREVIEW) S.conn = { mode: 'demo' };   // file preview
   renderShell();
   if (S.conn) sync();

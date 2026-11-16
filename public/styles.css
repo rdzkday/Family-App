@@ -410,3 +410,71 @@ input.input:disabled { opacity: .5; }
 .td-retry svg { width: 16px; height: 16px; }
 .td-retry:disabled { opacity: .5; cursor: default; }
 .section-h button.aside.lnk { color: var(--todo-ok); font-weight: 800; min-height: 44px; margin: -12px 0; }
+
+/* ---------- Agenda: lapisan kalender ---------- */
+/* Warna isi = brief (pastel). Cincin gelap di tema terang supaya titik tetap terlihat (kontras non-teks >= 3:1). */
+:root {
+  --l-todo: #93C5FD; --l-momen: #FDBA74; --l-siklus: #F9A8D4;
+  --l-todo-ring: #2563EB; --l-momen-ring: #C2410C; --l-siklus-ring: #BE185D;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --l-todo-ring: #93C5FD; --l-momen-ring: #FDBA74; --l-siklus-ring: #F9A8D4; }
+}
+:root[data-theme="dark"] { --l-todo-ring: #93C5FD; --l-momen-ring: #FDBA74; --l-siklus-ring: #F9A8D4; }
+
+.l-todo { background: var(--l-todo); box-shadow: inset 0 0 0 1.5px var(--l-todo-ring); }
+.l-momen { background: var(--l-momen); box-shadow: inset 0 0 0 1.5px var(--l-momen-ring); }
+.l-siklus { background: var(--l-siklus); box-shadow: inset 0 0 0 1.5px var(--l-siklus-ring); }
+.l-siklus.kira { background: none; box-shadow: none; border: 1.5px dashed var(--l-siklus-ring); }
+
+.ag-month { margin-bottom: 0; }
+.ag-right { display: flex; align-items: center; }
+.ag-today { min-height: 44px; padding: 0 12px; border-radius: 14px; font-size: 13px; font-weight: 800; color: var(--text); background: var(--surface-2); }
+.ag-today[hidden] { display: none; }
+.lapis { margin-top: 12px; }
+.lapis .chip { min-height: 44px; }
+.ldot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.lapis .chip[aria-pressed="false"] { color: var(--text-2); }
+.lapis .chip[aria-pressed="false"] .ldot { opacity: .45; }
+
+.cal { background: var(--surface); border-radius: var(--r-card); padding: 10px 8px 12px; box-shadow: var(--shadow); margin-top: 12px; }
+.cal-head, .cal-body { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cal-head span { text-align: center; font-size: 12px; font-weight: 800; color: var(--text-2); padding: 4px 0 8px; }
+.cal-day { min-height: 52px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px;
+  padding: 5px 0 6px; border-radius: 14px; color: var(--text); position: relative; }
+.cal-day .n { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+.cal-day.today .n { background: var(--accent); color: var(--ink); }
+.cal-day[aria-pressed="true"] { background: var(--surface-2); box-shadow: inset 0 0 0 2px var(--text); }
+.cal-day:focus-visible { outline: 3px solid var(--tf); outline-offset: 1px; }
+.cal-day .dots { display: flex; gap: 3px; height: 8px; align-items: center; }
+.cal-day .dots i { width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; }
+.cal-day.sk-kira::after { content: ''; position: absolute; left: 22%; right: 22%; bottom: 2px; border-bottom: 2px dashed var(--l-siklus-ring); }
+.cal-day.sk-catat::after { content: ''; position: absolute; left: 22%; right: 22%; bottom: 2px; height: 3px; border-radius: 3px; background: var(--l-siklus-ring); }
+
+.ag-hari .section-h h2 { font-size: 17px; }
+.ag-add { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.ag-add .btn.small { min-height: 44px; gap: 6px; }
+.ag-add .btn.small svg { width: 18px; height: 18px; }
+
+.momen-list { padding: 0 12px; }
+.momen-row { display: flex; align-items: flex-start; gap: 12px; width: 100%; min-height: 56px; padding: 10px 0; text-align: left; border-bottom: 1px dashed var(--line); color: var(--text); }
+.momen-row:last-child { border-bottom: 0; }
+.momen-row .mi, .kenangan .mi { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 12px; background: var(--hero-2); color: var(--l-momen-ring); }
+.momen-row .mi svg, .kenangan .mi svg { width: 20px; height: 20px; }
+.momen-row .main { flex: 1; min-width: 0; }
+.momen-row .t1 { display: block; font-weight: 800; font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
+.momen-row .t2 { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 3px; font-size: 12px; font-weight: 700; color: var(--text-2); }
+
+.kenangan { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; background: var(--hero-2); border-radius: var(--r-card); padding: 16px; }
+.kenangan .mi { background: var(--surface); }
+.kenangan .eyebrow { display: block; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
+.kenangan p { margin: 2px 0 0; font-size: 15px; line-height: 1.4; }
+.kenangan .t2 { display: block; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--text-2); }
+.kenangan .act { grid-column: 1 / -1; display: flex; gap: 8px; }
+.kenangan .act .btn.small { min-height: 44px; flex: 1; }
+
+.cek { display: flex; align-items: center; gap: 12px; min-height: 44px; margin-top: 8px; font-weight: 700; font-size: 15px; cursor: pointer; }
+.cek input { width: 22px; height: 22px; margin: 0; accent-color: var(--tf); flex: none; }
+.lnk { background: none; color: var(--todo-ok); font-weight: 800; text-decoration: underline; min-height: 44px; padding: 0 4px; }
+textarea.input { resize: vertical; min-height: 84px; line-height: 1.45; padding-top: 12px; }
+.lapis .chip[aria-pressed="true"] .ldot { box-shadow: inset 0 0 0 2px var(--ink); }
