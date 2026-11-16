@@ -5,5 +5,4 @@
 
 Data keuangan pribadi tidak disertakan di repo ini.
 
- 
-
+Hosting: Vercel (project `dompet-app`, folder `public/`, setting di `vercel.json`). Push ke `main` = otomatis rilis.
