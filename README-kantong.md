@@ -6,7 +6,7 @@
 - `kantong/apps-script/`: backend lama (Google Sheets), masih kompatibel, tidak dikembangkan lagi.
 - `kantong-pastel/`: varian tampilan lama. `public/dark/` mengarah ke app utama (tema gelap).
 
-Fitur to-do rumah tangga + sync ke Google Calendar "Rumah Kita": lihat `kantong/PANDUAN.md` §7. Agenda & Momen: §8. Siklus (project Supabase terpisah di akun Febie, `supabase-siklus/`): §9.
+Fitur to-do rumah tangga + sync ke Google Calendar "Rumah Kita": lihat `kantong/PANDUAN.md` §7. Agenda & Momen: §8. Siklus (modul terpisah di project Supabase yang sama, `supabase/migrations/*_siklus.sql`): §9.
 
 Data keuangan pribadi tidak disertakan di repo ini.
 
@@ -110,9 +110,9 @@ Dampak: kolom `tanggal_selesai` (kosong = satu hari), tampilan pita di kalender.
 - [x] **Supabase**
 
 **12. Project Supabase milik akun siapa?**
-- [x] Akun Febie ⭐ (Riki tidak bisa membuka dashboard)
+- [ ] Akun Febie ⭐ (Riki tidak bisa membuka dashboard)
 - [ ] Akun Riki + catatan dikunci PIN
-- [ ] Akun Riki tanpa kunci
+- [x] **Satu project dengan Kantong (akun Riki), modul/folder terpisah** — diubah 16 Nov; Riki secara teknis bisa membuka tabel lewat dashboard, disebutkan di layar privasi
 
 **13. Cara login Supabase**
 - [x] Kode OTP 6 angka via email, diketik di app ⭐
@@ -120,7 +120,7 @@ Dampak: kolom `tanggal_selesai` (kosong = satu hari), tampilan pita di kalender.
 - [ ] Link login di email (berisiko nyangkut di Safari pada iPhone)
 
 **14. Supabase gratis di-pause setelah 1 minggu tidak aktif**
-- [x] Gratis + ping harian dari Apps Script ⭐
+- [ ] Gratis + ping harian dari Apps Script ⭐ (tidak perlu lagi: project dipakai Kantong tiap hari)
 - [ ] Plan berbayar
 - [ ] Gratis, terima risiko
 
@@ -164,7 +164,7 @@ Dampak: kolom `tanggal_selesai` (kosong = satu hari), tampilan pita di kalender.
 - id user `istri` → `febie` (buku `istri` tetap, kode akses ikut pindah).
 - Aksi API: `agenda.month` (to-do + Momen 1 bulan, tanpa batas 30 hari), `momen.save`, `momen.delete`, `momen.sync`. `bootstrap` menambah `kenangan` dan `fitur`.
 
-**Supabase project Siklus, akun Febie** (`supabase-siklus/migrations/20261117000000_siklus.sql`):
+**Modul Siklus, project Supabase yang sama** (`supabase/migrations/20261117000100_siklus.sql`, prefix `siklus_*`, tidak lewat Edge Function Kantong):
 
 | Tabel | Isi | Akses |
 |---|---|---|
@@ -176,7 +176,6 @@ Dampak: kolom `tanggal_selesai` (kosong = satu hari), tampilan pita di kalender.
 - Semua tabel RLS tanpa policy; akses hanya lewat fungsi `siklus_muat/simpan/hapus/atur/hapus_semua` yang memeriksa `auth.uid()`.
 - Perkiraan **tidak disimpan**, dihitung di HP (`public/siklus.js`, `SiklusCore`).
 - Login: kode OTP 6 angka via email (Supabase Auth), sesi tersimpan di HP.
-- Ping harian: `kantong/apps-script/SiklusPing.gs`.
 - Siklus tidak pernah dikirim ke Google Calendar dan tidak tampil di Catat/Beranda.
 
 ### Onboarding fitur baru
@@ -231,7 +230,7 @@ Umum
 1. **Kode**: merge branch ini ke `main` → Vercel otomatis rilis PWA. Tanpa backend baru, app tetap jalan (Agenda menampilkan to-do terbaru + catatan "backend perlu diperbarui").
 2. **Backend Kantong**: `supabase db push` lalu `supabase functions deploy kantong --no-verify-jwt` (PANDUAN §8).
 3. **Pengingat H-1**: Riki & Febie masing-masing atur *All-day event notifications* kalender "Rumah Kita" = 1 hari sebelumnya.
-4. **Siklus**: Febie membuat project di akunnya → SQL → atur Auth & template email → daftarkan 2 email → isi `public/siklus-config.js` → push → pasang ping (PANDUAN §9).
+4. **Siklus**: atur Auth & template email → daftarkan 2 email → isi anon key di `public/siklus-config.js` → push (PANDUAN §9).
 
 ### Tes
 
@@ -239,8 +238,7 @@ Umum
 
 ### Catatan terbuka
 
-- Keputusan #15 (semua data pindah ke Supabase) vs #12 (project milik Febie): Siklus sudah di project terpisah akun Febie; data Kantong lain tetap di project Riki.
-- Ping harian adalah trik umum, bukan jaminan resmi Supabase.
+- Siklus satu project dengan Kantong: pemilik project (Riki) secara teknis bisa membuka tabel `siklus_*`. Kalau nanti butuh privasi penuh, tabelnya bisa dipindah ke project akun Febie tanpa mengubah app (cukup isi `url` di config).
 - Supabase gratis tidak punya backup otomatis (sumber pihak ketiga) → tombol **Unduh cadangan (JSON)** sudah ada di Pengaturan → Siklus.
 - Siklus butuh internet untuk menyimpan (tidak masuk antrean offline); membaca tetap bisa dari cache HP.
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Tes skema Siklus (supabase-siklus/migrations/*.sql) di Postgres lokal, dengan auth.users & auth.uid() tiruan.
+# Tes modul Siklus (supabase/migrations/*_siklus.sql) di Postgres lokal, dengan auth.users & auth.uid() tiruan.
 # Pakai: kantong/tools/test_siklus_sql.sh   (atau PGURL=postgres://... untuk server yang sudah ada)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SQL="$ROOT/supabase-siklus/migrations/20261117000000_siklus.sql"
+SQL="$ROOT/supabase/migrations/20261117000100_siklus.sql"
 TMP=""
 if [ -z "${PGURL:-}" ]; then
   TMP="$(mktemp -d)"

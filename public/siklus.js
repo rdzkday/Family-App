@@ -1,7 +1,7 @@
 /*
  * Siklus — catatan siklus Febie + onboarding fitur baru.
- * Data TIDAK lewat backend Kantong: langsung ke project Supabase terpisah milik akun Febie
- * (supabase-siklus/), login kode OTP via email, aturan baca/tulis dijalankan server (fungsi siklus_*).
+ * Satu project Supabase dengan Kantong, tapi modul terpisah: tabel & fungsi siklus_* (supabase/migrations/*_siklus.sql),
+ * tidak lewat Edge Function Kantong. Login kode OTP via email (Supabase Auth), aturan baca/tulis dijalankan server.
  * Perkiraan tidak disimpan: dihitung di HP dari catatan (SiklusCore, dites di kantong/tools/test_siklus.js).
  */
 var SiklusCore = (function () {
@@ -101,7 +101,13 @@ if (typeof window !== 'undefined') window.SiklusModul = function (x) {
   var st = { data: LS.get('k_siklus_data', null), sesi: LS.get('k_siklus_sesi', null), terakhir: 0, sibuk: false };
 
   function demo() { return x.conn() && x.conn().mode === 'demo'; }
-  function siap() { return demo() || !!(cfg.url && cfg.anonKey); }
+  // URL project: dari config, atau diturunkan dari kode koneksi Kantong (https://<ref>.supabase.co/functions/v1/kantong)
+  function baseUrl() {
+    if (cfg.url) return String(cfg.url).replace(/\/$/, '');
+    var m = /^(https:\/\/[^/]+\.supabase\.(co|in))\//.exec((x.conn() && x.conn().api) || '');
+    return m ? m[1] : '';
+  }
+  function siap() { return demo() || !!(baseUrl() && cfg.anonKey); }
   function idPemilik() { return cfg.pemilik || 'febie'; }
   function akuPemilik() { var m = x.me(); return !!m && m.id === idPemilik(); }
   function namaUser(id) { var u = x.users().filter(function (z) { return z.id === id; })[0]; return u ? u.nama : id; }
@@ -125,7 +131,7 @@ if (typeof window !== 'undefined') window.SiklusModul = function (x) {
     return m;
   }
   function apiRemote() {
-    var base = String(cfg.url || '').replace(/\/$/, '');
+    var base = baseUrl();
     function req(path, body, token) {
       return fetch(base + path, { method: 'POST', body: JSON.stringify(body || {}),
         headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + (token || cfg.anonKey), 'Content-Type': 'application/json' } })
@@ -503,7 +509,7 @@ if (typeof window !== 'undefined') window.SiklusModul = function (x) {
           '<div class="onb-act"><button type="button" class="btn" data-o="lanjut">Lanjut</button><button type="button" class="btn ghost" data-o="kembali">Kembali</button></div>';
       } else if (lang === 'tawaran') {
         if (!siap()) {
-          b.innerHTML = '<h2 class="onb-h2" id="onb-h">Catatan siklus</h2><p class="sk-p">Siklus butuh database khusus di akunmu dulu (' + esc(pas) + ' bisa bantu memasangnya). Setelah siap, aktifkan dari <b>Pengaturan → Siklus</b>.</p>' +
+          b.innerHTML = '<h2 class="onb-h2" id="onb-h">Catatan siklus</h2><p class="sk-p">Siklus belum dipasang di database Kantong (' + esc(pas) + ' perlu menjalankan langkah pasangnya). Setelah siap, aktifkan dari <b>Pengaturan → Siklus</b>.</p>' +
             '<div class="onb-act"><button type="button" class="btn" data-o="selesai">Lanjut</button></div>';
         } else {
           b.innerHTML = '<h2 class="onb-h2" id="onb-h">Mau catat siklus di sini?</h2>' +
@@ -513,7 +519,8 @@ if (typeof window !== 'undefined') window.SiklusModul = function (x) {
         }
       } else if (lang === 'privasi') {
         b.innerHTML = '<h2 class="onb-h2" id="onb-h">Siapa yang bisa melihat?</h2>' +
-          '<ul class="onb-list"><li>Catatanmu disimpan di <b>database milik akunmu sendiri</b>, terpisah dari data keuangan.</li>' +
+          '<ul class="onb-list"><li>Catatanmu disimpan di database Kantong, di <b>bagian terpisah</b> dari data keuangan. Di app, catatan dijaga login emailmu.</li>' +
+          '<li>' + esc(pas) + ' adalah pemilik database, jadi secara teknis bisa membuka tabelnya lewat dashboard Supabase.</li>' +
           '<li><b>Jadwal</b> (tanggal & perkiraan) <b>selalu terlihat oleh ' + esc(pas) + '</b>.</li>' +
           '<li><b>Catatan</b> hanya terlihat olehmu, kecuali kamu bagikan.</li>' +
           '<li>Tidak pernah masuk Google Calendar atau halaman Catat.</li>' +

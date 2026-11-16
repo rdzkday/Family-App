@@ -123,9 +123,9 @@ Urutan aman: skema dulu, lalu API. Selama API belum diperbarui, to-do tetap ters
 - Kartu "N tahun lalu hari ini" muncul di halaman Catat untuk semua momen; **Tutup** = sembunyi sampai besok.
 - Backend lama (Apps Script): tempel `Core.gs` + `Code.gs` baru, deploy versi baru, lalu menu **Kantong → Ganti id user istri → febie (sekali)**. Momen tahunan di versi ini hanya dibuat di hari pertama rentang.
 
-## 9. Siklus (project Supabase TERPISAH di akun Febie, ±20 menit)
+## 9. Siklus (modul terpisah di project Supabase Kantong, ±15 menit)
 
-Data siklus tidak pernah masuk project Kantong. Project dibuat di **akun Febie**, jadi hanya Febie yang bisa membuka dashboard dan tabelnya.
+Satu project dengan Kantong, tapi modulnya terpisah: tabel & fungsi `siklus_*` di `supabase/migrations/20261117000100_siklus.sql`, tidak lewat Edge Function Kantong, login sendiri (kode OTP email).
 
 | | Jadwal (tanggal & perkiraan) | Catatan |
 |---|---|---|
@@ -133,26 +133,26 @@ Data siklus tidak pernah masuk project Kantong. Project dibuat di **akun Febie**
 | Riki (pembaca) | baca, setelah Febie mengaktifkan | baca **hanya** kalau Febie menyalakan "Bagikan catatan" |
 | Lainnya | tidak ada | tidak ada |
 
-Aturan dijalankan server (fungsi `siklus_*`, dites di `kantong/tools/test_siklus_sql.sh`): data yang tidak boleh dilihat Riki tidak pernah dikirim ke HP-nya.
+Aturan dijalankan server (dites di `kantong/tools/test_siklus_sql.sh`). Batasnya: Riki adalah pemilik project, jadi lewat dashboard Supabase secara teknis tetap bisa membuka tabel `siklus_*`. Ini disebutkan terus terang di layar privasi onboarding Febie.
 
-1. Login supabase.com **dengan akun Febie** → **New project** (region Singapore).
-2. **SQL Editor** → tempel isi `supabase-siklus/migrations/20261117000000_siklus.sql` → **Run**.
-3. **Authentication → Sign In / Providers**: matikan *Allow new users to sign up*. Email provider tetap aktif.
-4. **Authentication → Email Templates → Magic Link**: ganti isi template supaya memuat kode, mis. `Kode masuk Siklus: {{ .Token }}`. (Tanpa `{{ .Token }}` yang terkirim cuma link, dan link di iPhone terbuka di Safari, bukan di app.)
-5. **Authentication → Users → Add user**: email Febie dan email Riki (centang *Auto Confirm User*).
-6. **SQL Editor**:
+1. `supabase db push` (ikut menjalankan migrasi Siklus).
+2. **Authentication → Sign In / Providers**: matikan *Allow new users to sign up*. Email provider tetap aktif.
+3. **Authentication → Email Templates → Magic Link**: isi template supaya memuat kode, mis. `Kode masuk Siklus: {{ .Token }}`. (Tanpa `{{ .Token }}` yang terkirim cuma link, dan di iPhone link terbuka di Safari, bukan di app.)
+4. **Authentication → Users → Add user**: email Febie dan email Riki (centang *Auto Confirm User*).
+5. **SQL Editor**:
    ```sql
    select siklus_atur_anggota('email-febie@…', 'pemilik');
    select siklus_atur_anggota('email-riki@…', 'pembaca');
    ```
-7. **Project Settings → API**: salin *Project URL* dan *anon public key* ke `public/siklus-config.js`, lalu push ke `main`. Anon key memang publik; data dijaga login + fungsi server.
-8. Ping harian supaya project gratis tidak di-pause (Supabase gratis di-pause setelah 1 minggu tanpa aktivitas): tempel `kantong/apps-script/SiklusPing.gs` ke project Apps Script, isi Script Properties `SIKLUS_URL` & `SIKLUS_ANON`, jalankan `pasangPingSiklus()` sekali.
+6. **Project Settings → API**: salin *anon public key* ke `public/siklus-config.js` (`url` boleh kosong, diambil dari kode koneksi), lalu push ke `main`. Anon key memang publik; data dijaga login + fungsi server.
+
+Tidak perlu ping harian: project yang sama dipakai Kantong setiap hari.
 
 Di app:
 - Febie: kartu **Ada yang baru** di Catat → pengenalan 8 layar → setuju → masuk dengan kode email → pilih bagikan catatan → isi catatan awal (opsional).
 - Riki: **Pengaturan → Siklus → Masuk untuk lihat jadwal** (kode email sekali).
 - Perkiraan tidak disimpan; dihitung di HP: hari pertama terakhir + rata-rata 6 jarak terakhir (kurang dari 2 catatan = 28 hari, "perkiraan kasar"), tampil sebagai rentang ±2 hari. Jarak di luar 21–35 hari → app bertanya "Ada yang terlewat?".
-- Febie bisa **Unduh cadangan (JSON)** dan **Hapus semua catatan** (persetujuan ikut ditarik) di Pengaturan → Siklus. Supabase gratis tidak punya backup otomatis, jadi unduh cadangan sesekali.
+- Febie bisa **Unduh cadangan (JSON)** dan **Hapus semua catatan** (persetujuan ikut ditarik) di Pengaturan → Siklus.
 
 ---
 

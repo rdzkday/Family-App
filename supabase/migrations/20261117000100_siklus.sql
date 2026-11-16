@@ -1,5 +1,6 @@
--- Siklus: project Supabase TERPISAH, dibuat di akun Febie. Jangan dipasang di project Kantong.
--- Pemilik project (Febie) satu-satunya yang bisa membuka dashboard/tabel ini.
+-- Siklus: modul terpisah di project Supabase yang sama dengan Kantong.
+-- Tidak lewat Edge Function Kantong; app memanggil fungsi siklus_* langsung dengan login Supabase Auth (OTP).
+-- Catatan: pemilik project (Riki) secara teknis bisa membuka tabel ini lewat dashboard.
 --
 -- Aturan (dijalankan di server, bukan cuma di tampilan):
 --  * pemilik (Febie): baca + tulis semua catatannya.
