@@ -1,5 +1,5 @@
 /*
- * Adapter Google Calendar untuk to-do, dipakai KantongCore.syncTodoCalendar lewat store.calendar:
+ * Adapter Google Calendar untuk to-do & momen tahunan, dipakai KantongCore lewat store.calendar:
  *   upsert(eventId, spec) -> eventId     remove(eventId)
  * Memakai service account (JWT RS256 lewat WebCrypto) + Calendar REST v3. Tanpa library.
  * Kalender "Rumah Kita" dibuat manual di akun Riki, lalu di-share ke email service account
@@ -66,15 +66,17 @@ export function createCalendarAdapter(cfg) {
   }
   function body(spec) {
     const b = { summary: spec.judul, description: spec.deskripsi,
-      colorId: spec.warna === 'bersama' ? '5' : (WARNA[spec.warna] || '8') };
+      colorId: spec.warna === 'bersama' ? '5' : (spec.warna === 'momen' ? '6' : (WARNA[spec.warna] || '8')) };
     if (spec.seharian) {
-      const p = spec.tanggal.split('-');
+      // rentang (momen beberapa hari): end.date = hari setelah tanggal terakhir (eksklusif)
+      const p = String(spec.tanggal_selesai || spec.tanggal).split('-');
       const besok = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + 1)).toISOString().slice(0, 10);
       b.start = { date: spec.tanggal }; b.end = { date: besok };
     } else {
       b.start = { dateTime: spec.mulai + ':00', timeZone: TZ };
       b.end = { dateTime: spec.akhir + ':00', timeZone: TZ };
     }
+    if (spec.tahunan) b.recurrence = [spec.rrule || 'RRULE:FREQ=YEARLY'];
     return b;
   }
   return {

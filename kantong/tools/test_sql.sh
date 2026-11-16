@@ -5,6 +5,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SQL="$ROOT/supabase/migrations/20261116000000_kantong.sql"
+SQL2="$ROOT/supabase/migrations/20261117000000_agenda_momen.sql"
 TMP=""
 if [ -z "${PGURL:-}" ]; then
   TMP="$(mktemp -d)"
@@ -29,6 +30,22 @@ echo "✓ migrasi jalan dua kali tanpa error"
 
 q() { psql -qtA -v ON_ERROR_STOP=1 "$PGURL" -c "$1"; }
 
+# data lama milik 'istri' sebelum migrasi kedua: kode akses + transaksi + to-do
+q "select kantong_buat_kode('istri', 'https://proj.supabase.co/functions/v1/kantong')" >/dev/null
+HASH_ISTRI="$(q "select token_hash from akses where user_id='istri'")"
+q "insert into transaksi (id, tanggal, tipe, nominal, buku, oleh) values ('tx-f', '2026-11-01', 'Pengeluaran', 1000, 'istri', 'istri')"
+q "insert into todo (id, judul, pemilik, oleh, selesai_oleh) values ('td-f', 'Arisan', 'istri', 'istri', 'istri')"
+psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$SQL2"
+psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$SQL2"   # idempoten
+echo "✓ migrasi agenda/momen jalan dua kali tanpa error"
+[ "$(q "select string_agg(id || ':' || nama || ':' || buku, ',' order by id) from users")" = "febie:Febie:istri,riki:Riki:riki" ] || { echo "user istri harus jadi febie (buku tetap istri)"; exit 1; }
+[ "$(q "select token_hash from akses where user_id='febie'")" = "$HASH_ISTRI" ] || { echo "kode akses Febie harus tetap berlaku"; exit 1; }
+[ "$(q "select pemilik || ':' || nama from buku where id='istri'")" = "febie:Febie" ] || { echo "pemilik buku istri harus febie"; exit 1; }
+[ "$(q "select oleh from transaksi where id='tx-f'")" = "febie" ] || { echo "transaksi.oleh harus febie"; exit 1; }
+[ "$(q "select pemilik || oleh || selesai_oleh from todo where id='td-f'")" = "febiefebiefebie" ] || { echo "todo harus pindah ke febie"; exit 1; }
+q "delete from transaksi; delete from todo; delete from akses"
+echo "✓ id user istri -> febie: data, buku, dan kode akses ikut pindah"
+
 # kode koneksi: base64url JSON {api, token}; hash token tersimpan
 KODE="$(q "select kantong_buat_kode('riki', 'https://proj.supabase.co/functions/v1/kantong')")"
 DECODED="$(node -e "let s=process.argv[1].replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const o=JSON.parse(Buffer.from(s,'base64').toString());console.log(o.api, o.token.length)" "$KODE")"
@@ -38,7 +55,7 @@ HASH="$(q "select token_hash from akses where user_id='riki'")"
 [ "$HASH" = "$(printf %s "$TOKEN" | sha256sum | cut -d' ' -f1)" ] || { echo "hash token tidak cocok"; exit 1; }
 echo "✓ kantong_buat_kode: kode koneksi valid, hash sha256 tersimpan"
 q "select kantong_buat_kode('riki', 'https://proj.supabase.co/functions/v1/kantong')" >/dev/null
-[ "$(q "select count(*) from akses")" = "1" ] || { echo "kode ganti harus menimpa, bukan menambah"; exit 1; }
+[ "$(q "select count(*) from akses where user_id='riki'")" = "1" ] || { echo "kode ganti harus menimpa, bukan menambah"; exit 1; }
 [ "$(q "select token_hash from akses where user_id='riki'")" != "$HASH" ] || { echo "kode lama harus mati"; exit 1; }
 echo "✓ buat kode lagi: kode lama tidak berlaku"
 if q "select kantong_buat_kode('siapa', 'https://x')" 2>/dev/null; then echo "user tak dikenal harus ditolak"; exit 1; fi
@@ -49,6 +66,11 @@ ROWS='[{"tabel":"kantong","baris":{"id":"bca","nama":"BCA","jenis":"Debit","buku
        {"tabel":"transaksi","baris":{"id":"tx-1","tanggal":"2026-11-16","tipe":"Pengeluaran","nominal":25000,"buku":"riki","kategori":"makan","kantong":"bca","kantong_tujuan":"","keterangan":"kopi","reimburse":false,"oleh":"riki","sumber":"app","dibuat":"2026-11-16T10:00:00+07:00","diubah":"2026-11-16T10:00:00+07:00","dihapus":"","terbayar":"","tx_balik":""}},
        {"tabel":"todo","baris":{"id":"td-1","judul":"Beli galon","pemilik":"riki","tanggal":null,"jam":"","durasi":30,"selesai":false,"selesai_oleh":"","gcal_event_id":"","gcal_status":"","gcal_error":"","oleh":"riki","dibuat":"2026-11-16T10:00:00+07:00","diubah":"2026-11-16T10:00:00+07:00","dihapus":""}}]'
 [ "$(q "select kantong_simpan('$ROWS'::jsonb)")" = "3" ] || { echo "kantong_simpan harus mengembalikan 3"; exit 1; }
+[ "$(q "select coalesce(selesai_at, 'NULL') from todo where id='td-1'")" = "NULL" ] || { echo "to-do dari Edge Function lama (tanpa selesai_at) harus tetap tersimpan"; exit 1; }
+MOMEN='[{"tabel":"momen","baris":{"id":"mo-1","judul":"Pindah rumah","cerita":"","tanggal":"2024-11-16","tanggal_selesai":null,"kategori":"kita","pemilik":"bersama","tahunan":true,"gcal_event_id":"","gcal_status":"","gcal_error":"","oleh":"riki","dibuat":"x","diubah":"x","dihapus":""}},
+        {"tabel":"momen","baris":{"id":"mo-2","judul":"Trip Bali","cerita":"seru","tanggal":"2025-06-01","tanggal_selesai":"2025-06-03","kategori":"kita","pemilik":"febie","tahunan":false,"gcal_event_id":"","gcal_status":"","gcal_error":"","oleh":"febie","dibuat":"x","diubah":"x","dihapus":""}}]'
+[ "$(q "select kantong_simpan('$MOMEN'::jsonb)")" = "2" ] || { echo "kantong_simpan harus bisa menulis momen"; exit 1; }
+echo "✓ kantong_simpan: tabel momen + to-do tanpa selesai_at"
 ROWS2='[{"tabel":"transaksi","baris":{"id":"tx-1","tanggal":"2026-11-17","tipe":"Pengeluaran","nominal":30000,"buku":"riki","kategori":"makan","kantong":"bca","kantong_tujuan":"","keterangan":"kopi lagi","reimburse":true,"oleh":"riki","sumber":"app","dibuat":"2026-11-16T10:00:00+07:00","diubah":"2026-11-17T10:00:00+07:00","dihapus":"","terbayar":"","tx_balik":""}}]'
 q "select kantong_simpan('$ROWS2'::jsonb)" >/dev/null
 [ "$(q "select count(*) from transaksi")" = "1" ] || { echo "upsert harus menimpa"; exit 1; }
@@ -68,6 +90,8 @@ a.strictEqual(s.transaksi[0].tanggal, "2026-11-17"); a.strictEqual(s.transaksi[0
 a.strictEqual(s.kantong[0].limit, 0); a.strictEqual(s.kantong[0].per_tanggal, "2026-10-31");
 a.strictEqual(s.todo[0].tanggal, null); a.strictEqual(s.todo[0].selesai, false);
 a.strictEqual(s.akses.length, 1); a.ok(s.akses[0].token_hash.length === 64);
+a.strictEqual(s.momen.length, 2); a.strictEqual(s.momen[0].tanggal_selesai, null); a.strictEqual(s.momen[1].tanggal_selesai, "2025-06-03");
+a.strictEqual(s.momen[0].tahunan, true); a.ok(s.users.some((u) => u.id === "febie"));
 ' "$MUAT"
 echo "✓ kantong_muat: snapshot lengkap, tipe kolom sesuai harapan core"
 

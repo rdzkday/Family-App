@@ -84,7 +84,7 @@ function utangAntara(store, bersama, pribadi) {
 }
 
 // ---------------------------------------------------------------- versi & salinan core
-eq('versi core naik ke 1.3.0', C.VERSION, '1.3.0');
+eq('versi core naik ke 1.4.0', C.VERSION, '1.4.0');
 (function () {
   // core.mjs (Supabase) dan Core.gs (Apps Script) harus persis hasil build_core.js
   var fs = require('fs'), build = require(path.join(__dirname, 'build_core.js'));
@@ -526,6 +526,118 @@ function todoById(store, id) { return C.byId(store.all('Todo'))[id]; }
   todoCall(st, 'u-riki', 'todo.save', { id: 'l3', judul: 'Belum selesai' }, '2026-09-01T10:00:00+07:00');
   var ids = todoCall(st, 'u-riki', 'todo.list', {}).todos.map(function (t) { return t.id; }).sort().join(',');
   eq('todo.list: selesai lama disembunyikan, yang belum selesai tetap', ids, 'l2,l3');
+})();
+
+
+// ---------------------------------------------------------------- agenda: tanggal selesai to-do
+(function () {
+  var st = todoStore();
+  todoCall(st, 'u-riki', 'todo.save', { id: 'a1', judul: 'Tanpa waktu' }, '2026-10-28T09:00:00+07:00');
+  var d = todoCall(st, 'u-riki', 'todo.done', { id: 'a1', selesai: true }, '2026-11-03T20:00:00+07:00').todo;
+  eq('agenda: selesai_at dicatat saat dicentang', d.selesai_at, '2026-11-03T20:00:00+07:00');
+  var d2 = todoCall(st, 'u-riki', 'todo.done', { id: 'a1', selesai: true }, '2026-11-05T08:00:00+07:00').todo;
+  eq('agenda: centang ulang tidak menggeser tanggal selesai', d2.selesai_at, '2026-11-03T20:00:00+07:00');
+  var e = todoCall(st, 'u-riki', 'todo.save', { id: 'a1', judul: 'Tanpa waktu (edit)' }, '2026-11-06T08:00:00+07:00').todo;
+  eq('agenda: edit judul tidak menghapus selesai_at', e.selesai_at, '2026-11-03T20:00:00+07:00');
+  eq('agenda: to-do selesai tanpa waktu muncul di tanggal selesai', C.agendaTanggalTodo(e), '2026-11-03');
+  var u = todoCall(st, 'u-riki', 'todo.done', { id: 'a1', selesai: false }, '2026-11-07T08:00:00+07:00').todo;
+  eq('agenda: batal selesai mengosongkan selesai_at', u.selesai_at, '');
+  eq('agenda: belum selesai muncul di tanggal dibuat', C.agendaTanggalTodo(u), '2026-10-28');
+  eq('agenda: punya tanggal -> tanggal itu', C.agendaTanggalTodo({ tanggal: '2026-12-01', dibuat: '2026-11-01T00:00:00+07:00' }), '2026-12-01');
+  eq('agenda: selesai lama tanpa selesai_at -> tanggal dibuat', C.agendaTanggalTodo({ selesai: true, selesai_at: '', dibuat: '2026-08-09T10:00:00+07:00', diubah: '2026-09-01T10:00:00+07:00' }), '2026-08-09');
+})();
+
+// ---------------------------------------------------------------- agenda.month: riwayat tanpa batas 30 hari
+(function () {
+  var st = todoStore();
+  todoCall(st, 'u-riki', 'todo.save', { id: 'h1', judul: 'Agustus' }, '2026-08-10T09:00:00+07:00');
+  todoCall(st, 'u-riki', 'todo.done', { id: 'h1', selesai: true }, '2026-08-12T09:00:00+07:00');
+  todoCall(st, 'u-riki', 'todo.save', { id: 'h2', judul: 'Berwaktu', tanggal: '2026-08-20', jam: '10:00' }, '2026-08-01T09:00:00+07:00');
+  todoCall(st, 'u-riki', 'todo.save', { id: 'h3', judul: 'September' }, '2026-09-02T09:00:00+07:00');
+  todoCall(st, 'u-riki', 'todo.save', { id: 'h4', judul: 'Dihapus' }, '2026-08-03T09:00:00+07:00');
+  todoCall(st, 'u-riki', 'todo.delete', { id: 'h4' }, '2026-08-04T09:00:00+07:00');
+  var ag = todoCall(st, 'u-riki', 'agenda.month', { bulan: '2026-08' });
+  eq('agenda.month: to-do Agustus (selesai > 30 hari tetap ada)', ag.todos.map(function (t) { return t.id; }).sort().join(','), 'h1,h2');
+  eq('agenda.month: list biasa tetap menyembunyikan selesai lama', todoCall(st, 'u-riki', 'todo.list', {}).todos.some(function (t) { return t.id === 'h1'; }), false);
+  lempar('agenda.month: bulan tidak valid ditolak', function () { todoCall(st, 'u-riki', 'agenda.month', { bulan: '2026-8' }); });
+})();
+
+// ---------------------------------------------------------------- momen: simpan, izin, validasi
+(function () {
+  var st = todoStore();
+  var m = todoCall(st, 'u-febie', 'momen.save', { id: 'm1', judul: '  Pindah  rumah ', tanggal: '2024-11-02', pemilik: 'u-febie', kategori: 'kita' }).momen;
+  eq('momen: judul dirapikan', m.judul, 'Pindah rumah');
+  eq('momen: satu hari = tanggal_selesai kosong', m.tanggal_selesai, '');
+  eq('momen: tidak tahunan -> tanpa event', Object.keys(st.calendar.events).length, 0);
+  var r = todoCall(st, 'u-riki', 'momen.save', { id: 'm1', judul: 'Pindah rumah baru', tanggal: '2024-11-02', pemilik: 'u-febie', kategori: 'kita' }).momen;
+  eq('momen: Riki bisa mengubah momen milik Febie', r.judul, 'Pindah rumah baru');
+  eq('momen: pembuat asli tetap tercatat', r.oleh, 'u-febie');
+  var rg = todoCall(st, 'u-riki', 'momen.save', { id: 'm2', judul: 'Trip', tanggal: '2025-06-01', tanggal_selesai: '2025-06-03', pemilik: 'bersama', kategori: 'kita' }).momen;
+  eq('momen: rentang tanggal tersimpan', rg.tanggal_selesai, '2025-06-03');
+  lempar('momen: selesai sebelum mulai ditolak', function () { todoCall(st, 'u-riki', 'momen.save', { id: 'm3', judul: 'X', tanggal: '2025-06-03', tanggal_selesai: '2025-06-01', pemilik: 'bersama', kategori: 'kita' }); });
+  lempar('momen: rentang > batas ditolak', function () { todoCall(st, 'u-riki', 'momen.save', { id: 'm3', judul: 'X', tanggal: '2025-01-01', tanggal_selesai: '2025-06-01', pemilik: 'bersama', kategori: 'kita' }); });
+  lempar('momen: kategori asing ditolak', function () { todoCall(st, 'u-riki', 'momen.save', { id: 'm3', judul: 'X', tanggal: '2025-01-01', pemilik: 'bersama', kategori: 'liburan' }); });
+  lempar('momen: tanpa judul ditolak', function () { todoCall(st, 'u-riki', 'momen.save', { id: 'm3', judul: ' ', tanggal: '2025-01-01', pemilik: 'bersama', kategori: 'kita' }); });
+  lempar('momen: pemilik asing ditolak', function () { todoCall(st, 'u-riki', 'momen.save', { id: 'm3', judul: 'X', tanggal: '2025-01-01', pemilik: 'tetangga', kategori: 'kita' }); });
+  var ag = todoCall(st, 'u-riki', 'agenda.month', { bulan: '2025-06' });
+  eq('agenda.month: momen rentang ikut di bulannya', ag.momen.map(function (x) { return x.id; }).join(','), 'm2');
+  todoCall(st, 'u-febie', 'momen.delete', { id: 'm2' });
+  eq('momen: dihapus tidak muncul lagi', todoCall(st, 'u-riki', 'agenda.month', { bulan: '2025-06' }).momen.length, 0);
+  eq('momen: hapus ulang idempoten', todoCall(st, 'u-febie', 'momen.delete', { id: 'm2' }).id, 'm2');
+})();
+
+// ---------------------------------------------------------------- momen tahunan: event tahunan seharian
+(function () {
+  var st = todoStore();
+  var m = todoCall(st, 'u-riki', 'momen.save', { id: 'y1', judul: 'Anniversary', tanggal: '2023-11-10', pemilik: 'bersama', kategori: 'kita', tahunan: true }).momen;
+  var ev = st.calendar.events[m.gcal_event_id];
+  ok('momen tahunan: event dibuat', !!ev);
+  eq('momen tahunan: status ok', m.gcal_status, 'ok');
+  eq('momen tahunan: judul diberi bintang', ev.judul, '★ Anniversary');
+  eq('momen tahunan: seharian', ev.seharian, true);
+  eq('momen tahunan: berulang tiap tahun', ev.rrule, 'RRULE:FREQ=YEARLY');
+  var again = todoCall(st, 'u-riki', 'momen.save', { id: 'y1', judul: 'Anniversary', tanggal: '2023-11-10', pemilik: 'bersama', kategori: 'kita', tahunan: true }).momen;
+  eq('momen tahunan: simpan ulang tidak membuat event dobel', Object.keys(st.calendar.events).length, 1);
+  eq('momen tahunan: id event sama', again.gcal_event_id, m.gcal_event_id);
+  var off = todoCall(st, 'u-riki', 'momen.save', { id: 'y1', judul: 'Anniversary', tanggal: '2023-11-10', pemilik: 'bersama', kategori: 'kita', tahunan: false }).momen;
+  eq('momen: tahunan dimatikan -> event dihapus', Object.keys(st.calendar.events).length, 0);
+  eq('momen: tahunan dimatikan -> id event kosong', off.gcal_event_id, '');
+  var feb = todoCall(st, 'u-riki', 'momen.save', { id: 'y2', judul: 'Lahir', tanggal: '2024-02-29', pemilik: 'bersama', kategori: 'keluarga', tahunan: true }).momen;
+  eq('momen 29 Feb: berulang di hari terakhir Februari', st.calendar.events[feb.gcal_event_id].rrule, 'RRULE:FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=-1');
+  st.calendar.gagal = 'Kuota habis';
+  var g = todoCall(st, 'u-riki', 'momen.save', { id: 'y3', judul: 'Ultah ibu', tanggal: '1960-05-05', pemilik: 'u-febie', kategori: 'keluarga', tahunan: true }).momen;
+  eq('momen tahunan: kalender gagal -> momen tetap tersimpan', g.gcal_status, 'gagal');
+  st.calendar.gagal = '';
+  eq('momen.sync: coba lagi berhasil', todoCall(st, 'u-riki', 'momen.sync', { id: 'y3' }).momen.gcal_status, 'ok');
+  todoCall(st, 'u-riki', 'momen.delete', { id: 'y3' });
+  eq('momen tahunan dihapus -> event ikut dihapus', Object.keys(st.calendar.events).length, 1);
+  eq('agenda.month: momen tahunan ikut di bulan lain (untuk tanda ulang tahun)', todoCall(st, 'u-riki', 'agenda.month', { bulan: '2026-02' }).momen.map(function (x) { return x.id; }).join(','), 'y2');
+})();
+
+// ---------------------------------------------------------------- kenangan di Beranda
+(function () {
+  var st = todoStore();
+  todoCall(st, 'u-riki', 'momen.save', { id: 'k1', judul: 'Pindah rumah', tanggal: '2024-11-02', pemilik: 'bersama', kategori: 'kita' });
+  todoCall(st, 'u-riki', 'momen.save', { id: 'k2', judul: 'Hari ini juga', tanggal: '2026-11-02', pemilik: 'bersama', kategori: 'kita' });
+  todoCall(st, 'u-riki', 'momen.save', { id: 'k3', judul: 'Lain hari', tanggal: '2025-11-03', pemilik: 'bersama', kategori: 'kita' });
+  todoCall(st, 'u-riki', 'momen.save', { id: 'k4', judul: 'Lebih lama', tanggal: '2020-11-02', pemilik: 'u-febie', kategori: 'keluarga' });
+  var b = todoCall(st, 'u-riki', 'bootstrap', {});
+  eq('kenangan: hanya tanggal ulang dari tahun lalu, paling lama dulu', b.kenangan.map(function (x) { return x.id + ':' + x.tahunLalu; }).join(','), 'k4:6,k1:2');
+  ok('bootstrap: fitur agenda & momen diumumkan', b.fitur.indexOf('agenda') >= 0 && b.fitur.indexOf('momen') >= 0);
+  todoCall(st, 'u-riki', 'momen.save', { id: 'k5', judul: 'Kabisat', tanggal: '2024-02-29', pemilik: 'bersama', kategori: 'kita' });
+  eq('kenangan 29 Feb muncul 28 Feb di tahun bukan kabisat', C.kenangan(C.memoryStore({ Momen: st.all('Momen'), Users: [] }).data, '2027-02-28').map(function (x) { return x.id; }).join(','), 'k5');
+  eq('tanggal ulang 29 Feb di tahun kabisat tetap 29', C.tanggalUlang('2024-02-29', 2028), '2028-02-29');
+})();
+
+// ---------------------------------------------------------------- id istri -> febie: antrean lama tetap diterima
+(function () {
+  var s = seed();
+  s.Users = [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'febie', nama: 'Febie', buku: 'istri' }];
+  var st = C.memoryStore(s);
+  var t = C.handle(st, { id: 'febie', nama: 'Febie', buku: 'istri' }, 'todo.save', { id: 'q1', judul: 'Dari antrean lama', pemilik: 'istri' }, NOW).todo;
+  eq('alias: pemilik istri diarahkan ke febie', t.pemilik, 'febie');
+  eq('alias: tidak mengubah id lain', C.aliasUser({ Users: s.Users }, 'riki'), 'riki');
+  eq('alias: tidak aktif kalau user istri masih ada', C.aliasUser({ Users: [{ id: 'istri' }, { id: 'febie' }] }, 'istri'), 'istri');
 })();
 
 console.log('\n' + lulus + ' cek lulus, ' + gagal + ' gagal.');

@@ -7,9 +7,9 @@
  */
 import KantongCore from './core.mjs';
 
-const TABEL = { Buku: 'buku', Users: 'users', Kategori: 'kategori', Kantong: 'kantong', Budget: 'budget', Transaksi: 'transaksi', Todo: 'todo' };
-const KOLOM_TANGGAL = { tanggal: 1, per_tanggal: 1 };
-const KOLOM_BOOL = { hitung: 1, aktif: 1, reimburse: 1, selesai: 1 };
+const TABEL = { Buku: 'buku', Users: 'users', Kategori: 'kategori', Kantong: 'kantong', Budget: 'budget', Transaksi: 'transaksi', Todo: 'todo', Momen: 'momen' };
+const KOLOM_TANGGAL = { tanggal: 1, per_tanggal: 1, tanggal_selesai: 1 };
+const KOLOM_BOOL = { hitung: 1, aktif: 1, reimburse: 1, selesai: 1, tahunan: 1 };
 const KOLOM_ANGKA = { nominal: 1, saldo_awal: 1, limit: 1, urutan: 1, durasi: 1 };
 
 // Postgres -> bentuk yang diharapkan core (null jadi '' / false / 0)

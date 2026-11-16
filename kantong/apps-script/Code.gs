@@ -9,10 +9,10 @@
 
 var TZ = 'Asia/Jakarta';
 var TODO_CAL_NAME = 'Rumah Kita';   // kalender khusus to-do di akun pemilik script, dibagikan ke pasangan
-var DATE_COLS = { tanggal: 1, per_tanggal: 1 };
+var DATE_COLS = { tanggal: 1, per_tanggal: 1, tanggal_selesai: 1 };
 var TEXT_COLS = { id: 1, bulan: 1, buku: 1, kategori: 1, kantong: 1, kantong_tujuan: 1, keterangan: 1, nama: 1,
   oleh: 1, sumber: 1, dibuat: 1, diubah: 1, dihapus: 1, pemilik: 1, warna: 1, jenis: 1, tipe: 1,
-  judul: 1, jam: 1, selesai_oleh: 1, gcal_event_id: 1, gcal_status: 1, gcal_error: 1 };
+  judul: 1, jam: 1, selesai_oleh: 1, gcal_event_id: 1, gcal_status: 1, gcal_error: 1, cerita: 1, selesai_at: 1 };
 
 // ---------------- HTTP ----------------
 function doGet() {
@@ -25,7 +25,7 @@ function doPost(e) {
   var user = auth_(body.token);
   if (!user) return json_({ ok: false, error: 'Kode akses salah', code: 'AUTH' });
 
-  var isWrite = body.action !== 'bootstrap' && body.action !== 'month' && body.action !== 'todo.list';
+  var isWrite = ['bootstrap', 'month', 'todo.list', 'agenda.month'].indexOf(body.action) < 0;
   var lock = LockService.getScriptLock();
   if (isWrite && !lock.tryLock(20000)) return json_({ ok: false, error: 'Server sibuk, coba lagi' });
   try {
@@ -131,7 +131,7 @@ function fromCell_(h, v) {
     if (DATE_COLS[h]) return Utilities.formatDate(v, TZ, 'yyyy-MM-dd');
     return Utilities.formatDate(v, TZ, "yyyy-MM-dd'T'HH:mm:ssXXX");
   }
-  if (h === 'hitung' || h === 'aktif' || h === 'reimburse' || h === 'selesai') return v === true || String(v).toUpperCase() === 'TRUE';
+  if (h === 'hitung' || h === 'aktif' || h === 'reimburse' || h === 'selesai' || h === 'tahunan') return v === true || String(v).toUpperCase() === 'TRUE';
   if (h === 'nominal' || h === 'saldo_awal' || h === 'limit' || h === 'urutan' || h === 'durasi') return Number(v) || 0;
   return v === null || v === undefined ? '' : (typeof v === 'string' ? v : String(v));
 }
@@ -153,6 +153,7 @@ function onOpen() {
     .addItem('3. Siapkan kalender ' + TODO_CAL_NAME, 'siapkanKalender')
     .addSeparator()
     .addItem('Ganti kode akses user…', 'resetKodeAkses')
+    .addItem('Ganti id user istri → febie (sekali)', 'migrasiIdFebie')
     .addToUi();
 }
 
@@ -178,10 +179,10 @@ function setup() {
   var buku = ss.getSheetByName('Buku');
   if (buku.getLastRow() < 2) {
     buku.getRange(2, 1, 3, 5).setValues([
-      ['riki', 'Riki', 'Pribadi', 'riki', 1], ['istri', 'Istri', 'Pribadi', 'istri', 2], ['rt', 'Rumah Tangga', 'Bersama', '', 3]]);
+      ['riki', 'Riki', 'Pribadi', 'riki', 1], ['istri', 'Febie', 'Pribadi', 'febie', 2], ['rt', 'Rumah Tangga', 'Bersama', '', 3]]);
   }
   var users = ss.getSheetByName('Users');
-  if (users.getLastRow() < 2) users.getRange(2, 1, 2, 3).setValues([['riki', 'Riki', 'riki'], ['istri', 'Istri', 'istri']]);
+  if (users.getLastRow() < 2) users.getRange(2, 1, 2, 3).setValues([['riki', 'Riki', 'riki'], ['febie', 'Febie', 'istri']]);
 
   var props = PropertiesService.getScriptProperties();
   props.setProperty('SHEET_ID', ss.getId());
@@ -218,7 +219,7 @@ function buatKodeKoneksi() {
 /** Ganti kode akses satu user (misal HP hilang). Kode lama langsung tidak berlaku. */
 function resetKodeAkses() {
   var ui = SpreadsheetApp.getUi();
-  var res = ui.prompt('Ganti kode akses', 'Ketik id user (mis. riki atau istri):', ui.ButtonSet.OK_CANCEL);
+  var res = ui.prompt('Ganti kode akses', 'Ketik id user (mis. riki atau febie):', ui.ButtonSet.OK_CANCEL);
   if (res.getSelectedButton() !== ui.Button.OK) return;
   var id = res.getResponseText().trim();
   if (!sheetStore_().all('Users').some(function (u) { return u.id === id; })) { ui.alert('User tidak ditemukan'); return; }
@@ -252,10 +253,28 @@ function calendarAdapter_() {
     if (spec.warna === 'bersama') return EC.YELLOW;
     return [EC.BLUE, EC.PALE_RED, EC.GREEN, EC.ORANGE][spec.warna] || EC.GRAY;
   }
+  // momen tahunan = seri event seharian berulang tiap tahun. Diubah dengan hapus + buat ulang (sederhana & aman).
+  // Catatan: backend lama ini hanya membuat seri satu hari (hari pertama) untuk momen rentang.
+  function hapusApaPun(c, eventId) {
+    var sr = null, ev = null;
+    try { sr = c.getEventSeriesById(eventId); } catch (e) { sr = null; }
+    if (sr) { try { sr.deleteEventSeries(); return; } catch (e2) { /* lanjut coba sebagai event biasa */ } }
+    try { ev = c.getEventById(eventId); } catch (e3) { ev = null; }
+    if (ev) ev.deleteEvent();
+  }
   return {
     // eventId kosong = buat baru; kalau event lama sudah tidak ada (dihapus manual) juga dibuat baru
     upsert: function (eventId, spec) {
       var c = kal(), ev = null;
+      if (spec.tahunan) {
+        if (eventId) hapusApaPun(c, eventId);
+        var p = String(spec.tanggal).split('-');
+        var rule = CalendarApp.newRecurrence().addYearlyRule();
+        var sr = c.createAllDayEventSeries(spec.judul, new Date(+p[0], +p[1] - 1, +p[2]), rule);
+        sr.setDescription(spec.deskripsi);
+        sr.setColor(CalendarApp.EventColor.ORANGE);
+        return sr.getId();
+      }
       if (eventId) { try { ev = c.getEventById(eventId); } catch (e) { ev = null; } }
       var mulai = tgl(spec.tanggal, spec.jam), akhir = new Date(mulai.getTime() + spec.durasi * 60000);
       if (!ev) ev = spec.seharian ? c.createAllDayEvent(spec.judul, mulai) : c.createEvent(spec.judul, mulai, akhir);
@@ -267,12 +286,30 @@ function calendarAdapter_() {
       ev.setColor(warna(spec));
       return ev.getId();
     },
-    remove: function (eventId) {
-      var ev = null;
-      try { ev = kal().getEventById(eventId); } catch (e) { ev = null; }
-      if (ev) ev.deleteEvent();
-    }
+    remove: function (eventId) { hapusApaPun(kal(), eventId); }
   };
+}
+
+/** Ganti id user 'istri' menjadi 'febie' di semua tab + kode akses. Aman dijalankan berulang. */
+function migrasiIdFebie() {
+  var ui = SpreadsheetApp.getUi(), ss = SpreadsheetApp.getActive();
+  var props = PropertiesService.getScriptProperties();
+  var users = sheetStore_().all('Users');
+  if (users.some(function (u) { return u.id === 'febie'; })) { ui.alert('Sudah: user febie sudah ada.'); return; }
+  if (!users.some(function (u) { return u.id === 'istri'; })) { ui.alert('User istri tidak ditemukan.'); return; }
+  var kolom = { Users: ['id'], Buku: ['pemilik'], Transaksi: ['oleh'], Todo: ['pemilik', 'oleh', 'selesai_oleh'], Momen: ['pemilik', 'oleh'] };
+  var n = 0;
+  Object.keys(kolom).forEach(function (tab) {
+    var sh = ss.getSheetByName(tab); if (!sh || sh.getLastRow() < 2) return;
+    var values = sh.getDataRange().getValues(), head = values[0].map(String);
+    kolom[tab].forEach(function (k) {
+      var c = head.indexOf(k); if (c < 0) return;
+      for (var r = 1; r < values.length; r++) if (values[r][c] === 'istri') { sh.getRange(r + 1, c + 1).setValue('febie'); n++; }
+    });
+  });
+  var lama = props.getProperty('token_istri');
+  if (lama) { props.setProperty('token_febie', lama); props.deleteProperty('token_istri'); }
+  ui.alert('Selesai: ' + n + ' sel diganti ke "febie". Kode koneksi Febie tetap berlaku (id buku "istri" tidak diubah).');
 }
 
 /** Buat kalender "Rumah Kita" (sekali), simpan id-nya, dan tampilkan langkah berbagi ke pasangan. */

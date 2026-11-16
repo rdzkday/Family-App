@@ -20,7 +20,7 @@ function mockDb() {
     kategori: [{ id: 'makan', nama: 'Makan', tipe: 'Pengeluaran', buku: 'riki,istri,rt', warna: '#FFC2B0', hitung: true, aktif: true, urutan: 1 }],
     kantong: [{ id: 'bca', nama: 'BCA', jenis: 'Debit', buku: 'riki', saldo_awal: 1000000, per_tanggal: '2026-10-31', limit: 0, aktif: true, urutan: 1 },
       { id: 'kas-rt', nama: 'Dompet RT', jenis: 'Debit', buku: 'rt', saldo_awal: 0, per_tanggal: '2026-10-31', limit: 0, aktif: true, urutan: 2 }],
-    budget: [], transaksi: [], todo: [],
+    budget: [], transaksi: [], todo: [], momen: [],
     akses: [{ user_id: 'riki', token_hash: sha('r'.repeat(40)) }, { user_id: 'istri', token_hash: sha('i'.repeat(40)) }]
   };
   const calls = [];
@@ -208,6 +208,25 @@ function mockGoogle() {
     assert.strictEqual(d.todo.gcal_status, 'gagal'); assert.match(d.todo.gcal_error, /belum disiapkan/);
     const e = ok(await call(R, 'todo.save', { id: 'td-6', judul: 'Tanpa waktu' }, { ...deps, calendar: null }));
     assert.strictEqual(e.todo.gcal_status, '');
+  });
+  await t('momen tahunan: event seharian berulang tiap tahun, rentang sampai hari terakhir', async () => {
+    const d = ok(await call(R, 'momen.save', { id: 'mo-1', judul: 'Trip pertama', tanggal: '2025-06-01', tanggal_selesai: '2025-06-03', pemilik: 'bersama', kategori: 'kita', tahunan: true }));
+    assert.match(d.momen.gcal_event_id, /^ev\d+$/); assert.strictEqual(d.momen.gcal_status, 'ok');
+    const ev = g.events[d.momen.gcal_event_id];
+    assert.deepStrictEqual(ev.start, { date: '2025-06-01' }); assert.deepStrictEqual(ev.end, { date: '2025-06-04' });
+    assert.deepStrictEqual(ev.recurrence, ['RRULE:FREQ=YEARLY']); assert.strictEqual(ev.colorId, '6');
+    const row = db.tabel.momen.find((x) => x.id === 'mo-1');
+    assert.strictEqual(row.gcal_status, 'ok'); assert.strictEqual(row.tanggal_selesai, '2025-06-03'); assert.strictEqual(row.tahunan, true);
+    const off = ok(await call(R, 'momen.save', { id: 'mo-1', judul: 'Trip pertama', tanggal: '2025-06-01', tanggal_selesai: '2025-06-03', pemilik: 'bersama', kategori: 'kita', tahunan: false }));
+    assert.strictEqual(off.momen.gcal_event_id, ''); assert.strictEqual(g.events[d.momen.gcal_event_id], undefined);
+    const satu = ok(await call(I, 'momen.save', { id: 'mo-2', judul: 'Kenangan biasa', tanggal: '2024-01-05', pemilik: 'istri', kategori: 'keluarga' }));
+    assert.strictEqual(satu.momen.gcal_event_id, ''); assert.strictEqual(db.tabel.momen.find((x) => x.id === 'mo-2').tanggal_selesai, null);
+  });
+  await t('agenda.month & bootstrap.kenangan lewat Supabase', async () => {
+    const a = ok(await call(R, 'agenda.month', { bulan: '2025-06' }));
+    assert.deepStrictEqual(a.momen.map((x) => x.id), ['mo-1']);
+    const b = ok(await call(R, 'bootstrap', {}));
+    assert.ok(b.fitur.includes('agenda')); assert.ok(Array.isArray(b.kenangan));
   });
   await t('database gagal saat simpan: dilaporkan sebagai error, bukan ok palsu', async () => {
     const rusak = { ...deps, fetch: async (url, opt) => url.endsWith('kantong_simpan') ? { ok: false, status: 500, text: async () => 'boom' } : db.fetch(url, opt) };

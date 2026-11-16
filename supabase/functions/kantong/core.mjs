@@ -16,6 +16,8 @@ var KantongCore = (function () {
     Transaksi: ['id', 'tanggal', 'tipe', 'nominal', 'buku', 'kategori', 'kantong', 'kantong_tujuan',
       'keterangan', 'reimburse', 'oleh', 'sumber', 'dibuat', 'diubah', 'dihapus', 'terbayar', 'tx_balik'],
     Todo: ['id', 'judul', 'pemilik', 'tanggal', 'jam', 'durasi', 'selesai', 'selesai_oleh',
+      'gcal_event_id', 'gcal_status', 'gcal_error', 'oleh', 'dibuat', 'diubah', 'dihapus', 'selesai_at'],
+    Momen: ['id', 'judul', 'cerita', 'tanggal', 'tanggal_selesai', 'kategori', 'pemilik', 'tahunan',
       'gcal_event_id', 'gcal_status', 'gcal_error', 'oleh', 'dibuat', 'diubah', 'dihapus']
   };
   var KAT_REIMBURSE = 'reimburse-masuk';   // kategori pemasukan otomatis, tidak dihitung sebagai pendapatan
@@ -23,7 +25,12 @@ var KantongCore = (function () {
   var KAT_SETORAN_MASUK = 'setoran-rt-in'; // pemasukan otomatis di sisi dompet bersama
   var TIPE_TX = ['Pengeluaran', 'Pemasukan', 'Transfer'];
   var JENIS_KANTONG = ['Cash', 'Debit', 'E-wallet', 'Kredit'];
-  var VERSION = '1.3.0';
+  var VERSION = '1.4.0';
+  // fitur yang didukung server ini; PWA memakainya untuk tahu backend sudah diperbarui atau belum
+  var FITUR = ['todo', 'agenda', 'momen'];
+  // ---------- momen (tanggal penting) ----------
+  var MOMEN_KATEGORI = ['kita', 'keluarga', 'pekerjaan', 'lainnya'];
+  var MOMEN_MAKS_HARI = 62;              // rentang terpanjang satu momen
   // ---------- to-do ----------
   var TODO_BERSAMA = 'bersama';          // pemilik to-do bersama (selain itu: id user)
   var TODO_DURASI = 30;                  // menit, dipakai kalau jam diisi tapi durasi kosong
@@ -310,8 +317,15 @@ var KantongCore = (function () {
   function clone(o) { var c = {}; Object.keys(o).forEach(function (k) { c[k] = o[k]; }); return c; }
   function softDelete(store, t, nowIso) { var d = clone(t); d.dihapus = nowIso; d.diubah = nowIso; store.upsert('Transaksi', d); }
 
+  // ID user Febie diganti 'istri' -> 'febie'. Data/antrean lama di HP yang masih membawa 'istri' diarahkan ke id baru.
+  function aliasUser(db, id) {
+    var u = byId(db.Users || []);
+    if (id === 'istri' && !u.istri && u.febie) return 'febie';
+    return id;
+  }
+
   // ---------- to-do rumah tangga ----------
-  // pemilik: id user ('riki', 'istri', ...) atau 'bersama'.
+  // pemilik: id user ('riki', 'febie', ...) atau 'bersama'.
   // Tulis = pemilik sendiri atau bersama; semua orang bisa lihat semua.
   function canWriteTodo(user, t) {
     if (!user || !t) return false;
@@ -326,7 +340,7 @@ var KantongCore = (function () {
     var t = {
       id: String(input.id || ''),
       judul: String(input.judul || '').replace(/\s+/g, ' ').trim().slice(0, 120),
-      pemilik: String(input.pemilik || (existing ? existing.pemilik : user.id)),
+      pemilik: aliasUser(db, String(input.pemilik || (existing ? existing.pemilik : user.id))),
       tanggal: String(input.tanggal || ''),
       jam: String(input.jam || ''),
       durasi: (input.durasi === undefined || input.durasi === null || input.durasi === '')
@@ -413,6 +427,7 @@ var KantongCore = (function () {
       var t = cleanTodo(payload, db, user, ex);
       t.selesai = ex ? bool(ex.selesai) : false;
       t.selesai_oleh = ex ? String(ex.selesai_oleh || '') : '';
+      t.selesai_at = ex ? String(ex.selesai_at || '') : '';
       t.gcal_event_id = ex ? String(ex.gcal_event_id || '') : '';
       t.gcal_status = ex ? String(ex.gcal_status || '') : ''; t.gcal_error = ex ? String(ex.gcal_error || '') : '';
       t.oleh = ex ? ex.oleh : user.id; t.dibuat = ex ? ex.dibuat : nowIso; t.diubah = nowIso; t.dihapus = '';
@@ -426,6 +441,8 @@ var KantongCore = (function () {
       if (!canWriteTodo(user, ex)) throw err('To-do ini milik ' + todoPemilikNama(db, ex.pemilik) + '. Kamu hanya bisa melihat.');
       var d = clone(ex), selesai = bool(payload.selesai);
       d.selesai = selesai; d.selesai_oleh = selesai ? user.id : ''; d.diubah = nowIso;
+      // tanggal selesai dicatat sekali; centang ulang (request diulang) tidak menggeser tanggalnya
+      d.selesai_at = selesai ? (bool(ex.selesai) && ex.selesai_at ? String(ex.selesai_at) : nowIso) : '';
       if (bool(ex.selesai) !== selesai || d.gcal_status === 'gagal') syncTodoCalendar(store, db, d);
       store.upsert('Todo', d);
       return { todo: d };
@@ -445,6 +462,143 @@ var KantongCore = (function () {
       syncTodoCalendar(store, db, s);
       store.upsert('Todo', s);
       return { todo: s };
+    }
+    throw err('Aksi tidak dikenal: ' + action);
+  }
+
+  // ---------- agenda (kalender bulanan) ----------
+  // Tanggal tempat to-do muncul di kalender:
+  //  punya tanggal -> tanggal itu; tanpa tanggal & belum selesai -> tanggal dibuat;
+  //  tanpa tanggal & selesai -> tanggal selesai (to-do lama tanpa selesai_at: tanggal dibuat).
+  function agendaTanggalTodo(t) {
+    if (t.tanggal) return String(t.tanggal).slice(0, 10);
+    if (bool(t.selesai) && t.selesai_at) return String(t.selesai_at).slice(0, 10);
+    return String(t.dibuat || '').slice(0, 10);
+  }
+  function akhirBulan(bulan) {
+    var p = bulan.split('-');
+    return new Date(Date.UTC(+p[0], +p[1], 0)).toISOString().slice(0, 10);
+  }
+  function kabisat(y) { return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; }
+  // tanggal ulang tahunan sebuah momen di tahun tertentu (29 Feb -> 28 Feb di tahun bukan kabisat)
+  function tanggalUlang(tanggal, tahun) {
+    var md = String(tanggal).slice(5, 10);
+    if (md === '02-29' && !kabisat(tahun)) md = '02-28';
+    return tahun + '-' + md;
+  }
+  function liveMomen(db) { return (db.Momen || []).filter(function (m) { return !m.dihapus; }); }
+  function momenAkhir(m) { return String(m.tanggal_selesai || m.tanggal); }
+  // momen yang tanggal ulangnya = hari ini, dari tahun-tahun sebelumnya (kartu kenangan di Beranda)
+  function kenangan(db, today) {
+    var y = +today.slice(0, 4);
+    return liveMomen(db).filter(function (m) {
+      var ty = +String(m.tanggal).slice(0, 4);
+      return isDate(String(m.tanggal)) && ty < y && tanggalUlang(m.tanggal, y) === today;
+    }).map(function (m) {
+      var c = clone(m); c.tahunLalu = y - +String(m.tanggal).slice(0, 4); return c;
+    }).sort(function (a, b) { return b.tahunLalu - a.tahunLalu; });
+  }
+  function agendaMonth(db, bulan) {
+    var awal = bulan + '-01', akhir = akhirBulan(bulan);
+    var todos = (db.Todo || []).filter(function (t) {
+      if (t.dihapus) return false;
+      var tg = agendaTanggalTodo(t);
+      return tg >= awal && tg <= akhir;
+    });
+    // momen yang rentangnya menyentuh bulan ini + semua momen tahunan (untuk tanda ulang tahun)
+    var momen = liveMomen(db).filter(function (m) {
+      return bool(m.tahunan) || (String(m.tanggal) <= akhir && momenAkhir(m) >= awal);
+    });
+    return { bulan: bulan, todos: todos, momen: momen };
+  }
+
+  // ---------- momen (tanggal penting) ----------
+  // pemilik: id user atau 'bersama'. Semua orang bisa melihat, membuat, dan mengubah semua momen.
+  function cleanMomen(input, db, user, existing) {
+    var m = {
+      id: String(input.id || ''),
+      judul: String(input.judul || '').replace(/\s+/g, ' ').trim().slice(0, 80),
+      cerita: String(input.cerita || '').trim().slice(0, 500),
+      tanggal: String(input.tanggal || ''),
+      tanggal_selesai: String(input.tanggal_selesai || ''),
+      kategori: String(input.kategori || (existing ? existing.kategori : 'kita')),
+      pemilik: aliasUser(db, String(input.pemilik || (existing ? existing.pemilik : TODO_BERSAMA))),
+      tahunan: bool(input.tahunan)
+    };
+    if (!m.id || m.id.length > 64) throw err('ID momen tidak valid');
+    if (!m.judul) throw err('Tulis dulu judul momennya');
+    if (!isDate(m.tanggal)) throw err('Tanggal tidak valid');
+    if (m.tanggal_selesai === m.tanggal) m.tanggal_selesai = '';
+    if (m.tanggal_selesai) {
+      if (!isDate(m.tanggal_selesai)) throw err('Tanggal selesai tidak valid');
+      if (m.tanggal_selesai < m.tanggal) throw err('Tanggal selesai harus setelah tanggal mulai');
+      if (m.tanggal_selesai > addDays(m.tanggal, MOMEN_MAKS_HARI - 1)) throw err('Rentang momen maksimal ' + MOMEN_MAKS_HARI + ' hari');
+    }
+    if (MOMEN_KATEGORI.indexOf(m.kategori) < 0) throw err('Kategori momen tidak valid');
+    if (m.pemilik !== TODO_BERSAMA && !byId(db.Users || [])[m.pemilik]) throw err('Pilih momen milik siapa');
+    return m;
+  }
+  // Event tahunan seharian di kalender "Rumah Kita". Hanya untuk momen dengan "Ingatkan tiap tahun".
+  function momenEventSpec(m) {
+    var md = String(m.tanggal).slice(5, 10);
+    return {
+      tabel: 'Momen', judul: '★ ' + m.judul, tanggal: m.tanggal, tanggal_selesai: m.tanggal_selesai || '',
+      seharian: true, tahunan: true, warna: 'momen',
+      // 29 Feb: ulang di hari terakhir Februari supaya tetap muncul di tahun bukan kabisat
+      rrule: md === '02-29' ? 'RRULE:FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=-1' : 'RRULE:FREQ=YEARLY',
+      deskripsi: 'Momen sejak ' + String(m.tanggal).slice(0, 4) + ' dari Kantong.' + (m.cerita ? '\n\n' + m.cerita : '') + '\nkantong-momen:' + m.id
+    };
+  }
+  function momenPerluEvent(m) { return !m.dihapus && bool(m.tahunan); }
+  function momenEventSama(a, b) {
+    return !!a && !!b && a.judul === b.judul && a.cerita === b.cerita && a.tanggal === b.tanggal &&
+      String(a.tanggal_selesai || '') === String(b.tanggal_selesai || '') && bool(a.tahunan) === bool(b.tahunan) && !a.dihapus === !b.dihapus;
+  }
+  function syncMomenCalendar(store, db, m) {
+    var cal = store.calendar, mau = momenPerluEvent(m);
+    try {
+      if (!cal) {
+        if (mau || m.gcal_event_id) throw new Error('Kalender belum disiapkan');
+        m.gcal_status = ''; m.gcal_error = '';
+      } else if (mau) {
+        m.gcal_event_id = String(cal.upsert(String(m.gcal_event_id || ''), momenEventSpec(m), m) || '');
+        if (!m.gcal_event_id) throw new Error('Kalender tidak mengembalikan id event');
+        m.gcal_status = 'ok'; m.gcal_error = '';
+      } else {
+        if (m.gcal_event_id) cal.remove(String(m.gcal_event_id), m, 'Momen');
+        m.gcal_event_id = ''; m.gcal_status = ''; m.gcal_error = '';
+      }
+    } catch (e) {
+      m.gcal_status = 'gagal';
+      m.gcal_error = String(e && e.message ? e.message : e).slice(0, 200);
+    }
+    return m;
+  }
+  function momenAksi(store, db, user, action, payload, nowIso) {
+    var ex = byId(db.Momen || [])[String(payload.id || '')];
+    if (action === 'momen.save') {
+      if (ex && ex.dihapus) throw err('Momen sudah dihapus');
+      var m = cleanMomen(payload, db, user, ex);
+      m.gcal_event_id = ex ? String(ex.gcal_event_id || '') : '';
+      m.gcal_status = ex ? String(ex.gcal_status || '') : ''; m.gcal_error = ex ? String(ex.gcal_error || '') : '';
+      m.oleh = ex ? ex.oleh : user.id; m.dibuat = ex ? ex.dibuat : nowIso; m.diubah = nowIso; m.dihapus = '';
+      if (!ex || !momenEventSama(ex, m) || m.gcal_status === 'gagal' || (momenPerluEvent(m) && !m.gcal_event_id)) syncMomenCalendar(store, db, m);
+      store.upsert('Momen', m);
+      return { momen: m };
+    }
+    if (action === 'momen.delete') {
+      if (!ex || ex.dihapus) return { id: String(payload.id || '') };   // idempoten
+      var h = clone(ex); h.dihapus = nowIso; h.diubah = nowIso;
+      syncMomenCalendar(store, db, h);
+      store.upsert('Momen', h);
+      return { id: h.id };
+    }
+    if (action === 'momen.sync') {
+      if (!ex || ex.dihapus) throw err('Momen tidak ditemukan');
+      var s = clone(ex); s.diubah = nowIso;
+      syncMomenCalendar(store, db, s);
+      store.upsert('Momen', s);
+      return { momen: s };
     }
     throw err('Aksi tidak dikenal: ' + action);
   }
@@ -469,8 +623,14 @@ var KantongCore = (function () {
           buku: sortBy(db.Buku, 'urutan'), users: db.Users,
           kategori: sortBy(db.Kategori, 'urutan'), kantong: sortBy(db.Kantong, 'urutan'),
           saldo: computeSaldo(db).saldo, bulan: Object.keys(months).sort().reverse(),
-          utang: computeUtang(db), talangan: computeTalangan(db)
+          utang: computeUtang(db), talangan: computeTalangan(db),
+          fitur: FITUR, kenangan: kenangan(db, today)
         };
+      }
+      case 'agenda.month': {
+        var bulanA = String(payload.bulan || '');
+        if (!isMonth(bulanA)) throw err('Bulan tidak valid');
+        return agendaMonth(db, bulanA);
       }
       case 'month': {
         var bulan = String(payload.bulan || '');
@@ -686,6 +846,7 @@ var KantongCore = (function () {
       }
       default:
         if (String(action).indexOf('todo.') === 0) return todoAksi(store, db, user, action, payload, nowIso);
+        if (String(action).indexOf('momen.') === 0) return momenAksi(store, db, user, action, payload, nowIso);
         throw err('Aksi tidak dikenal: ' + action);
     }
   }
@@ -724,7 +885,10 @@ var KantongCore = (function () {
     computeUtang: computeUtang, computeTalangan: computeTalangan, arahTransfer: arahTransfer,
     KAT_REIMBURSE: KAT_REIMBURSE, KAT_SETORAN: KAT_SETORAN, KAT_SETORAN_MASUK: KAT_SETORAN_MASUK,
     cleanTodo: cleanTodo, canWriteTodo: canWriteTodo, todoEventSpec: todoEventSpec, todoPerluEvent: todoPerluEvent,
-    isTime: isTime, TODO_BERSAMA: TODO_BERSAMA, TODO_DURASI: TODO_DURASI, TODO_SELESAI_EVENT: TODO_SELESAI_EVENT
+    isTime: isTime, TODO_BERSAMA: TODO_BERSAMA, TODO_DURASI: TODO_DURASI, TODO_SELESAI_EVENT: TODO_SELESAI_EVENT,
+    FITUR: FITUR, MOMEN_KATEGORI: MOMEN_KATEGORI, MOMEN_MAKS_HARI: MOMEN_MAKS_HARI, cleanMomen: cleanMomen,
+    momenEventSpec: momenEventSpec, momenPerluEvent: momenPerluEvent, agendaTanggalTodo: agendaTanggalTodo,
+    agendaMonth: agendaMonth, kenangan: kenangan, tanggalUlang: tanggalUlang, akhirBulan: akhirBulan, aliasUser: aliasUser
   };
 })();
 export default KantongCore;
