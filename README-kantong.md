@@ -4,7 +4,7 @@
 - `supabase/`: backend. Skema di `migrations/`, API di `functions/kantong/` (Edge Function). Panduan pasang: `kantong/PANDUAN.md`.
 - `public/core.js`: logika bersama (aturan akses, hitungan, to-do). Salinannya untuk Edge Function dan Apps Script dibuat lewat `node kantong/tools/build_core.js`.
 - `kantong/apps-script/`: backend lama (Google Sheets), masih kompatibel, tidak dikembangkan lagi.
-- `kantong-pastel/`, `public/dark/`: varian tampilan lama.
+- `kantong-pastel/`: varian tampilan lama. `public/dark/` mengarah ke app utama (tema gelap).
 
 Fitur to-do rumah tangga + sync ke Google Calendar "Rumah Kita": lihat `kantong/PANDUAN.md` §7. Agenda & Momen: §8. Siklus (project Supabase terpisah di akun Febie, `supabase-siklus/`): §9.
 
@@ -20,7 +20,7 @@ Status: **dibangun** (16 Nov 2026), menunggu pasang backend. Brief v1: Riki (UI/
 - Backend Kantong sudah pindah ke Supabase (branch `claude/gallant-clarke-kiuupp`, ikut di-merge), jadi `Momen` & `selesai_at` ada di database Supabase, bukan tab Sheet. Apps Script lama tetap kompatibel.
 - Status pengenalan (onboarding) dan "Tutup" kartu kenangan disimpan per HP (localStorage), bukan tab `Pengaturan`. Persetujuan Siklus (`setuju_at`, `versi_teks`) tetap di server Siklus.
 - Akses Siklus memakai tabel `siklus_anggota` (pemilik/pembaca) + fungsi server, bukan tabel `siklus_pembaca`; catatan dihapus permanen (bukan kolom `dihapus`).
-- `public/dark/` (varian lama, belum punya to-do) **belum** diberi fitur ini. App pastel sudah punya mode terang & gelap; semua fitur baru dites di keduanya.
+- `public/dark/` (varian lama) sekarang mengarah ke app utama dengan tema gelap; cache & service worker lamanya dibersihkan. Semua fitur baru dites di tema terang & gelap.
 
 | Lapisan | Isi | Warna |
 |---|---|---|
@@ -243,7 +243,6 @@ Umum
 - Ping harian adalah trik umum, bukan jaminan resmi Supabase.
 - Supabase gratis tidak punya backup otomatis (sumber pihak ketiga) → tombol **Unduh cadangan (JSON)** sudah ada di Pengaturan → Siklus.
 - Siklus butuh internet untuk menyimpan (tidak masuk antrean offline); membaca tetap bisa dari cache HP.
-- `public/dark/`: perlu keputusan, port penuh atau arahkan ke app utama dengan tema gelap.
 
 ### Sumber
 
