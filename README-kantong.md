@@ -3,6 +3,8 @@
 - `kantong/`: versi dark mode. Panduan pasang ada di `kantong/PANDUAN.md`.
 - `kantong-pastel/`: versi pastel dengan mode terang dan gelap (front-end saja, backend sama dengan `kantong/apps-script`).
 
+Fitur to-do rumah tangga + sync ke Google Calendar "Rumah Kita": lihat `kantong/PANDUAN.md` §7.
+
 Data keuangan pribadi tidak disertakan di repo ini.
 
 Hosting: Vercel (project `dompet-app`, folder `public/`, setting di `vercel.json`). Push ke `main` = otomatis rilis.

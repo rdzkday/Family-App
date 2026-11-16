@@ -8,9 +8,11 @@
  */
 
 var TZ = 'Asia/Jakarta';
+var TODO_CAL_NAME = 'Rumah Kita';   // kalender khusus to-do di akun pemilik script, dibagikan ke pasangan
 var DATE_COLS = { tanggal: 1, per_tanggal: 1 };
 var TEXT_COLS = { id: 1, bulan: 1, buku: 1, kategori: 1, kantong: 1, kantong_tujuan: 1, keterangan: 1, nama: 1,
-  oleh: 1, sumber: 1, dibuat: 1, diubah: 1, dihapus: 1, pemilik: 1, warna: 1, jenis: 1, tipe: 1 };
+  oleh: 1, sumber: 1, dibuat: 1, diubah: 1, dihapus: 1, pemilik: 1, warna: 1, jenis: 1, tipe: 1,
+  judul: 1, jam: 1, selesai_oleh: 1, gcal_event_id: 1, gcal_status: 1, gcal_error: 1 };
 
 // ---------------- HTTP ----------------
 function doGet() {
@@ -23,7 +25,7 @@ function doPost(e) {
   var user = auth_(body.token);
   if (!user) return json_({ ok: false, error: 'Kode akses salah', code: 'AUTH' });
 
-  var isWrite = body.action !== 'bootstrap' && body.action !== 'month';
+  var isWrite = body.action !== 'bootstrap' && body.action !== 'month' && body.action !== 'todo.list';
   var lock = LockService.getScriptLock();
   if (isWrite && !lock.tryLock(20000)) return json_({ ok: false, error: 'Server sibuk, coba lagi' });
   try {
@@ -64,6 +66,15 @@ function sheetStore_() {
   function load(table) {
     if (cache[table]) return cache[table];
     var sh = ss.getSheetByName(table);
+    if (!sh && KantongCore.SCHEMA[table]) {
+      // tab baru (mis. Todo setelah update script) dibuat otomatis supaya tidak perlu Setup ulang
+      try {
+        sh = ss.insertSheet(table);
+        var cols = KantongCore.SCHEMA[table];
+        sh.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold');
+        sh.setFrozenRows(1);
+      } catch (eNew) { sh = null; }
+    }
     if (!sh) throw new Error('Sheet "' + table + '" tidak ada. Jalankan menu Kantong > Setup.');
     var values = sh.getDataRange().getValues();
     var head = values[0].map(function (h) { return String(h).trim(); });
@@ -80,6 +91,7 @@ function sheetStore_() {
   }
 
   return {
+    calendar: calendarAdapter_(),
     all: function (table) { return load(table).rows.map(function (r) { return JSON.parse(JSON.stringify(r)); }); },
     upsert: function (table, obj) {
       var t = load(table);
@@ -115,11 +127,12 @@ function sheetStore_() {
 function fromCell_(h, v) {
   if (v instanceof Date) {
     if (h === 'bulan') return Utilities.formatDate(v, TZ, 'yyyy-MM');
+    if (h === 'jam') return Utilities.formatDate(v, TZ, 'HH:mm');   // kalau Sheets terlanjur mengubah "14:00" jadi waktu
     if (DATE_COLS[h]) return Utilities.formatDate(v, TZ, 'yyyy-MM-dd');
     return Utilities.formatDate(v, TZ, "yyyy-MM-dd'T'HH:mm:ssXXX");
   }
-  if (h === 'hitung' || h === 'aktif' || h === 'reimburse') return v === true || String(v).toUpperCase() === 'TRUE';
-  if (h === 'nominal' || h === 'saldo_awal' || h === 'limit' || h === 'urutan') return Number(v) || 0;
+  if (h === 'hitung' || h === 'aktif' || h === 'reimburse' || h === 'selesai') return v === true || String(v).toUpperCase() === 'TRUE';
+  if (h === 'nominal' || h === 'saldo_awal' || h === 'limit' || h === 'urutan' || h === 'durasi') return Number(v) || 0;
   return v === null || v === undefined ? '' : (typeof v === 'string' ? v : String(v));
 }
 
@@ -137,6 +150,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('Kantong')
     .addItem('1. Setup / perbaiki struktur', 'setup')
     .addItem('2. Buat kode koneksi', 'buatKodeKoneksi')
+    .addItem('3. Siapkan kalender ' + TODO_CAL_NAME, 'siapkanKalender')
     .addSeparator()
     .addItem('Ganti kode akses user…', 'resetKodeAkses')
     .addToUi();
@@ -158,7 +172,7 @@ function setup() {
       var rng = sh.getRange(2, i + 1, maxR, 1);
       if (DATE_COLS[h]) rng.setNumberFormat('yyyy-mm-dd');
       else if (h === 'nominal' || h === 'saldo_awal' || h === 'limit') rng.setNumberFormat('#,##0');
-      else if (h === 'bulan' || h === 'id') rng.setNumberFormat('@');
+      else if (h === 'bulan' || h === 'id' || h === 'jam') rng.setNumberFormat('@');
     });
   });
   var buku = ss.getSheetByName('Buku');
@@ -210,4 +224,66 @@ function resetKodeAkses() {
   if (!sheetStore_().all('Users').some(function (u) { return u.id === id; })) { ui.alert('User tidak ditemukan'); return; }
   PropertiesService.getScriptProperties().setProperty('token_' + id, newToken_());
   ui.alert('Kode akses ' + id + ' sudah diganti. Buat kode koneksi baru lewat menu.');
+}
+
+// ---------------- Google Calendar (to-do) ----------------
+// Satu kalender khusus di akun pemilik script. Dibagikan manual ke akun pasangan (izin "Make changes to events").
+// Sync satu arah: app -> kalender. Perubahan di Google Calendar tidak kembali ke app.
+function kalenderTodo_(buatKalauBelumAda) {
+  var props = PropertiesService.getScriptProperties();
+  var cal = null, id = props.getProperty('TODO_CAL_ID');
+  if (id) { try { cal = CalendarApp.getCalendarById(id); } catch (e) { cal = null; } }
+  if (!cal) cal = CalendarApp.getCalendarsByName(TODO_CAL_NAME)[0] || null;
+  if (!cal && buatKalauBelumAda) cal = CalendarApp.createCalendar(TODO_CAL_NAME, { summary: 'To-do rumah tangga dari Kantong', timeZone: TZ });
+  if (!cal) throw new Error('Kalender "' + TODO_CAL_NAME + '" belum disiapkan. Jalankan menu Kantong > 3. Siapkan kalender.');
+  if (cal.getId() !== id) props.setProperty('TODO_CAL_ID', cal.getId());
+  return cal;
+}
+
+function calendarAdapter_() {
+  var cal = null;
+  function kal() { if (!cal) cal = kalenderTodo_(false); return cal; }
+  function tgl(iso, jam) {
+    var p = String(iso).split('-'), h = jam ? String(jam).split(':') : [0, 0];
+    return new Date(+p[0], +p[1] - 1, +p[2], +h[0], +h[1], 0);   // timezone script = Asia/Jakarta
+  }
+  function warna(spec) {
+    var EC = CalendarApp.EventColor;
+    if (spec.warna === 'bersama') return EC.YELLOW;
+    return [EC.BLUE, EC.PALE_RED, EC.GREEN, EC.ORANGE][spec.warna] || EC.GRAY;
+  }
+  return {
+    // eventId kosong = buat baru; kalau event lama sudah tidak ada (dihapus manual) juga dibuat baru
+    upsert: function (eventId, spec) {
+      var c = kal(), ev = null;
+      if (eventId) { try { ev = c.getEventById(eventId); } catch (e) { ev = null; } }
+      var mulai = tgl(spec.tanggal, spec.jam), akhir = new Date(mulai.getTime() + spec.durasi * 60000);
+      if (!ev) ev = spec.seharian ? c.createAllDayEvent(spec.judul, mulai) : c.createEvent(spec.judul, mulai, akhir);
+      else {
+        ev.setTitle(spec.judul);
+        if (spec.seharian) ev.setAllDayDate(mulai); else ev.setTime(mulai, akhir);
+      }
+      ev.setDescription(spec.deskripsi);
+      ev.setColor(warna(spec));
+      return ev.getId();
+    },
+    remove: function (eventId) {
+      var ev = null;
+      try { ev = kal().getEventById(eventId); } catch (e) { ev = null; }
+      if (ev) ev.deleteEvent();
+    }
+  };
+}
+
+/** Buat kalender "Rumah Kita" (sekali), simpan id-nya, dan tampilkan langkah berbagi ke pasangan. */
+function siapkanKalender() {
+  var cal = kalenderTodo_(true);
+  var ui = SpreadsheetApp.getUi();
+  ui.alert('Kalender "' + cal.getName() + '" siap.\n\n' +
+    'Langkah terakhir (sekali saja), di Google Calendar web:\n' +
+    '1. Settings > kalender "' + cal.getName() + '" > Share with specific people.\n' +
+    '2. Tambahkan email Google pasangan, izin "Make changes to events".\n' +
+    '3. Pasangan buka undangan di email, kalender muncul di HP-nya.\n\n' +
+    'Pengingat event ikut setelan default kalender ini (bisa diubah di Settings > Event notifications).\n' +
+    'Setelah itu: Deploy > Manage deployments > Edit > New version, supaya izin kalender ikut aktif di API.');
 }

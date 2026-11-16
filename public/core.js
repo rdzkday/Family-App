@@ -13,19 +13,27 @@ var KantongCore = (function () {
     Kantong: ['id', 'nama', 'jenis', 'buku', 'saldo_awal', 'per_tanggal', 'limit', 'aktif', 'urutan'],
     Budget: ['id', 'bulan', 'buku', 'kategori', 'nominal'],
     Transaksi: ['id', 'tanggal', 'tipe', 'nominal', 'buku', 'kategori', 'kantong', 'kantong_tujuan',
-      'keterangan', 'reimburse', 'oleh', 'sumber', 'dibuat', 'diubah', 'dihapus', 'terbayar', 'tx_balik']
+      'keterangan', 'reimburse', 'oleh', 'sumber', 'dibuat', 'diubah', 'dihapus', 'terbayar', 'tx_balik'],
+    Todo: ['id', 'judul', 'pemilik', 'tanggal', 'jam', 'durasi', 'selesai', 'selesai_oleh',
+      'gcal_event_id', 'gcal_status', 'gcal_error', 'oleh', 'dibuat', 'diubah', 'dihapus']
   };
   var KAT_REIMBURSE = 'reimburse-masuk';   // kategori pemasukan otomatis, tidak dihitung sebagai pendapatan
   var KAT_SETORAN = 'setoran-rt';          // pengeluaran otomatis: topup dari kantong pribadi ke dompet bersama
   var KAT_SETORAN_MASUK = 'setoran-rt-in'; // pemasukan otomatis di sisi dompet bersama
   var TIPE_TX = ['Pengeluaran', 'Pemasukan', 'Transfer'];
   var JENIS_KANTONG = ['Cash', 'Debit', 'E-wallet', 'Kredit'];
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.0';
+  // ---------- to-do ----------
+  var TODO_BERSAMA = 'bersama';          // pemilik to-do bersama (selain itu: id user)
+  var TODO_DURASI = 30;                  // menit, dipakai kalau jam diisi tapi durasi kosong
+  var TODO_SELESAI_EVENT = 'centang';    // 'centang' = event dibiarkan, judul diberi tanda ✓ ; 'hapus' = event dihapus saat dicentang
+  var TODO_SIMPAN_SELESAI_HARI = 30;     // to-do selesai lebih lama dari ini tidak dikirim ke app
 
   // ---------- util ----------
   function err(msg) { var e = new Error(msg); e.userFacing = true; return e; }
   function isDate(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s); }
   function isMonth(s) { return typeof s === 'string' && /^\d{4}-\d{2}$/.test(s); }
+  function isTime(s) { return typeof s === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(s); }
   function bool(v) { return v === true || v === 'TRUE' || v === 'true' || v === 1; }
   function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
   function byId(list) { var m = {}; for (var i = 0; i < list.length; i++) m[list[i].id] = list[i]; return m; }
@@ -301,8 +309,146 @@ var KantongCore = (function () {
   function clone(o) { var c = {}; Object.keys(o).forEach(function (k) { c[k] = o[k]; }); return c; }
   function softDelete(store, t, nowIso) { var d = clone(t); d.dihapus = nowIso; d.diubah = nowIso; store.upsert('Transaksi', d); }
 
+  // ---------- to-do rumah tangga ----------
+  // pemilik: id user ('riki', 'istri', ...) atau 'bersama'.
+  // Tulis = pemilik sendiri atau bersama; semua orang bisa lihat semua.
+  function canWriteTodo(user, t) {
+    if (!user || !t) return false;
+    return t.pemilik === TODO_BERSAMA || t.pemilik === user.id;
+  }
+  function todoPemilikNama(db, pemilik) {
+    if (pemilik === TODO_BERSAMA) return 'Bersama';
+    var u = byId(db.Users || [])[pemilik];
+    return u ? u.nama : pemilik;
+  }
+  function cleanTodo(input, db, user, existing) {
+    var t = {
+      id: String(input.id || ''),
+      judul: String(input.judul || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+      pemilik: String(input.pemilik || (existing ? existing.pemilik : user.id)),
+      tanggal: String(input.tanggal || ''),
+      jam: String(input.jam || ''),
+      durasi: (input.durasi === undefined || input.durasi === null || input.durasi === '')
+        ? (existing && num(existing.durasi) ? num(existing.durasi) : TODO_DURASI) : Math.round(num(input.durasi))
+    };
+    if (!t.id || t.id.length > 64) throw err('ID to-do tidak valid');
+    if (!t.judul) throw err('Tulis dulu to-do-nya');
+    if (t.pemilik !== TODO_BERSAMA && !byId(db.Users || [])[t.pemilik]) throw err('Pilih untuk siapa to-do ini');
+    if (t.tanggal && !isDate(t.tanggal)) throw err('Tanggal tidak valid');
+    if (!t.tanggal) t.jam = '';                       // tanpa tanggal = tanpa waktu sama sekali
+    if (t.jam && !isTime(t.jam)) throw err('Jam tidak valid');
+    if (!(t.durasi >= 5 && t.durasi <= 1440)) throw err('Durasi 5 menit sampai 24 jam');
+    return t;
+  }
+  // jam akhir event: 'YYYY-MM-DDTHH:MM' + menit, aman lewat tengah malam
+  function addMinutes(tanggal, jam, menit) {
+    var p = tanggal.split('-'), h = jam.split(':');
+    var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2], +h[0], +h[1] + menit));
+    return d.toISOString().slice(0, 16);
+  }
+  // Rincian event kalender dari satu to-do. Adapter kalender tinggal memakainya, tidak perlu tahu aturan.
+  function todoEventSpec(t, db) {
+    var users = db.Users || [], idx = -1, nama = 'Bersama';
+    for (var i = 0; i < users.length; i++) if (users[i].id === t.pemilik) { idx = i; nama = users[i].nama; }
+    var huruf = t.pemilik === TODO_BERSAMA ? 'B' : String(nama || t.pemilik).charAt(0).toUpperCase();
+    var selesai = bool(t.selesai);
+    var spec = {
+      judul: '[' + huruf + '] ' + (selesai ? '\u2713 ' : '') + t.judul,
+      tanggal: t.tanggal, jam: t.jam, durasi: num(t.durasi) || TODO_DURASI, seharian: !t.jam,
+      pemilik: t.pemilik, pemilikNama: nama, warna: t.pemilik === TODO_BERSAMA ? 'bersama' : idx, selesai: selesai,
+      deskripsi: 'To-do ' + nama + ' dari Kantong.' + (selesai ? ' Sudah selesai.' : '') + '\nkantong-todo:' + t.id
+    };
+    if (!spec.seharian) { spec.mulai = t.tanggal + 'T' + t.jam; spec.akhir = addMinutes(t.tanggal, t.jam, spec.durasi); }
+    return spec;
+  }
+  function todoPerluEvent(t) {
+    if (t.dihapus || !t.tanggal) return false;
+    if (bool(t.selesai) && TODO_SELESAI_EVENT === 'hapus') return false;
+    return true;
+  }
+  // Samakan Google Calendar dengan isi to-do. Tidak pernah melempar error:
+  // kegagalan dicatat di gcal_status supaya to-do tetap tersimpan dan bisa "Coba lagi".
+  // store.calendar: { upsert(eventId, spec) -> eventId, remove(eventId) } (opsional)
+  function syncTodoCalendar(store, db, t) {
+    var cal = store.calendar, mau = todoPerluEvent(t);
+    try {
+      if (!cal) {
+        if (mau || t.gcal_event_id) throw new Error('Kalender belum disiapkan');
+        t.gcal_status = ''; t.gcal_error = '';
+      } else if (mau) {
+        t.gcal_event_id = String(cal.upsert(String(t.gcal_event_id || ''), todoEventSpec(t, db)) || '');
+        if (!t.gcal_event_id) throw new Error('Kalender tidak mengembalikan id event');
+        t.gcal_status = 'ok'; t.gcal_error = '';
+      } else {
+        if (t.gcal_event_id) cal.remove(String(t.gcal_event_id));
+        t.gcal_event_id = ''; t.gcal_status = ''; t.gcal_error = '';
+      }
+    } catch (e) {
+      t.gcal_status = 'gagal';
+      t.gcal_error = String(e && e.message ? e.message : e).slice(0, 200);
+    }
+    return t;
+  }
+  function todoEventSama(a, b) {
+    return !!a && !!b && a.judul === b.judul && a.pemilik === b.pemilik && a.tanggal === b.tanggal &&
+      a.jam === b.jam && num(a.durasi) === num(b.durasi) && bool(a.selesai) === bool(b.selesai) && !a.dihapus === !b.dihapus;
+  }
+  function liveTodo(db, today) {
+    var batas = addDays(today, -TODO_SIMPAN_SELESAI_HARI);
+    return (db.Todo || []).filter(function (t) {
+      if (t.dihapus) return false;
+      if (bool(t.selesai) && String(t.diubah || t.dibuat || '').slice(0, 10) < batas) return false;
+      return true;
+    });
+  }
+  function todoAksi(store, db, user, action, payload, nowIso) {
+    var today = nowIso.slice(0, 10);
+    if (action === 'todo.list') return { todos: liveTodo(db, today) };
+    var ex = byId(db.Todo || [])[String(payload.id || '')];
+    if (action === 'todo.save') {
+      if (ex && ex.dihapus) throw err('To-do sudah dihapus');
+      if (ex && !canWriteTodo(user, ex)) throw err('To-do ini milik ' + todoPemilikNama(db, ex.pemilik) + '. Kamu hanya bisa melihat.');
+      var t = cleanTodo(payload, db, user, ex);
+      t.selesai = ex ? bool(ex.selesai) : false;
+      t.selesai_oleh = ex ? String(ex.selesai_oleh || '') : '';
+      t.gcal_event_id = ex ? String(ex.gcal_event_id || '') : '';
+      t.gcal_status = ex ? String(ex.gcal_status || '') : ''; t.gcal_error = ex ? String(ex.gcal_error || '') : '';
+      t.oleh = ex ? ex.oleh : user.id; t.dibuat = ex ? ex.dibuat : nowIso; t.diubah = nowIso; t.dihapus = '';
+      // kalender hanya disentuh kalau ada yang berubah atau sync sebelumnya gagal: hemat kuota, idempoten saat request diulang
+      if (!ex || !todoEventSama(ex, t) || t.gcal_status === 'gagal' || (todoPerluEvent(t) && !t.gcal_event_id)) syncTodoCalendar(store, db, t);
+      store.upsert('Todo', t);
+      return { todo: t };
+    }
+    if (action === 'todo.done') {
+      if (!ex || ex.dihapus) throw err('To-do tidak ditemukan');
+      if (!canWriteTodo(user, ex)) throw err('To-do ini milik ' + todoPemilikNama(db, ex.pemilik) + '. Kamu hanya bisa melihat.');
+      var d = clone(ex), selesai = bool(payload.selesai);
+      d.selesai = selesai; d.selesai_oleh = selesai ? user.id : ''; d.diubah = nowIso;
+      if (bool(ex.selesai) !== selesai || d.gcal_status === 'gagal') syncTodoCalendar(store, db, d);
+      store.upsert('Todo', d);
+      return { todo: d };
+    }
+    if (action === 'todo.delete') {
+      if (!ex || ex.dihapus) return { id: String(payload.id || '') };   // idempoten
+      if (!canWriteTodo(user, ex)) throw err('To-do ini milik ' + todoPemilikNama(db, ex.pemilik) + '. Kamu hanya bisa melihat.');
+      var h = clone(ex); h.dihapus = nowIso; h.diubah = nowIso;
+      syncTodoCalendar(store, db, h);
+      store.upsert('Todo', h);
+      return { id: h.id };
+    }
+    if (action === 'todo.sync') {
+      if (!ex) throw err('To-do tidak ditemukan');
+      if (!canWriteTodo(user, ex)) throw err('To-do ini milik ' + todoPemilikNama(db, ex.pemilik) + '. Kamu hanya bisa melihat.');
+      var s = clone(ex); s.diubah = nowIso;
+      syncTodoCalendar(store, db, s);
+      store.upsert('Todo', s);
+      return { todo: s };
+    }
+    throw err('Aksi tidak dikenal: ' + action);
+  }
+
   // ---------- API handler (dipakai server & mode demo) ----------
-  // store: { all(table) -> array, upsert(table, obj) -> obj }
+  // store: { all(table) -> array, upsert(table, obj) -> obj, calendar?: { upsert, remove } }
   function handle(store, user, action, payload, nowIso) {
     payload = payload || {};
     var db = {};
@@ -537,6 +683,7 @@ var KantongCore = (function () {
         }) };
       }
       default:
+        if (String(action).indexOf('todo.') === 0) return todoAksi(store, db, user, action, payload, nowIso);
         throw err('Aksi tidak dikenal: ' + action);
     }
   }
@@ -545,8 +692,18 @@ var KantongCore = (function () {
   function memoryStore(seed) {
     var data = {};
     Object.keys(SCHEMA).forEach(function (t) { data[t] = (seed && seed[t] ? seed[t] : []).map(function (r) { return JSON.parse(JSON.stringify(r)); }); });
+    // kalender tiruan: menyimpan event di memori, bisa dibuat gagal lewat calendar.gagal = 'pesan'
+    var calendar = {
+      events: {}, n: 0, gagal: '',
+      upsert: function (id, spec) {
+        if (this.gagal) throw new Error(this.gagal);
+        if (!id || !this.events[id]) id = 'ev-' + (++this.n);
+        this.events[id] = spec; return id;
+      },
+      remove: function (id) { if (this.gagal) throw new Error(this.gagal); delete this.events[id]; }
+    };
     return {
-      data: data,
+      data: data, calendar: calendar,
       all: function (t) { return data[t].map(function (r) { return JSON.parse(JSON.stringify(r)); }); },
       upsert: function (t, obj) {
         var row = {}; SCHEMA[t].forEach(function (h) { row[h] = obj[h] === undefined ? '' : obj[h]; });
@@ -563,7 +720,9 @@ var KantongCore = (function () {
     bukuOfKantong: bukuOfKantong, scopeOf: scopeOf, bool: bool, num: num, byId: byId,
     addDays: addDays, slug: slug, handle: handle, memoryStore: memoryStore, cleanTx: cleanTx,
     computeUtang: computeUtang, computeTalangan: computeTalangan, arahTransfer: arahTransfer,
-    KAT_REIMBURSE: KAT_REIMBURSE, KAT_SETORAN: KAT_SETORAN, KAT_SETORAN_MASUK: KAT_SETORAN_MASUK
+    KAT_REIMBURSE: KAT_REIMBURSE, KAT_SETORAN: KAT_SETORAN, KAT_SETORAN_MASUK: KAT_SETORAN_MASUK,
+    cleanTodo: cleanTodo, canWriteTodo: canWriteTodo, todoEventSpec: todoEventSpec, todoPerluEvent: todoPerluEvent,
+    isTime: isTime, TODO_BERSAMA: TODO_BERSAMA, TODO_DURASI: TODO_DURASI, TODO_SELESAI_EVENT: TODO_SELESAI_EVENT
   };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = KantongCore;

@@ -55,7 +55,11 @@
     left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>',
     right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
     swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg>',
-    lock: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+    lock: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="6"/><path d="M8 12.5l3 3 5.5-6.5"/></svg>',
+    cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="4"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    calx: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="4"/><path d="M3 10h18M8 3v4M16 3v4M9.5 13.5l5 5M14.5 13.5l-5 5"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
   };
 
   // ================= tema =================
@@ -79,19 +83,20 @@
     boot: LS.get('k_boot', null),
     months: LS.get('k_months', {}),
     outbox: LS.get('k_outbox', []),
+    todos: LS.get('k_todos', null),        // null = belum pernah dimuat
     prefs: LS.get('k_prefs', { lastKantong: {}, demoUser: 'riki' }),
     tab: 'home', sub: null, bukuView: null, bulan: thisMonth(),
     syncing: false, again: false, lastError: null, catTab: 'Pengeluaran'
   };
   function persist() {
-    LS.set('k_conn', S.conn); LS.set('k_boot', S.boot); LS.set('k_outbox', S.outbox); LS.set('k_prefs', S.prefs);
+    LS.set('k_conn', S.conn); LS.set('k_boot', S.boot); LS.set('k_outbox', S.outbox); LS.set('k_prefs', S.prefs); LS.set('k_todos', S.todos);
     var keys = Object.keys(S.months).sort().reverse();
     var keep = {}; keys.slice(0, 8).forEach(function (k) { keep[k] = S.months[k]; });
     S.months = keep; LS.set('k_months', keep);
   }
   function db() {
     var b = S.boot || {};
-    return { Buku: b.buku || [], Users: b.users || [], Kategori: b.kategori || [], Kantong: b.kantong || [], Budget: [], Transaksi: [] };
+    return { Buku: b.buku || [], Users: b.users || [], Kategori: b.kategori || [], Kantong: b.kantong || [], Budget: [], Transaksi: [], Todo: S.todos || [] };
   }
   function me() { return S.boot ? S.boot.user : null; }
   function bukuById(id) { return C.byId(db().Buku)[id]; }
@@ -109,7 +114,7 @@
     var saved = LS.get('k_demo', null);
     if (saved) return saved;
     var seed = window.KANTONG_DEMO_SEED || makeDemoSeed();
-    return { Buku: seed.buku, Users: seed.users, Kategori: seed.kategori, Kantong: seed.kantong, Budget: seed.budget, Transaksi: seed.transaksi };
+    return { Buku: seed.buku, Users: seed.users, Kategori: seed.kategori, Kantong: seed.kantong, Budget: seed.budget, Transaksi: seed.transaksi, Todo: seed.todo || [] };
   }
   var demoStore = null;
   function demoRpc(action, payload) {
@@ -203,6 +208,18 @@
         buku: bersama, kategori: '', kantong: p.kantong, kantong_tujuan: p.kantong_tujuan,
         keterangan: 'Ganti talangan', reimburse: false, oleh: me().id, sumber: 'app',
         dibuat: nowIso(), diubah: '', dihapus: '', terbayar: '', tx_balik: '', _pending: true });
+    } else if (op.action === 'todo.save') {
+      var exT = findTodo(op.payload.id);
+      upsertTodoLocal(Object.assign({ selesai: false, selesai_oleh: '', gcal_event_id: '', gcal_status: '', gcal_error: '',
+        oleh: me() ? me().id : '', dibuat: op.at }, exT || {}, op.payload, { diubah: op.at, dihapus: '', _pending: true }));
+    } else if (op.action === 'todo.done') {
+      var tdn = findTodo(op.payload.id);
+      if (tdn) { tdn.selesai = !!op.payload.selesai; tdn.selesai_oleh = tdn.selesai && me() ? me().id : ''; tdn.diubah = op.at; tdn._pending = true; }
+    } else if (op.action === 'todo.delete') {
+      S.todos = todos().filter(function (t) { return t.id !== op.payload.id; });
+    } else if (op.action === 'todo.sync') {
+      var tsy = findTodo(op.payload.id);
+      if (tsy) tsy._pending = true;
     }
   }
   function sync(extraMonths) {
@@ -214,12 +231,13 @@
     (extraMonths || []).concat(S.wantMonths || []).forEach(function (b) { want[b] = 1; });
     S.wantMonths = [];
     var batch = ops.map(function (o) { return { opId: o.opId, action: o.action, payload: o.payload }; })
-      .concat([{ opId: '_boot', action: 'bootstrap' }])
+      .concat([{ opId: '_boot', action: 'bootstrap' }, { opId: '_todo', action: 'todo.list' }])
       .concat(Object.keys(want).map(function (b) { return { opId: '_m_' + b, action: 'month', payload: { bulan: b } }; }));
     return rpc('batch', { ops: batch }).then(function (d) {
       var sent = {}; ops.forEach(function (o) { sent[o.opId] = 1; });
       d.results.forEach(function (r) {
         if (r.opId === '_boot') { if (r.ok) S.boot = r.data; }
+        else if (r.opId === '_todo') { if (r.ok) S.todos = r.data.todos || []; }
         else if (String(r.opId).indexOf('_m_') === 0) { if (r.ok) S.months[r.data.bulan] = r.data; }
         else if (!r.ok) toast('Tidak tersimpan: ' + r.error, true);
       });
@@ -237,6 +255,12 @@
   }
 
   // ================= UI primitives =================
+  function agoLabel(ts) {
+    var sec = Math.round((Date.now() - ts) / 1000);
+    if (sec < 60) return 'baru saja';
+    if (sec < 3600) return Math.floor(sec / 60) + ' mnt lalu';
+    return new Date(ts).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  }
   var toastTimer;
   function toast(msg, bad) {
     var el = $('#toast'); el.textContent = msg; el.className = 'toast show' + (bad ? ' bad' : '');
@@ -247,7 +271,7 @@
     if (S.syncing) { cls += ' busy'; label = 'Sinkron…'; }
     else if (n) { cls += S.lastError ? ' offline' : ' pending'; label = n + ' belum terkirim'; }
     else if (S.lastError) { cls += ' offline'; label = 'Offline'; }
-    else label = S.conn && S.conn.mode === 'demo' ? 'Demo' : 'Tersinkron';
+    else label = S.conn && S.conn.mode === 'demo' ? 'Demo' : 'Tersinkron' + (S.lastSync ? ' · ' + agoLabel(S.lastSync) : '');
     return '<button class="' + cls + '" data-act="sync" aria-label="Sinkronkan sekarang"><i></i>' + label + '</button>';
   }
   function renderSync() { $$('.sync').forEach(function (el) { el.outerHTML = syncPill(); }); }
@@ -835,6 +859,252 @@
     });
   }
 
+  // ================= to-do rumah tangga =================
+  // Sumber kebenaran: S.todos (dari server, aksi todo.list). Perubahan lewat outbox, sama seperti transaksi.
+  function todos() { return S.todos || []; }
+  function findTodo(id) { return todos().filter(function (t) { return t.id === id; })[0] || null; }
+  function upsertTodoLocal(t) {
+    var list = todos(), i = -1;
+    for (var k = 0; k < list.length; k++) if (list[k].id === t.id) i = k;
+    if (i >= 0) list[i] = t; else list.push(t);
+    S.todos = list;
+  }
+  function todoPemilikList() {
+    return db().Users.map(function (u) { return { id: u.id, nama: u.nama, warna: bukuColor(u.buku) }; })
+      .concat([{ id: C.TODO_BERSAMA, nama: 'Bersama', warna: 'var(--b-rt)' }]);
+  }
+  function todoPemilikInfo(id) {
+    return todoPemilikList().filter(function (p) { return p.id === id; })[0] || { id: id, nama: id, warna: 'var(--surface-3)' };
+  }
+  function canWriteTodo(t) { return C.canWriteTodo(me(), t); }
+  function todoFilter() { return S.prefs.todoFilter || 'untukku'; }
+  function todoMatch(t, f) {
+    if (f === 'semua') return true;
+    if (f === 'bersama') return t.pemilik === C.TODO_BERSAMA;
+    return canWriteTodo(t);                       // Untukku = milikku + bersama
+  }
+  function todoDefaultPemilik() { return todoFilter() === 'bersama' ? C.TODO_BERSAMA : me().id; }
+  function nowHM() { var d = new Date(); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function todoTerlewat(t) {
+    if (C.bool(t.selesai) || !t.tanggal) return false;
+    var today = todayISO();
+    return t.tanggal < today || (t.tanggal === today && !!t.jam && t.jam < nowHM());
+  }
+  function todoWaktuLabel(t) {
+    if (!t.tanggal) return '';
+    var today = todayISO(), lbl;
+    if (t.tanggal === today) lbl = 'Hari ini';
+    else if (t.tanggal === C.addDays(today, 1)) lbl = 'Besok';
+    else if (t.tanggal === C.addDays(today, -1)) lbl = 'Kemarin';
+    else {
+      var d = dateObj(t.tanggal);
+      lbl = HARI[d.getDay()] + ', ' + d.getDate() + ' ' + BULAN[d.getMonth()].slice(0, 3) + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : '');
+    }
+    return lbl + (t.jam ? ' ' + t.jam : ' · seharian');
+  }
+  function todoSorted(list) {
+    // yang punya waktu dulu (paling dekat di atas), lalu tanpa waktu (terbaru di atas)
+    return list.slice().sort(function (a, b) {
+      var ka = a.tanggal ? 0 : 1, kb = b.tanggal ? 0 : 1;
+      if (ka !== kb) return ka - kb;
+      if (!ka) { var sa = a.tanggal + 'T' + (a.jam || ''), sb = b.tanggal + 'T' + (b.jam || ''); if (sa !== sb) return sa < sb ? -1 : 1; }
+      return String(b.dibuat || '').localeCompare(String(a.dibuat || ''));
+    });
+  }
+  // status kalender per baris (UX copy dari brief: menunggu koneksi / menyinkronkan / tersinkron / gagal)
+  function todoStatusHtml(t) {
+    if (!t.tanggal) return '';
+    var waktu = esc(todoWaktuLabel(t));
+    if (t._pending) {
+      var sedang = S.syncing || !S.lastError;
+      return '<span class="td-st wait">' + ICON.clock + waktu + ' · ' + (sedang ? 'Menyinkronkan…' : 'Menunggu koneksi') + '</span>';
+    }
+    if (t.gcal_status === 'gagal') return '<span class="td-st bad">' + ICON.calx + waktu + '</span>';
+    if (t.gcal_status === 'ok') return '<span class="td-st ok">' + ICON.cal + waktu + '</span>';
+    return '<span class="td-st">' + ICON.cal + waktu + '</span>';
+  }
+  function todoRow(t) {
+    var bisa = canWriteTodo(t), selesai = C.bool(t.selesai), p = todoPemilikInfo(t.pemilik);
+    var tags = '';
+    if (t.pemilik !== me().id) tags += '<span class="tag" style="--c:' + p.warna + '"><i></i>' + esc(p.nama) + '</span>';
+    if (selesai && t.pemilik === C.TODO_BERSAMA && t.selesai_oleh) tags += '<span class="tag">oleh ' + esc(userName(t.selesai_oleh)) + '</span>';
+    var gagal = !t._pending && t.gcal_status === 'gagal' && C.todoPerluEvent(t);
+    return '<div class="todo-row' + (selesai ? ' done' : '') + (todoTerlewat(t) ? ' late' : '') + '">' +
+      '<button type="button" class="todo-chk" role="checkbox" aria-checked="' + selesai + '" data-tdone="' + esc(t.id) + '" aria-label="' + (selesai ? 'Batalkan selesai' : 'Tandai selesai') + ': ' + esc(t.judul) + '"' + (bisa ? '' : ' disabled') + '></button>' +
+      '<div class="todo-main" role="button" tabindex="0" data-todo="' + esc(t.id) + '"><span class="t1">' + esc(t.judul) + '</span>' +
+      '<span class="t2">' + todoStatusHtml(t) + tags + '</span>' +
+      (gagal ? '<button type="button" class="td-retry" data-tretry="' + esc(t.id) + '"' + (bisa ? '' : ' disabled') + '>' + ICON.calx + 'Gagal masuk kalender. Coba lagi</button>' : '') +
+      '</div></div>';
+  }
+  function bindTodoRows(root) {
+    if (!root) return;
+    $$('[data-tdone]', root).forEach(function (b) { b.addEventListener('click', function () { toggleTodoDone(findTodo(b.getAttribute('data-tdone'))); }); });
+    $$('[data-todo]', root).forEach(function (el) {
+      var buka = function (e) {
+        if (e.target.closest && e.target.closest('[data-tretry]')) return;
+        var t = findTodo(el.getAttribute('data-todo'));
+        if (t) openTodoSheet(t);
+      };
+      el.addEventListener('click', buka);
+      el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); buka(e); } });
+    });
+    $$('[data-tretry]', root).forEach(function (b) { b.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var t = findTodo(b.getAttribute('data-tretry'));
+      if (!t || !canWriteTodo(t)) return;
+      enqueue('todo.sync', { id: t.id }); toast('Mencoba masuk ke kalender lagi…');
+    }); });
+  }
+  function toggleTodoDone(t) {
+    if (!t) return;
+    if (!canWriteTodo(t)) { toast('To-do ini milik ' + todoPemilikInfo(t.pemilik).nama + ', hanya bisa dilihat', true); return; }
+    var selesai = !C.bool(t.selesai);
+    enqueue('todo.done', { id: t.id, selesai: selesai });
+    toast(selesai ? 'Selesai: ' + t.judul : 'Dikembalikan ke daftar');
+  }
+  // simpan dari form cepat maupun sheet; validasi memakai aturan yang sama dengan server
+  function simpanTodo(f, existing, errEl) {
+    var payload = { id: f.id || uid(), judul: f.judul, pemilik: f.pemilik,
+      tanggal: f.aturWaktu ? f.tanggal : '', jam: f.aturWaktu && !f.seharian ? f.jam : '', durasi: f.durasi };
+    try { payload = C.cleanTodo(payload, db(), me(), existing); }
+    catch (e) { if (errEl) errEl.textContent = e.message; else toast(e.message, true); return null; }
+    if (errEl) errEl.textContent = '';
+    enqueue('todo.save', payload);
+    if (existing && existing.tanggal && !payload.tanggal) toast('Waktu dihapus. Event kalender ikut dihapus, to-do tetap ada.');
+    else if (payload.tanggal) toast(existing ? 'Perubahan disimpan. Masuk ke Google Calendar.' : 'Tersimpan. Masuk ke Google Calendar.');
+    else toast(existing ? 'Perubahan disimpan' : 'Tersimpan');
+    return payload;
+  }
+  var TODO_DURASI_PILIHAN = [[15, '15 mnt'], [30, '30 mnt'], [45, '45 mnt'], [60, '1 jam'], [90, '1,5 jam'], [120, '2 jam'], [180, '3 jam']];
+  function openTodoSheet(t, init) {
+    var editable = !t || canWriteTodo(t);
+    var now = new Date(), jamDefault = pad((now.getHours() + 1) % 24) + ':00';
+    var f = t
+      ? { id: t.id, judul: t.judul, pemilik: t.pemilik, aturWaktu: !!t.tanggal, tanggal: t.tanggal || todayISO(),
+        seharian: !!t.tanggal && !t.jam, jam: t.jam || jamDefault, durasi: C.num(t.durasi) || C.TODO_DURASI }
+      : Object.assign({ id: '', judul: '', pemilik: todoDefaultPemilik(), aturWaktu: false, tanggal: todayISO(), seharian: false, jam: jamDefault, durasi: C.TODO_DURASI }, init || {});
+    openSheet(t ? (editable ? 'Ubah to-do' : 'Detail to-do') : 'To-do baru', function (sh) {
+      function hintText() {
+        if (!f.aturWaktu) return 'Tanpa waktu: hanya di app, tidak masuk kalender.';
+        var spec = C.todoEventSpec({ id: f.id || 'x', judul: f.judul || 'to-do', pemilik: f.pemilik, tanggal: f.tanggal, jam: f.seharian ? '' : f.jam, durasi: f.durasi, selesai: t ? t.selesai : false }, db());
+        var kapan = todoWaktuLabel({ tanggal: f.tanggal, jam: f.seharian ? '' : f.jam });
+        if (!spec.seharian) kapan += '–' + spec.akhir.slice(11);
+        return 'Masuk ke Google Calendar "Rumah Kita" sebagai ' + spec.judul + ' · ' + kapan + '.';
+      }
+      function draw() {
+        var dis = editable ? '' : ' disabled';
+        var pil = TODO_DURASI_PILIHAN.slice();
+        if (!pil.some(function (x) { return x[0] === f.durasi; })) pil.push([f.durasi, f.durasi + ' mnt']);
+        sh.el.innerHTML = (editable ? '' : '<div class="readonly-note">' + ICON.lock + '<span>To-do ini milik ' + esc(todoPemilikInfo(f.pemilik).nama) + '. Hanya bisa kamu lihat.</span></div>') +
+          '<div class="field" style="margin-top:4px"><label for="td-judul">Apa yang mau dikerjain?</label><input id="td-judul" class="input" maxlength="120" placeholder="mis. bayar listrik" autocomplete="off" value="' + esc(f.judul) + '"' + dis + '></div>' +
+          '<div class="field"><span class="lbl">Untuk</span><div class="chips wrap" role="group" aria-label="Pemilik to-do">' + todoPemilikList().map(function (p) {
+            return '<button type="button" class="chip" data-tp="' + esc(p.id) + '" aria-pressed="' + (f.pemilik === p.id) + '" style="--c:' + p.warna + '"' + dis + '><span class="dot" style="background:' + p.warna + '"></span>' + esc(p.nama) + '</button>';
+          }).join('') + '</div></div>' +
+          toggleHtml('td-waktu', 'Atur waktu', f.aturWaktu ? 'Masuk ke Google Calendar "Rumah Kita"' : 'Tanpa waktu: hanya di app', f.aturWaktu).replace('<button ', '<button' + dis + ' ') +
+          (f.aturWaktu ?
+            '<div class="field row2"><div><label for="td-tgl">Tanggal</label><input id="td-tgl" class="input" type="date" value="' + esc(f.tanggal) + '"' + dis + '></div>' +
+            '<div><label for="td-jam">Jam</label><input id="td-jam" class="input" type="time" step="300" value="' + esc(f.jam) + '"' + (f.seharian || !editable ? ' disabled' : '') + '></div></div>' +
+            toggleHtml('td-seharian', 'Seharian', 'Tanpa jam, muncul sebagai event sehari penuh', f.seharian).replace('<button ', '<button' + dis + ' ') +
+            (!f.seharian ? '<div class="field"><span class="lbl">Durasi</span><div class="chips" role="group" aria-label="Durasi">' + pil.map(function (x) {
+              return '<button type="button" class="chip" data-td="' + x[0] + '" aria-pressed="' + (f.durasi === x[0]) + '"' + dis + '>' + x[1] + '</button>';
+            }).join('') + '</div></div>' : '') : '') +
+          '<div class="hint" id="td-hint">' + esc(hintText()) + '</div>' +
+          (t && t.gcal_status === 'gagal' && C.todoPerluEvent(t) && !t._pending ? '<div class="hint" style="color:var(--todo-bad)">Terakhir gagal masuk kalender: ' + esc(t.gcal_error || 'tidak diketahui') + '</div>' : '') +
+          '<div class="err" id="td-err" role="alert"></div>' +
+          (editable ? '<button type="button" class="btn" id="td-save">' + (t ? 'Simpan perubahan' : 'Simpan') + '</button>' +
+            (t ? '<button type="button" class="btn danger" id="td-del">Hapus to-do</button>' : '') : '');
+        if (!editable) return;
+        var judul = $('#td-judul', sh.el);
+        judul.addEventListener('input', function () { f.judul = judul.value; $('#td-hint', sh.el).textContent = hintText(); });
+        judul.addEventListener('keydown', function (e) { if (e.key === 'Enter') simpan(); });
+        $$('[data-tp]', sh.el).forEach(function (b) { b.addEventListener('click', function () {
+          f.pemilik = b.getAttribute('data-tp');
+          $$('[data-tp]', sh.el).forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+          $('#td-hint', sh.el).textContent = hintText();
+        }); });
+        $('#td-waktu', sh.el).addEventListener('click', function () { f.aturWaktu = !f.aturWaktu; draw(); });
+        var tgl = $('#td-tgl', sh.el), jam = $('#td-jam', sh.el), sehari = $('#td-seharian', sh.el);
+        if (tgl) tgl.addEventListener('change', function () { f.tanggal = tgl.value || todayISO(); $('#td-hint', sh.el).textContent = hintText(); });
+        if (jam) jam.addEventListener('change', function () { if (jam.value) f.jam = jam.value.slice(0, 5); $('#td-hint', sh.el).textContent = hintText(); });
+        if (sehari) sehari.addEventListener('click', function () { f.seharian = !f.seharian; draw(); });
+        $$('[data-td]', sh.el).forEach(function (b) { b.addEventListener('click', function () {
+          f.durasi = +b.getAttribute('data-td');
+          $$('[data-td]', sh.el).forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+          $('#td-hint', sh.el).textContent = hintText();
+        }); });
+        $('#td-save', sh.el).addEventListener('click', simpan);
+        var del = $('#td-del', sh.el);
+        if (del) del.addEventListener('click', function () {
+          if (!confirm('Hapus to-do ini?' + (t.gcal_event_id ? ' Event di Google Calendar ikut dihapus.' : ''))) return;
+          enqueue('todo.delete', { id: t.id }); toast('To-do dihapus'); sh.close();
+        });
+      }
+      function simpan() {
+        if (simpanTodo(f, t, $('#td-err', sh.el))) sh.close();
+      }
+      draw();
+      if (!t) { var j = $('#td-judul', sh.el); if (j && !f.judul) setTimeout(function () { j.focus(); }, 300); }
+    });
+  }
+  // kartu kecil di Beranda: to-do hari ini & yang terlewat (milikku + bersama)
+  function renderHomeTodo(root) {
+    if (!root) return;
+    var today = todayISO();
+    var list = todoSorted(todos().filter(function (t) { return canWriteTodo(t) && !C.bool(t.selesai) && t.tanggal && t.tanggal <= today; }));
+    root.innerHTML = list.length
+      ? '<section class="section"><div class="section-h"><h2>To-do hari ini</h2><button type="button" class="aside lnk" data-act="goto-todo">Lihat semua</button></div>' +
+        '<div class="list todo-list">' + list.slice(0, 3).map(todoRow).join('') + '</div>' +
+        (list.length > 3 ? '<p class="faint" style="font-size:12px;text-align:center;margin:8px 0 0">+' + (list.length - 3) + ' lainnya di tab To-do</p>' : '') + '</section>'
+      : '';
+    bindTodoRows(root);
+  }
+  var TodoView = {
+    render: function (el) {
+      var self = this;
+      el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>To-do</h1></div><div class="top-actions">' + syncPill() + '</div></div>' +
+        '<div class="seg" role="group" aria-label="Filter to-do">' + [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) {
+          return '<button type="button" data-tf="' + x[0] + '" aria-pressed="' + (todoFilter() === x[0]) + '">' + x[1] + '</button>';
+        }).join('') + '</div>' +
+        '<div class="todo-add"><input id="td-new" class="input" type="text" maxlength="120" placeholder="Tulis to-do, lalu Enter" autocomplete="off" enterkeyhint="done" aria-label="To-do baru">' +
+        '<button type="button" class="btn small ghost" id="td-time" aria-label="Atur waktu">' + ICON.cal + '<span>Atur waktu</span></button></div>' +
+        '<div id="td-list"></div>';
+      $$('[data-tf]', el).forEach(function (b) { b.addEventListener('click', function () {
+        S.prefs.todoFilter = b.getAttribute('data-tf'); persist();
+        $$('[data-tf]', el).forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+        self.update(el);
+      }); });
+      var inp = $('#td-new', el);
+      inp.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        var judul = inp.value.trim(); if (!judul) return;
+        if (simpanTodo({ judul: judul, pemilik: todoDefaultPemilik(), aturWaktu: false, durasi: C.TODO_DURASI }, null)) { inp.value = ''; }
+      });
+      $('#td-time', el).addEventListener('click', function () {
+        openTodoSheet(null, { judul: inp.value.trim(), aturWaktu: true });
+        inp.value = '';
+      });
+      this.update(el);
+    },
+    update: function (el) {
+      var box = $('#td-list', el); if (!box) return this.render(el);
+      if (S.todos === null) { box.innerHTML = skeleton(3); return; }
+      var f = todoFilter(), list = todos().filter(function (t) { return todoMatch(t, f); });
+      var buka = todoSorted(list.filter(function (t) { return !C.bool(t.selesai); }));
+      var beres = list.filter(function (t) { return C.bool(t.selesai); })
+        .sort(function (a, b) { return String(b.diubah || '').localeCompare(String(a.diubah || '')); }).slice(0, 20);
+      var html;
+      if (!buka.length && !beres.length) html = '<div class="list"><div class="empty">Belum ada to-do. Tulis satu hal yang mau dikerjain hari ini.</div></div>';
+      else {
+        html = buka.length ? '<div class="list todo-list">' + buka.map(todoRow).join('') + '</div>'
+          : '<div class="list"><div class="empty">Semua beres. Tulis to-do berikutnya di atas.</div></div>';
+        if (beres.length) html += '<section class="section"><div class="section-h"><h2>Selesai</h2><span class="aside">' + beres.length + ' terakhir</span></div><div class="list todo-list">' + beres.map(todoRow).join('') + '</div></section>';
+      }
+      box.innerHTML = html;
+      bindTodoRows(box);
+    }
+  };
+
   // ================= views =================
   var view = null;
   function renderShell() {
@@ -842,20 +1112,21 @@
     if (!S.conn) { renderConnect(); return; }
     app.innerHTML = (S.conn.mode === 'demo' ? '<div class="demo-bar">Ini versi demo dengan data contoh. <button data-act="leave-demo">Hubungkan Google Sheets</button></div>' : '') +
       '<main id="view" class="view"></main>' +
-      '<footer class="tabbar"><nav>' + [['home', 'Catat', ICON.home], ['ringkasan', 'Ringkasan', ICON.chart], ['riwayat', 'Riwayat', ICON.list], ['pengaturan', 'Pengaturan', ICON.gear]].map(function (x) {
+      '<footer class="tabbar"><nav>' + [['home', 'Catat', ICON.home], ['todo', 'To-do', ICON.check], ['ringkasan', 'Ringkasan', ICON.chart], ['riwayat', 'Riwayat', ICON.list], ['pengaturan', 'Pengaturan', ICON.gear]].map(function (x) {
         return '<button data-tab="' + x[0] + '" aria-current="' + (S.tab === x[0] ? 'page' : 'false') + '">' + x[2] + x[1] + '</button>';
       }).join('') + '</nav></footer>';
-    $$('[data-tab]', app).forEach(function (b) { b.addEventListener('click', function () {
-      S.tab = b.getAttribute('data-tab'); S.sub = null;
-      $$('[data-tab]', app).forEach(function (x) { x.setAttribute('aria-current', x === b ? 'page' : 'false'); });
-      renderView(); window.scrollTo(0, 0);
-    }); });
+    $$('[data-tab]', app).forEach(function (b) { b.addEventListener('click', function () { goTab(b.getAttribute('data-tab')); }); });
     renderView();
+  }
+  function goTab(id) {
+    S.tab = id; S.sub = null;
+    $$('[data-tab]').forEach(function (x) { x.setAttribute('aria-current', x.getAttribute('data-tab') === id ? 'page' : 'false'); });
+    renderView(); window.scrollTo(0, 0);
   }
   function renderView() {
     if (!S.boot) { $('#view').innerHTML = '<div class="topbar"><div><h1>Memuat data…</h1></div>' + syncPill() + '</div>' + skeleton(5); return; }
     if (!S.bukuView) S.bukuView = me().buku;
-    var v = { home: HomeView, ringkasan: RingkasanView, riwayat: RiwayatView, pengaturan: SettingsView }[S.tab];
+    var v = { home: HomeView, todo: TodoView, ringkasan: RingkasanView, riwayat: RiwayatView, pengaturan: SettingsView }[S.tab];
     view = v; v.render($('#view'));
   }
   function refresh() {
@@ -869,6 +1140,7 @@
     if (a === 'sync') sync();
     if (a === 'theme') { setTheme(isDark() ? 'light' : 'dark'); t.outerHTML = themeBtn(); }
     if (a === 'leave-demo') { if (confirm('Keluar dari mode demo?')) disconnect(); }
+    if (a === 'goto-todo') goTab('todo');
   });
 
   // ---------- Catat (home) ----------
@@ -877,7 +1149,7 @@
       el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Halo, ' + esc(me().nama) + '!</h1></div><div class="top-actions">' + themeBtn() + syncPill() + '</div></div>' +
         '<div id="home-budget"></div>' +
         '<section class="section"><div class="entry" id="entry"></div></section>' +
-        '<div id="home-utang"></div><div id="home-reim"></div>' +
+        '<div id="home-todo"></div><div id="home-utang"></div><div id="home-reim"></div>' +
         '<section class="section"><div class="section-h"><h2>Catatan hari ini</h2><span class="aside" id="today-total"></span></div><div id="today"></div></section>';
       txForm($('#entry', el), null, { allowAdd: true });
       this.update(el);
@@ -904,6 +1176,7 @@
       todayEl.innerHTML = list.length ? '<div class="list">' + list.sort(function (a, b) { return String(b.dibuat || '9').localeCompare(String(a.dibuat || '9')); })
         .map(function (x) { return txRow(x, null); }).join('') + '</div>' : '<div class="list"><div class="empty">Hari ini masih bersih. Catat jajan pertamamu di atas.</div></div>';
       bindTxRows(todayEl);
+      renderHomeTodo($('#home-todo', el));
       renderTalangan($('#home-utang', el), null);
       var waits = [];
       Object.keys(S.months).forEach(function (b) { (S.months[b].transaksi || []).forEach(function (x) { if (reimStatus(x) === 'wait' && canWrite(x.buku)) waits.push(x); }); });
@@ -1291,20 +1564,20 @@
       } catch (e) { $('#c-err').textContent = 'Kode tidak dikenali. Salin ulang dari menu Kantong, Buat kode koneksi.'; return; }
       btn.disabled = true; btn.textContent = 'Menghubungkan…';
       rpc('bootstrap', {}, conn).then(function (boot) {
-        S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.bukuView = null; persist(); renderShell(); sync();
+        S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
       }, function (e) {
         btn.disabled = false; btn.textContent = 'Hubungkan';
         $('#c-err').textContent = e.code === 'AUTH' ? 'Kode akses ditolak server.' : e.message;
       });
     });
     $('#demo').addEventListener('click', function () {
-      S.conn = { mode: 'demo' }; S.boot = null; S.months = {}; S.outbox = []; S.bukuView = null; persist(); renderShell(); sync();
+      S.conn = { mode: 'demo' }; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
     });
   }
   function disconnect() {
-    ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo'].forEach(LS.del);
+    ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos'].forEach(LS.del);
     demoStore = null;
-    S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.sub = null; S.tab = 'home'; S.bukuView = null;
+    S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.sub = null; S.tab = 'home'; S.bukuView = null;
     renderConnect();
   }
 
@@ -1357,10 +1630,24 @@
     var pd = tx[tx.length - 1]; pd.reimburse = true; pd.terbayar = bm + '-' + pad(Math.min(today, 4)); pd.tx_balik = 'rb-' + pd.id;
     tx.push({ id: pd.tx_balik, tanggal: pd.terbayar, tipe: 'Pemasukan', nominal: 350000, buku: 'riki', kategori: C.KAT_REIMBURSE, kantong: 'bca', kantong_tujuan: '',
       keterangan: 'Reimburse: kereta dinas', reimburse: false, oleh: 'riki', sumber: 'auto', dibuat: pd.terbayar + 'T09:00:00+07:00', diubah: '', dihapus: '', terbayar: '', tx_balik: '' });
+    // to-do contoh: campuran dengan waktu, tanpa waktu, bersama, dan yang sudah selesai
+    var t0 = todayISO(), td = [];
+    var tdAdd = function (n, judul, pemilik, tanggal, jam, selesai) {
+      var kapan = (tanggal || t0) + 'T08:0' + n + ':00+07:00';
+      td.push({ id: 'demo-td-' + n, judul: judul, pemilik: pemilik, tanggal: tanggal, jam: jam, durasi: 30,
+        selesai: !!selesai, selesai_oleh: selesai ? 'istri' : '', gcal_event_id: tanggal ? 'demo-ev-' + n : '',
+        gcal_status: tanggal ? 'ok' : '', gcal_error: '', oleh: pemilik === 'bersama' ? 'riki' : pemilik,
+        dibuat: kapan, diubah: kapan, dihapus: '' });
+    };
+    tdAdd(1, 'Bayar listrik & air', 'bersama', t0, '19:00');
+    tdAdd(2, 'Beli galon', 'riki', '', '');
+    tdAdd(3, 'Jemput paket di agen', 'istri', C.addDays(t0, 1), '10:00');
+    tdAdd(4, 'Servis AC kamar', 'bersama', C.addDays(t0, 3), '');
+    tdAdd(5, 'Transfer arisan', 'istri', C.addDays(t0, -1), '16:00', true);
     return {
       buku: [{ id: 'riki', nama: 'Riki', tipe: 'Pribadi', pemilik: 'riki', urutan: 1 }, { id: 'istri', nama: 'Febie', tipe: 'Pribadi', pemilik: 'istri', urutan: 2 }, { id: 'rt', nama: 'Rumah Tangga', tipe: 'Bersama', pemilik: '', urutan: 3 }],
       users: [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'istri', nama: 'Febie', buku: 'istri' }],
-      kategori: kat, kantong: kan, budget: bud, transaksi: tx
+      kategori: kat, kantong: kan, budget: bud, transaksi: tx, todo: td
     };
   }
 
@@ -1369,13 +1656,13 @@
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') sync(); });
   setInterval(function () { if (document.visibilityState === 'visible' && (S.outbox.length || !S.lastSync || Date.now() - S.lastSync > 120000)) sync(); }, 30000);
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
-  // data demo versi lama (sebelum daftar talangan & setoran) dibuang sekali supaya tidak bentrok
-  if (LS.get('k_ver', null) !== 'v4') {
+  // data demo versi lama (sebelum to-do) dibuang sekali supaya contoh to-do ikut muncul
+  if (LS.get('k_ver', null) !== 'v5') {
     if (S.conn && S.conn.mode === 'demo') {
-      ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo'].forEach(LS.del);
-      S.conn = null; S.boot = null; S.months = {}; S.outbox = [];
+      ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos'].forEach(LS.del);
+      S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null;
     }
-    LS.set('k_ver', 'v4');
+    LS.set('k_ver', 'v5');
   }
   if (!S.conn && window.KANTONG_PREVIEW) S.conn = { mode: 'demo' };   // file preview
   renderShell();

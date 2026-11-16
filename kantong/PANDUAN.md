@@ -5,7 +5,7 @@ Total waktu sekitar 20 menit, cukup sekali. Isi paket:
 | Folder/file | Fungsinya |
 |---|---|
 | `app/` | PWA. Folder ini yang di-upload ke hosting. Tidak berisi data keuangan. |
-| `apps-script/` | Backend: `Code.gs`, `Core.gs`, `appsscript.json` |
+| `apps-script/` | Backend: `Code.gs`, `Core.gs`, `appsscript.json` (termasuk sync to-do ke Google Calendar) |
 | `Kantong-Database.xlsx` | Database awal: kategori, kantong, budget, dan 462 transaksi April–Oktober |
 
 ---
@@ -14,7 +14,7 @@ Total waktu sekitar 20 menit, cukup sekali. Isi paket:
 
 1. Buka sheets.new dan beri nama **Kantong Database**.
 2. **File → Import → Upload** → pilih `Kantong-Database.xlsx` → pilih **Replace spreadsheet** → **Import data**.
-3. Cek ada 6 tab: Transaksi, Kategori, Kantong, Budget, Buku, Users.
+3. Cek ada 6 tab: Transaksi, Kategori, Kantong, Budget, Buku, Users. (Tab **Todo** dibuat otomatis di langkah 2.)
 4. Di tab **Buku** dan **Users**, ganti kolom `nama` yang berisi "Istri" dengan nama istri lo. Kolom `id` jangan diubah.
 
 ## 2. Pasang backend (5 menit)
@@ -69,6 +69,30 @@ Lalu buka app dari home screen, tempel **kode koneksi**, dan pilih **Hubungkan**
 | Istri | baca | tulis + baca | tulis + baca |
 
 Aturan ini dijalankan di server, bukan cuma di tampilan.
+
+## 7. To-do rumah tangga + Google Calendar (fitur baru, 5 menit)
+
+To-do berdua ada di tab **To-do**. To-do yang **punya waktu** otomatis masuk ke satu kalender khusus bernama **Rumah Kita** di akun Google pemilik script (Riki), lalu dibagikan ke akun pasangan. Tanpa waktu = hanya di app.
+
+1. Tempel `Code.gs` dan `Core.gs` versi baru (lihat "Cara update nanti"). Tab **Todo** di Sheet dibuat otomatis saat app pertama kali dipakai, atau jalankan **Kantong → 1. Setup** lagi.
+2. Di Sheet: **Kantong → 3. Siapkan kalender Rumah Kita**, izinkan akses Calendar. Kalender dibuat sekali, id-nya disimpan.
+3. **Deploy → Manage deployments → ✎ Edit → Version: New version → Deploy**, supaya izin kalender ikut aktif di API. Kalau diminta, izinkan lagi.
+4. Buka calendar.google.com (web) → ⚙ Settings → kalender **Rumah Kita** → **Share with specific people** → tambahkan email Google pasangan dengan izin **Make changes to events**. Pasangan buka undangannya dari email, kalender langsung muncul di HP.
+5. Pengingat event ikut setelan kalender ini (Settings → Rumah Kita → Event notifications). Atur sekali, berlaku untuk semua to-do.
+
+Aturan yang dijalankan server:
+
+| | To-do Riki | To-do Istri | Bersama |
+|---|---|---|---|
+| Riki | tulis + centang | lihat | tulis + centang |
+| Istri | lihat | tulis + centang | tulis + centang |
+
+- Judul event diberi awalan `[R]`, `[F]` (inisial nama di tab Users), atau `[B]` untuk bersama; warnanya berbeda per pemilik.
+- Ubah waktu → event pindah. Hapus waktu → event dihapus, to-do tetap. Hapus to-do → event ikut dihapus.
+- Centang selesai → event dibiarkan, judulnya diberi tanda ✓. Mau event dihapus saat dicentang? Ganti `TODO_SELESAI_EVENT` di `Core.gs` (dan `core.js`) menjadi `'hapus'`.
+- Sync satu arah: app → kalender. Mengubah event langsung di Google Calendar **tidak** kembali ke app.
+- Offline: to-do tersimpan di HP, dikirim saat online lagi; request ulang tidak membuat event dobel.
+- Gagal masuk kalender (mis. kalender belum disiapkan): to-do tetap tersimpan, barisnya merah dengan tombol **Coba lagi**.
 
 ## Cara update nanti
 

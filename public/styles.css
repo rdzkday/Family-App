@@ -99,9 +99,9 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
 
 .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding-bottom: var(--safe-b); background: var(--tabbar);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--line); }
-.tabbar nav { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); height: var(--tab-h); padding: 0 8px; }
+.tabbar nav { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); height: var(--tab-h); padding: 0 4px; }
 .tabbar button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; font-weight: 800; color: var(--text-3); }
-.tabbar button svg { width: 24px; height: 24px; padding: 2px; border-radius: 10px; box-sizing: content-box; padding: 3px 14px; }
+.tabbar button svg { width: 24px; height: 24px; border-radius: 10px; box-sizing: content-box; padding: 3px 12px; }
 .tabbar button[aria-current="page"] { color: var(--text); }
 .tabbar button[aria-current="page"] svg { background: var(--accent); color: var(--ink); }
 
@@ -163,17 +163,18 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
 textarea.input { padding: 12px 14px; min-height: 90px; resize: vertical; }
 /* Safari/iOS tidak mewarisi font ke input tanggal, jadi disamakan manual dengan field lain */
 /* jangan pakai appearance:none di sini: itu mematikan color-scheme, ikon kalender jadi hitam di tema gelap */
-input[type="date"].input {
+input[type="date"].input, input[type="time"].input {
   height: 48px; line-height: normal; font-size: 15px; font-weight: 600; font-family: inherit; text-align: left;
 }
-input[type="date"].input::-webkit-date-and-time-value {
+input[type="date"].input::-webkit-date-and-time-value, input[type="time"].input::-webkit-date-and-time-value {
   text-align: left; font-size: 15px; font-weight: 600; margin: 0; padding: 0; min-height: 20px;
 }
-input[type="date"].input::-webkit-datetime-edit { padding: 0; font-size: 15px; font-weight: 600; }
-input[type="date"].input::-webkit-calendar-picker-indicator {
+input[type="date"].input::-webkit-datetime-edit, input[type="time"].input::-webkit-datetime-edit { padding: 0; font-size: 15px; font-weight: 600; }
+input[type="date"].input::-webkit-calendar-picker-indicator, input[type="time"].input::-webkit-calendar-picker-indicator {
   opacity: .55; cursor: pointer; width: 20px; height: 20px; padding: 0; margin-left: 4px;
 }
-input[type="date"].input::-webkit-calendar-picker-indicator:hover { opacity: .9; }
+input[type="date"].input::-webkit-calendar-picker-indicator:hover, input[type="time"].input::-webkit-calendar-picker-indicator:hover { opacity: .9; }
+input.input:disabled { opacity: .5; }
 .toggle { width: 100%; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
 .toggle .sw { position: relative; width: 48px; height: 30px; border-radius: 999px; background: var(--surface-3); flex: none; transition: background .15s; }
 .toggle .sw::after { content: ''; position: absolute; top: 4px; left: 4px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
@@ -373,3 +374,39 @@ input[type="date"].input::-webkit-calendar-picker-indicator:hover { opacity: .9;
   background: var(--surface-2); border-radius: 12px; font-size: 12px; font-weight: 600; color: var(--text-2); line-height: 1.5; }
 .setoran-note b { font-weight: 800; color: var(--text); }
 .setoran-note .lnk { color: var(--accent); font-weight: 800; white-space: nowrap; }
+
+/* ---------- v4: to-do rumah tangga + Google Calendar ---------- */
+/* warna status: kontras >= 4.5:1 di atas --surface pada kedua tema */
+:root { --todo-ok: #3F5BB5; --todo-bad: #B8364C; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --todo-ok: #A9B9FF; --todo-bad: #FF9AAA; } }
+:root[data-theme="dark"] { --todo-ok: #A9B9FF; --todo-bad: #FF9AAA; }
+
+.todo-add { display: flex; gap: 8px; align-items: stretch; margin: 16px 0 16px; }
+.todo-add .input { flex: 1; min-width: 0; min-height: 52px; }
+.todo-add .btn.small { min-height: 52px; flex: none; padding: 0 14px; gap: 6px; border-radius: var(--r-field); }
+.todo-add .btn.small svg { width: 18px; height: 18px; }
+.todo-list { padding: 0 12px 0 6px; }
+.todo-row { display: flex; align-items: flex-start; gap: 6px; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+.todo-row:last-child { border-bottom: 0; }
+.todo-chk { flex: none; width: 44px; height: 44px; margin-top: 2px; display: grid; place-items: center; border-radius: 12px; }
+.todo-chk::before { content: ''; width: 24px; height: 24px; border-radius: 9px; border: 2px solid var(--surface-3); background: var(--surface);
+  display: grid; place-items: center; font-size: 15px; font-weight: 900; line-height: 1; color: var(--bg); }
+.todo-chk[aria-checked="true"]::before { content: '\2713'; background: var(--in); border-color: var(--in); }
+.todo-chk:disabled { cursor: default; }
+.todo-chk:disabled::before { opacity: .4; }
+.todo-main { flex: 1; min-width: 0; min-height: 44px; padding: 8px 0; text-align: left; cursor: pointer; border-radius: 10px; }
+.todo-main .t1 { display: block; font-weight: 800; font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
+.todo-main .t2 { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 3px; font-size: 12px; font-weight: 700; color: var(--text-2); }
+.todo-main .t2:empty { display: none; }
+.todo-row.done .t1 { color: var(--text-2); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.td-st { display: inline-flex; align-items: center; gap: 4px; }
+.td-st svg { width: 15px; height: 15px; flex: none; }
+.td-st.ok { color: var(--todo-ok); }
+.td-st.bad { color: var(--todo-bad); }
+.td-st.wait { color: var(--text-2); }
+.todo-row.late:not(.done) .td-st.ok, .todo-row.late:not(.done) .td-st:not(.wait):not(.bad) { color: var(--todo-bad); }
+.td-retry { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 2px; padding: 0 12px; border-radius: 999px;
+  background: color-mix(in srgb, var(--todo-bad) 12%, var(--surface)); color: var(--todo-bad); font-size: 12.5px; font-weight: 800; }
+.td-retry svg { width: 16px; height: 16px; }
+.td-retry:disabled { opacity: .5; cursor: default; }
+.section-h button.aside.lnk { color: var(--todo-ok); font-weight: 800; min-height: 44px; margin: -12px 0; }
