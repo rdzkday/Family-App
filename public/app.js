@@ -1113,12 +1113,14 @@
         '<button data-s="kategori"><span class="main">Kategori<div class="t2">' + db().Kategori.filter(function (k) { return C.bool(k.aktif) && k.id !== C.KAT_REIMBURSE; }).length + ' kategori aktif</div></span>' + ICON.right + '</button>' +
         '<button data-s="kantong"><span class="main">Kantong<div class="t2">Cash, debit, e-wallet, kartu kredit</div></span>' + ICON.right + '</button>' +
         '</div></section>' +
+        '<section class="section"><div class="menu"><button data-s="beranda"><span class="main">Beranda desktop<div class="t2">Ringkasan, to-do, dan mood dalam satu layar lebar</div></span>' + ICON.right + '</button></div></section>' +
         '<section class="section"><div class="menu"><button data-s="out"><span class="main" style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Putuskan koneksi di HP ini') + '</span></button></div>' +
         '<p class="faint" style="font-size:12px;text-align:center;margin-top:20px">Kantong v' + (S.boot.version || C.VERSION) + '</p></section>';
       $$('[data-theme-set]', el).forEach(function (b) { b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme-set')); SettingsView.render(el); }); });
       $$('[data-s]', el).forEach(function (b) { b.addEventListener('click', function () {
         var a = b.getAttribute('data-s');
         if (a === 'sync') sync();
+        else if (a === 'beranda') location.href = 'beranda.html';
         else if (a === 'switch') { S.prefs.demoUser = S.prefs.demoUser === 'riki' ? 'istri' : 'riki'; S.bukuView = null; persist(); S.boot = null; renderView(); sync(); }
         else if (a === 'out') { if (confirm(demo ? 'Keluar dari mode demo? Data demo dihapus.' : 'Putuskan koneksi? Transaksi yang belum terkirim akan hilang dari HP ini.')) disconnect(); }
         else goSub({ type: a });

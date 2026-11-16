@@ -1,0 +1,94 @@
+/* Beranda desktop: layout lebar di atas token Kantong (styles.css). */
+.dash { max-width: 1200px; margin: 0 auto; padding: 32px var(--gutter) 64px; display: flex; flex-direction: column; gap: 24px; }
+@media (min-width: 720px) { .dash { padding-left: 24px; padding-right: 24px; } }
+
+.dash-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+.dash-head .date { font-size: 14px; color: var(--text-2); font-weight: 700; }
+.dash-head h1 { margin: 2px 0 0; font-size: 32px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.15; }
+.dash-head .right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dash-head .seg { min-width: 180px; }
+
+/* kartu aplikasi */
+.apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.app { display: flex; align-items: center; gap: 14px; padding: 18px; background: var(--surface); border-radius: var(--r-card);
+  box-shadow: var(--shadow); color: var(--text); text-decoration: none; text-align: left; width: 100%; transition: transform .12s; }
+.app:hover { transform: translateY(-2px); }
+.app .ic { width: 44px; height: 44px; flex: none; border-radius: 14px 14px 14px 6px; background: var(--c); color: var(--ink); display: grid; place-items: center; }
+.app .ic svg { width: 22px; height: 22px; }
+.app .t1 { display: flex; align-items: center; gap: 4px; font-size: 15px; font-weight: 900; }
+.app .t1 svg { width: 12px; height: 12px; }
+.app .t2 { font-size: 12px; color: var(--text-2); font-weight: 600; }
+
+/* dua kolom */
+.cols { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.col-main { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+.col-side { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+.panel { background: var(--surface); border-radius: var(--r-card); padding: 22px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 14px; }
+.panel-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.panel-h h2 { margin: 0; font-size: 18px; font-weight: 900; }
+.panel-h .aside { font-size: 13px; color: var(--text-2); font-weight: 700; }
+.panel .lnk { font-size: 13px; font-weight: 800; color: var(--tf); text-decoration: none; }
+.panel .btn { margin-top: 4px; text-decoration: none; }
+.todo-bar .input { flex: 1 1 160px; }
+
+/* Kantong */
+.kantong-grid { display: flex; flex-wrap: wrap; gap: 24px; }
+.kantong-grid > div { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.big-num { font-size: 34px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.1; }
+.big-num.over { color: var(--over); }
+.mini { background: var(--surface-2); border-radius: 16px; padding: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mini .t1 { font-size: 13px; color: var(--text-2); font-weight: 700; }
+.mini b { font-size: 16px; font-weight: 900; }
+.tx.flat { padding: 12px 0; min-height: 56px; }
+
+/* To-do */
+.todo-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; background: var(--surface-2); border-radius: 18px; padding: 8px; }
+.todo-bar .seg { padding: 3px; gap: 3px; min-width: 160px; }
+.todo-bar .seg button { min-height: 34px; font-size: 13px; }
+.todo-bar .input { flex: 1 1 220px; min-height: 40px; background: var(--surface); }
+.todo-bar .chip { min-height: 40px; font-size: 13px; background: var(--surface); }
+.todo-bar .chip[aria-pressed="true"] { background: var(--accent); }
+.todo-bar .btn.small { min-height: 40px; background: var(--text); color: var(--bg); }
+.todo { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-top: 1px dashed var(--line); }
+.todo .box { width: 24px; height: 24px; flex: none; border-radius: 8px; border: 2px solid var(--surface-3); display: grid; place-items: center; color: var(--ink); }
+.todo .box svg { width: 14px; height: 14px; }
+.todo.done .box { background: var(--accent); border-color: var(--accent); }
+.todo .t1 { flex: 1; min-width: 0; font-size: 15px; font-weight: 800; }
+.todo.done .t1 { color: var(--text-3); text-decoration: line-through; }
+.todo .who { font-size: 13px; color: var(--text-2); font-weight: 700; width: 72px; flex: none; }
+.todo .when { font-size: 13px; font-weight: 700; color: var(--tf); width: 170px; flex: none; display: inline-flex; align-items: center; gap: 6px; }
+.todo .when.none { color: var(--text-3); }
+.todo .when svg { width: 13px; height: 13px; }
+.todo .del { color: var(--text-3); width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; flex: none; opacity: 0; }
+.todo:hover .del, .todo .del:focus-visible { opacity: 1; }
+.todo .del:hover { background: var(--surface-2); color: var(--over); }
+.note-row { padding: 12px 0; border-top: 1px dashed var(--line); font-size: 14px; font-weight: 600; display: flex; gap: 12px; align-items: flex-start; }
+.note-row .t2 { font-size: 12px; color: var(--text-3); flex: none; padding-top: 2px; }
+.note-row .main { flex: 1; white-space: pre-wrap; }
+@media (max-width: 560px) { .todo { flex-wrap: wrap; row-gap: 4px; } .todo .t1 { flex-basis: calc(100% - 38px); } .todo .who, .todo .when { width: auto; margin-left: 38px; } .todo .when { font-size: 12px; margin-left: 0; } .todo .del { opacity: 1; margin-left: auto; } }
+
+/* Komitmen: blok pastel butter */
+.panel.komit { background: color-mix(in srgb, var(--b-rt) 45%, var(--surface)); }
+:root[data-theme="dark"] .panel.komit { background: var(--hero-2); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .panel.komit { background: var(--hero-2); } }
+.komit .ic { width: 40px; height: 40px; flex: none; border-radius: 12px; background: var(--b-rt); color: var(--ink); display: grid; place-items: center; }
+.komit .ic svg { width: 22px; height: 22px; }
+.komit .head { display: flex; align-items: center; gap: 12px; }
+.komit h2 { margin: 0; font-size: 17px; font-weight: 900; }
+.komit .t2 { font-size: 13px; color: var(--text-2); font-weight: 700; }
+.komit p { margin: 0; font-size: 14px; line-height: 1.55; font-weight: 600; }
+.komit .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.komit .btn { margin: 0; min-height: 46px; font-size: 14px; flex: 1 1 160px; width: auto; }
+.komit .btn.primary { background: var(--text); color: var(--bg); }
+.komit .btn.ghost { background: var(--surface); flex: 0 1 auto; padding: 0 16px; }
+
+/* Ruang Catat mood */
+.moods { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.mood { height: 66px; border-radius: 16px; background: var(--surface-2); border: 2px solid transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 11px; font-weight: 800; color: var(--text-2); }
+.mood i { width: 14px; height: 14px; border-radius: 50%; background: var(--c); }
+.mood[aria-pressed="true"] { border-color: var(--accent); background: var(--surface); color: var(--text); }
+.panel .tag-pastel { font-size: 12px; font-weight: 800; color: var(--text-2); background: var(--accent); color: var(--ink); padding: 4px 10px; border-radius: 999px; }
+
+.dash ~ .toast { bottom: 24px; }
+.dash .empty-state { padding: 40px 20px; text-align: center; color: var(--text-2); font-weight: 600; }
+.dash .empty-state .btn { max-width: 320px; margin: 20px auto 0; }
