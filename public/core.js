@@ -368,7 +368,8 @@ var KantongCore = (function () {
   }
   // Samakan Google Calendar dengan isi to-do. Tidak pernah melempar error:
   // kegagalan dicatat di gcal_status supaya to-do tetap tersimpan dan bisa "Coba lagi".
-  // store.calendar: { upsert(eventId, spec) -> eventId, remove(eventId) } (opsional)
+  // store.calendar: { upsert(eventId, spec, todo) -> eventId, remove(eventId, todo) } (opsional).
+  // Argumen ketiga/kedua (todo) hanya dipakai adapter yang bekerja asinkron (Supabase) untuk menulis hasil belakangan.
   function syncTodoCalendar(store, db, t) {
     var cal = store.calendar, mau = todoPerluEvent(t);
     try {
@@ -376,11 +377,11 @@ var KantongCore = (function () {
         if (mau || t.gcal_event_id) throw new Error('Kalender belum disiapkan');
         t.gcal_status = ''; t.gcal_error = '';
       } else if (mau) {
-        t.gcal_event_id = String(cal.upsert(String(t.gcal_event_id || ''), todoEventSpec(t, db)) || '');
+        t.gcal_event_id = String(cal.upsert(String(t.gcal_event_id || ''), todoEventSpec(t, db), t) || '');
         if (!t.gcal_event_id) throw new Error('Kalender tidak mengembalikan id event');
         t.gcal_status = 'ok'; t.gcal_error = '';
       } else {
-        if (t.gcal_event_id) cal.remove(String(t.gcal_event_id));
+        if (t.gcal_event_id) cal.remove(String(t.gcal_event_id), t);
         t.gcal_event_id = ''; t.gcal_status = ''; t.gcal_error = '';
       }
     } catch (e) {

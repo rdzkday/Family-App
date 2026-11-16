@@ -1,63 +1,111 @@
-# Kantong: panduan pasang
+# Kantong: panduan pasang (Supabase)
 
-Total waktu sekitar 20 menit, cukup sekali. Isi paket:
+Backend memakai **Supabase** (Postgres + Edge Function). Logika bisnis ada di `public/core.js`, jadi aturan akses, hitungan, dan to-do sama persis dengan versi Google Sheets sebelumnya. Total sekitar 30 menit, cukup sekali.
 
 | Folder/file | Fungsinya |
 |---|---|
-| `app/` | PWA. Folder ini yang di-upload ke hosting. Tidak berisi data keuangan. |
-| `apps-script/` | Backend: `Code.gs`, `Core.gs`, `appsscript.json` (termasuk sync to-do ke Google Calendar) |
-| `Kantong-Database.xlsx` | Database awal: kategori, kantong, budget, dan 462 transaksi April–Oktober |
+| `public/` | PWA. Di-deploy ke Vercel (push ke `main`). Tidak berisi data keuangan. |
+| `supabase/migrations/` | Skema database: tabel, kode akses, fungsi RPC |
+| `supabase/functions/kantong/` | Edge Function: API untuk PWA + sync to-do ke Google Calendar |
+| `kantong/apps-script/` | Backend lama (Google Sheets). Masih bisa dipakai, tidak dikembangkan lagi |
+| `kantong/tools/` | Tes & alat bantu (`build_core.js`, `test_core.js`, `test_supabase.js`, `test_sql.sh`) |
+
+Butuh di laptop: [Supabase CLI](https://supabase.com/docs/guides/cli) dan Node.
 
 ---
 
-## 1. Siapkan Google Sheet (5 menit)
+## 1. Buat project Supabase (5 menit)
 
-1. Buka sheets.new dan beri nama **Kantong Database**.
-2. **File → Import → Upload** → pilih `Kantong-Database.xlsx` → pilih **Replace spreadsheet** → **Import data**.
-3. Cek ada 6 tab: Transaksi, Kategori, Kantong, Budget, Buku, Users. (Tab **Todo** dibuat otomatis di langkah 2.)
-4. Di tab **Buku** dan **Users**, ganti kolom `nama` yang berisi "Istri" dengan nama istri lo. Kolom `id` jangan diubah.
+1. supabase.com → **New project**. Region pilih **Singapore** (paling dekat Jakarta). Simpan **database password**.
+2. **Project Settings → General**: salin **Project ID** (reference id).
 
-## 2. Pasang backend (5 menit)
+## 2. Pasang skema (5 menit)
 
-1. Di sheet tadi: **Extensions → Apps Script**.
-2. Ganti isi `Code.gs` dengan isi `apps-script/Code.gs`.
-3. Klik **+ → Script**, beri nama `Core`, lalu tempel isi `apps-script/Core.gs`.
-4. **Project Settings (ikon ⚙)** → centang *Show "appsscript.json" manifest file* → kembali ke Editor → ganti isinya dengan `apps-script/appsscript.json`.
-5. **Save**, lalu kembali ke tab sheet dan refresh. Menu **Kantong** akan muncul.
-6. Pilih **Kantong → 1. Setup / perbaiki struktur** dan izinkan akses (Advanced → Go to project jika muncul peringatan).
+Di folder repo:
 
-## 3. Deploy jadi API (3 menit)
+```bash
+supabase login
+supabase link --project-ref <PROJECT_ID>
+supabase db push
+```
 
-1. Di Apps Script: **Deploy → New deployment** → ikon ⚙ → **Web app**.
-2. Isi **Execute as: Me** dan **Who has access: Anyone** → **Deploy**.
-3. Salin **Web app URL** (berakhiran `/exec`).
-4. Kembali ke sheet: **Kantong → 2. Buat kode koneksi** → tempel URL. Akan muncul 2 kode, satu untuk lo dan satu untuk istri.
+Ini membuat tabel `buku, users, kategori, kantong, budget, transaksi, todo, akses` beserta fungsi `kantong_muat`, `kantong_simpan`, `kantong_buat_kode`. Semua tabel memakai RLS tanpa policy: hanya Edge Function (service role) yang bisa membaca/menulis.
 
-> "Anyone" aman di sini, karena tiap request wajib membawa kode akses. Tanpa kode, server menolak.
+Alternatif tanpa CLI: buka **SQL Editor**, tempel isi `supabase/migrations/20261116000000_kantong.sql`, **Run**.
 
-## 4. Hosting PWA (3 menit)
+Lalu di **Table Editor → users** dan **buku**: ganti nama `Istri` sesuai nama pasangan. Kolom `id` jangan diubah.
 
-Rekomendasi: **Netlify** (gratis, HTTPS otomatis, update cukup drag-and-drop).
+## 3. Deploy API (5 menit)
 
-1. Daftar di netlify.com (bisa login Google). Akun diperlukan supaya situsnya permanen.
-2. **Add new site → Deploy manually** → drag folder `app/`.
-3. Ganti nama situs di **Site configuration** supaya URL-nya mudah diingat, misal `kantong-riki.netlify.app`.
+```bash
+supabase functions deploy kantong --no-verify-jwt
+```
 
-## 5. Pasang di HP
+`--no-verify-jwt` wajib: autentikasi memakai **kode akses** di body request, bukan JWT Supabase. Tanpa kode akses yang cocok, server menolak.
 
-- **Android (Chrome)**: buka URL → menu ⋮ → **Install app**.
-- **iPhone (Safari)**: buka URL → Share → **Add to Home Screen**.
+URL API: `https://<PROJECT_ID>.supabase.co/functions/v1/kantong`. Buka di browser, harus muncul `{"ok":true,"app":"Kantong API","backend":"supabase"}`.
 
-Lalu buka app dari home screen, tempel **kode koneksi**, dan pilih **Hubungkan**.
+## 4. Buat kode koneksi (2 menit)
 
-> iPhone: tempel kode **setelah** app dipasang dan dibuka dari home screen. iOS memisahkan penyimpanan Safari dan app home screen.
+Di **SQL Editor**, jalankan satu per satu (ganti `<PROJECT_ID>`):
 
-## 6. Setelah terhubung
+```sql
+select kantong_buat_kode('riki',  'https://<PROJECT_ID>.supabase.co/functions/v1/kantong');
+select kantong_buat_kode('istri', 'https://<PROJECT_ID>.supabase.co/functions/v1/kantong');
+```
 
-1. **Pengaturan → Kantong**: isi **saldo saat ini** tiap kantong sesuai aplikasi bank. Untuk kartu kredit, isi tagihan dan limit.
-2. Istri: rename kantong "Rekening" sesuai bank-nya, isi saldo, lalu cek **Kas Rumah Tangga**.
-3. **Pengaturan → Budget bulanan**: atur budget buku Istri dan Rumah Tangga. Budget Riki sudah terisi dari sheet lama.
-4. Share Google Sheet ke istri sebagai **Viewer**, lalu kirim kodenya lewat chat pribadi.
+Hasilnya adalah kode koneksi (teks panjang) untuk masing-masing. Kirim lewat chat pribadi, jangan dibagikan ke orang lain. Yang disimpan di database hanya hash-nya. Menjalankan ulang perintah ini = kode lama langsung mati (berguna kalau HP hilang).
+
+## 5. Pindahkan data dari Google Sheets (10 menit, kalau ada)
+
+Nama tabel dan kolom di Supabase sama dengan tab di Sheet, hanya huruf kecil.
+
+1. Di Google Sheets: tiap tab → **File → Download → CSV**.
+2. Supabase **Table Editor** → pilih tabel → **Insert → Import data from CSV** → pilih file. Urutan: `buku`, `users`, `kategori`, `kantong`, `budget`, `transaksi`, `todo`.
+3. Kalau baris `riki`/`istri`/`rt` sudah ada dari langkah 2, lewati baris itu atau hapus dulu.
+
+Cek: buka app, saldo kantong & ringkasan bulan lalu harus sama dengan versi Sheets.
+
+## 6. Hosting PWA & pasang di HP
+
+PWA di-host di Vercel (`public/`, lihat `vercel.json`). Push ke `main` = otomatis rilis.
+
+- **Android (Chrome)**: buka URL → ⋮ → **Install app**.
+- **iPhone (Safari)**: buka URL → Share → **Add to Home Screen**. Tempel kode **setelah** app dibuka dari home screen.
+
+Buka app dari home screen → tempel **kode koneksi** → **Hubungkan**.
+
+## 7. To-do + Google Calendar "Rumah Kita" (10 menit, opsional)
+
+To-do yang **punya waktu** otomatis masuk ke satu kalender khusus bernama **Rumah Kita**. Tanpa waktu = hanya di app. Server memakai **service account** Google, jadi tidak perlu login Google per orang.
+
+1. Google Calendar web → ⚙ **Settings → Add calendar → Create new calendar** → nama `Rumah Kita`.
+2. console.cloud.google.com → project baru (mis. `kantong`) → **APIs & Services → Enable APIs** → aktifkan **Google Calendar API**.
+3. **IAM & Admin → Service Accounts → Create** (nama `kantong`) → tab **Keys → Add key → JSON**. File JSON terunduh; salin alamat email service account-nya (`kantong@….iam.gserviceaccount.com`).
+4. Google Calendar → Settings → **Rumah Kita → Share with specific people** → tambahkan email service account, izin **Make changes to events**. Tambahkan juga email Google pasangan dengan izin yang sama.
+5. Di halaman yang sama, bagian **Integrate calendar**, salin **Calendar ID**.
+6. Simpan secret ke Edge Function:
+
+```bash
+supabase secrets set TODO_CAL_ID='<Calendar ID>'
+supabase secrets set GOOGLE_SA_JSON="$(cat kantong-xxxx.json)"
+```
+
+7. Pengingat event ikut setelan kalender ini (Settings → Rumah Kita → Event notifications). Atur sekali, berlaku untuk semua to-do.
+
+Aturan yang dijalankan server:
+
+| | To-do Riki | To-do Istri | Bersama |
+|---|---|---|---|
+| Riki | tulis + centang | lihat | tulis + centang |
+| Istri | lihat | tulis + centang | tulis + centang |
+
+- Judul event diberi awalan `[R]`, `[F]` (inisial nama di tabel `users`), atau `[B]` untuk bersama; warnanya berbeda per pemilik.
+- Ubah waktu → event pindah. Hapus waktu → event dihapus, to-do tetap. Hapus to-do → event ikut dihapus.
+- Centang selesai → event dibiarkan, judulnya diberi tanda ✓. Mau event dihapus saat dicentang? Ganti `TODO_SELESAI_EVENT` di `public/core.js` menjadi `'hapus'`, lalu `node kantong/tools/build_core.js` dan deploy ulang.
+- Sync satu arah: app → kalender. Mengubah event langsung di Google Calendar **tidak** kembali ke app.
+- Offline: to-do tersimpan di HP, dikirim saat online lagi; request ulang tidak membuat event dobel.
+- Gagal masuk kalender (secret belum diisi, kalender belum di-share): to-do tetap tersimpan, barisnya merah dengan tombol **Coba lagi**.
 
 ---
 
@@ -68,46 +116,29 @@ Lalu buka app dari home screen, tempel **kode koneksi**, dan pilih **Hubungkan**
 | Riki | tulis + baca | baca | tulis + baca |
 | Istri | baca | tulis + baca | tulis + baca |
 
-Aturan ini dijalankan di server, bukan cuma di tampilan.
-
-## 7. To-do rumah tangga + Google Calendar (fitur baru, 5 menit)
-
-To-do berdua ada di tab **To-do**. To-do yang **punya waktu** otomatis masuk ke satu kalender khusus bernama **Rumah Kita** di akun Google pemilik script (Riki), lalu dibagikan ke akun pasangan. Tanpa waktu = hanya di app.
-
-1. Tempel `Code.gs` dan `Core.gs` versi baru (lihat "Cara update nanti"). Tab **Todo** di Sheet dibuat otomatis saat app pertama kali dipakai, atau jalankan **Kantong → 1. Setup** lagi.
-2. Di Sheet: **Kantong → 3. Siapkan kalender Rumah Kita**, izinkan akses Calendar. Kalender dibuat sekali, id-nya disimpan.
-3. **Deploy → Manage deployments → ✎ Edit → Version: New version → Deploy**, supaya izin kalender ikut aktif di API. Kalau diminta, izinkan lagi.
-4. Buka calendar.google.com (web) → ⚙ Settings → kalender **Rumah Kita** → **Share with specific people** → tambahkan email Google pasangan dengan izin **Make changes to events**. Pasangan buka undangannya dari email, kalender langsung muncul di HP.
-5. Pengingat event ikut setelan kalender ini (Settings → Rumah Kita → Event notifications). Atur sekali, berlaku untuk semua to-do.
-
-Aturan yang dijalankan server:
-
-| | To-do Riki | To-do Istri | Bersama |
-|---|---|---|---|
-| Riki | tulis + centang | lihat | tulis + centang |
-| Istri | lihat | tulis + centang | tulis + centang |
-
-- Judul event diberi awalan `[R]`, `[F]` (inisial nama di tab Users), atau `[B]` untuk bersama; warnanya berbeda per pemilik.
-- Ubah waktu → event pindah. Hapus waktu → event dihapus, to-do tetap. Hapus to-do → event ikut dihapus.
-- Centang selesai → event dibiarkan, judulnya diberi tanda ✓. Mau event dihapus saat dicentang? Ganti `TODO_SELESAI_EVENT` di `Core.gs` (dan `core.js`) menjadi `'hapus'`.
-- Sync satu arah: app → kalender. Mengubah event langsung di Google Calendar **tidak** kembali ke app.
-- Offline: to-do tersimpan di HP, dikirim saat online lagi; request ulang tidak membuat event dobel.
-- Gagal masuk kalender (mis. kalender belum disiapkan): to-do tetap tersimpan, barisnya merah dengan tombol **Coba lagi**.
+Aturan ini dijalankan di server (`core.js` di Edge Function), bukan cuma di tampilan.
 
 ## Cara update nanti
 
-- **Backend**: tempel kode baru → **Deploy → Manage deployments → ✎ Edit → Version: New version → Deploy**. URL tidak berubah. Jangan pakai "New deployment", karena itu membuat URL baru dan kode koneksi harus dibuat ulang.
-- **PWA**: Netlify → Deploys → drag folder `app/` lagi. HP otomatis memuat versi baru saat online.
+- **Logika (`public/core.js`)**: ubah, lalu `node kantong/tools/build_core.js` supaya salinan untuk Edge Function (`core.mjs`) dan Apps Script (`Core.gs`) ikut. `node kantong/tools/test_core.js` menolak kalau salinan tidak sinkron.
+- **API**: `supabase functions deploy kantong --no-verify-jwt`. URL tidak berubah, kode koneksi tetap berlaku.
+- **Skema**: tambah file di `supabase/migrations/`, lalu `supabase db push`.
+- **PWA**: push ke `main`. HP otomatis memuat versi baru saat online.
+
+## Tes
+
+```bash
+node kantong/tools/test_core.js        # logika bersama (tanpa data asli)
+node kantong/tools/test_supabase.js    # Edge Function dengan database & Google tiruan
+bash kantong/tools/test_sql.sh         # skema SQL di Postgres lokal (Ubuntu: butuh paket postgresql)
+```
 
 ## Darurat
 
-- **HP hilang**: Kantong → *Ganti kode akses user…* → isi `riki` atau `istri`. Kode lama langsung mati.
-- **Salah input massal**: Google Sheets → File → Version history. Transaksi yang dihapus dari app juga tidak benar-benar hilang: barisnya tetap ada dengan kolom `dihapus` terisi.
+- **HP hilang**: jalankan lagi `select kantong_buat_kode('riki', '…')`. Kode lama langsung mati.
+- **Salah input massal**: transaksi yang dihapus dari app tidak benar-benar hilang (kolom `dihapus` terisi). Supabase juga menyimpan backup harian (Database → Backups).
+- **Cek log API**: Supabase → Edge Functions → kantong → Logs.
 
-## Catatan data lama (April–Oktober)
+## Versi lama (Google Sheets + Apps Script)
 
-- Tanggal per transaksi **diperkirakan** dari penanda "last update" di sheet lama. Totalnya per bulan tetap tepat.
-- "Debit" lama tidak menyebut bank, jadi masuk ke kantong arsip **Debit (data lama)** yang nonaktif. Saldo bank dihitung dari angka yang lo isi di langkah 6.
-- Bayar kartu kredit dan tarik tunai sekarang tercatat sebagai **Transfer**, bukan pengeluaran, sehingga tidak dobel hitung.
-- Total pengeluaran yang berbeda dari sheet lama: April +214.470 (typo "Cafe/hagout" dulu tidak terhitung), Juli −1.218.443 (bayar CC jadi transfer, plus typo), Agustus +338.550 ("Payment wifi rumah" tanpa tujuan jadi pengeluaran Lain-lain).
-- Topup rumah tangga Oktober tercatat sebagai Transfer ke **Kas Rumah Tangga**. April–September tetap kategori "Topup bulanan (lama)".
+Masih ada di `kantong/apps-script/` dan tetap kompatibel dengan PWA (kode koneksi lama tetap bisa dipakai). Tidak dikembangkan lagi; panduan lamanya ada di riwayat git.

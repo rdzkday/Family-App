@@ -83,8 +83,16 @@ function utangAntara(store, bersama, pribadi) {
   return f ? f.jumlah : 0;
 }
 
-// ---------------------------------------------------------------- versi
+// ---------------------------------------------------------------- versi & salinan core
 eq('versi core naik ke 1.3.0', C.VERSION, '1.3.0');
+(function () {
+  // core.mjs (Supabase) dan Core.gs (Apps Script) harus persis hasil build_core.js
+  var fs = require('fs'), build = require(path.join(__dirname, 'build_core.js'));
+  Object.keys(build.targets).forEach(function (f) {
+    var ada = fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');
+    ok('salinan core sinkron: ' + f + ' (jalankan node kantong/tools/build_core.js)', ada === build.targets[f]);
+  });
+})();
 
 // ---------------------------------------------------------------- arah transfer
 (function () {
