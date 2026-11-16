@@ -92,14 +92,15 @@
       }).join('') + '</div>' : '') + '</div></header>';
   }
   function appsHtml() {
-    var a = function (href, c, ic, t1, t2, ext) {
-      return '<a class="app" href="' + href + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + ' style="--c:' + c + '"><span class="ic">' + ic + '</span><span><span class="t1">' + t1 + (ext ? ICON.ext : '') + '</span><span class="t2">' + t2 + '</span></span></a>';
+    var a = function (href, c, ic, t1, t2, ext, dev) {
+      return '<a class="app' + (dev ? ' dev' : '') + '" href="' + href + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + ' style="--c:' + c + '"><span class="ic">' + ic + '</span><span><span class="t1">' + t1 + (ext ? ICON.ext : '') +
+        (dev ? '<span class="dev-tag">Dalam pengembangan</span>' : '') + '</span><span class="t2">' + t2 + '</span></span></a>';
     };
     return '<section class="apps" aria-label="Aplikasi">' +
-      a('#kantong', 'var(--b-riki)', ICON.wallet, 'Kantong', 'Keuangan') +
-      a('#todo', '#C7D3FF', ICON.cal, 'Agenda', 'To-do, catatan & kalender') +
-      a('#komitmen', 'var(--b-rt)', ICON.heart, 'Komitmen', 'Kesepakatan berdua') +
-      a(RUANG_CATAT_URL || '#ruangcatat', '#E4D7FF', ICON.book, 'Ruang Catat', 'App terpisah', !!RUANG_CATAT_URL) + '</section>';
+      a('./', 'var(--b-riki)', ICON.wallet, 'Kantong', 'Keuangan') +
+      a('#todo', '#C7D3FF', ICON.cal, 'Agenda', 'To-do & catatan, baru tersimpan di browser ini', false, true) +
+      a('#komitmen', 'var(--b-rt)', ICON.heart, 'Komitmen', 'Kesepakatan berdua, baru pengingat tanggal', false, true) +
+      a(RUANG_CATAT_URL || '#ruangcatat', '#E4D7FF', ICON.book, 'Ruang Catat', RUANG_CATAT_URL ? 'App terpisah' : 'App terpisah, belum tersambung', !!RUANG_CATAT_URL, !RUANG_CATAT_URL) + '</section>';
   }
   function kantongHtml() {
     var u = curUser(), d = db(), m = months[thisMonth()], rt = bersama();
@@ -155,7 +156,7 @@
       return '<button type="button" class="chip" data-filter="' + f[0] + '" aria-pressed="' + (T.filter === f[0]) + '">' + f[1] + '</button>';
     }).join('');
     return '<section class="panel" id="todo" aria-label="To-do dan catatan">' +
-      '<div class="panel-h"><div><h2>To-do</h2><span class="aside">' + done + ' dari ' + mineAll.length + ' selesai</span></div><div class="chips wrap">' + chips + '</div></div>' +
+      '<div class="panel-h"><div><h2>To-do <span class="dev-tag">Dalam pengembangan</span></h2><span class="aside">' + done + ' dari ' + mineAll.length + ' selesai</span></div><div class="chips wrap">' + chips + '</div></div>' +
       '<form class="todo-bar" id="todo-form"><div class="seg" role="group" aria-label="Jenis">' +
       '<button type="button" data-type="todo" aria-pressed="' + isTodo + '">To-do</button><button type="button" data-type="note" aria-pressed="' + !isTodo + '">Catatan</button></div>' +
       '<input class="input" id="dq" type="text" autocomplete="off" value="' + esc(T.text) + '" aria-label="' + (isTodo ? 'To-do baru' : 'Catatan baru') + '" placeholder="' + (isTodo ? 'To-do baru… mis. Jemput ' + esc(users().filter(function (x) { return x.id !== me; }).map(function (x) { return x.nama; })[0] || 'pasangan') : 'Tulis catatan…') + '">' +
@@ -190,7 +191,7 @@
     } else {
       head = 'Evaluasi bulanan'; sub = 'Belum dijadwalkan'; body = 'Atur tanggal ngobrol berdua soal kesepakatan rumah tangga, sebulan sekali.';
     }
-    return '<section class="panel komit" id="komitmen" aria-label="Pengingat evaluasi bulanan"><div class="head"><span class="ic">' + ICON.heart + '</span><div><h2>' + esc(head) + '</h2><span class="t2">' + esc(sub) + '</span></div></div>' +
+    return '<section class="panel komit" id="komitmen" aria-label="Pengingat evaluasi bulanan"><div class="head"><span class="ic">' + ICON.heart + '</span><div><h2>' + esc(head) + ' <span class="dev-tag">Dalam pengembangan</span></h2><span class="t2">' + esc(sub) + '</span></div></div>' +
       '<p>' + body + '</p><div class="acts"><label class="btn primary" style="position:relative;cursor:pointer">' + (tgl ? 'Ubah tanggal' : 'Atur tanggal') +
       '<input type="date" id="eval-tgl" value="' + esc(tgl) + '" aria-label="Tanggal evaluasi" style="position:absolute;inset:0;opacity:0;width:100%;cursor:pointer"></label>' +
       (tgl ? '<button type="button" class="btn ghost" id="eval-tunda">Ingatkan besok</button>' : '') + '</div></section>';
@@ -199,7 +200,7 @@
   var MOODS = [['berat', 'Berat', '#FFADB9'], ['lelah', 'Lelah', '#FFD1C2'], ['biasa', 'Biasa', '#FFE29A'], ['baik', 'Baik', '#BDEBD3'], ['senang', 'Senang', '#8EE3BC']];
   function moodHtml() {
     var u = curUser(), key = todayISO() + '|' + (u ? u.id : ''), cur = D.mood[key];
-    return '<section class="panel" id="ruangcatat" aria-label="Ruang Catat"><div class="panel-h"><h2 style="font-size:17px">Gimana rasanya hari ini?</h2><span class="tag-pastel">Ruang Catat</span></div>' +
+    return '<section class="panel" id="ruangcatat" aria-label="Ruang Catat"><div class="panel-h"><h2 style="font-size:17px">Gimana rasanya hari ini?</h2><span class="dev-tag">Ruang Catat · dalam pengembangan</span></div>' +
       '<div class="moods">' + MOODS.map(function (m) {
         return '<button type="button" class="mood" data-mood="' + m[0] + '" aria-pressed="' + (cur === m[0]) + '" style="--c:' + m[2] + '"><i></i>' + m[1] + '</button>';
       }).join('') + '</div>' +

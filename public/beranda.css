@@ -92,3 +92,9 @@
 .dash ~ .toast { bottom: 24px; }
 .dash .empty-state { padding: 40px 20px; text-align: center; color: var(--text-2); font-weight: 600; }
 .dash .empty-state .btn { max-width: 320px; margin: 20px auto 0; }
+
+/* penanda fitur yang belum jalan penuh */
+.dev-tag { display: inline-flex; align-items: center; font-size: 11px; font-weight: 800; line-height: 1; padding: 5px 8px; border-radius: 999px;
+  background: var(--surface-2); color: var(--text-2); border: 1px dashed var(--text-3); white-space: nowrap; vertical-align: middle; margin-left: 6px; }
+.app.dev .ic { opacity: .7; }
+.app .t1 { flex-wrap: wrap; }
