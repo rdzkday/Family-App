@@ -281,6 +281,7 @@
       S.lastError = null; S.lastSync = Date.now();
       persist();
       pindahkanTodoBrowser();
+      if (Siklus) Siklus.segarkan();
     }).catch(function (e) {
       S.lastError = e.message;
       if (e.code === 'AUTH') { toast('Kode akses tidak berlaku. Hubungkan ulang.', true); }
@@ -1405,6 +1406,14 @@
     if (n) { S.outbox.slice(-n).forEach(applyLocal); persist(); toast(n + ' to-do dari Beranda desktop dipindah ke Agenda'); setTimeout(sync, 50); }
   }
 
+  // ================= Siklus + onboarding (public/siklus.js) =================
+  var Siklus = window.SiklusModul ? window.SiklusModul({
+    $: $, $$: $$, esc: esc, LS: LS, toast: toast, openSheet: openSheet, toggleHtml: function (a, b, c, d) { return toggleHtml(a, b, c, d); },
+    todayISO: todayISO, nowIso: nowIso, uid: uid, me: me, users: function () { return db().Users; }, conn: function () { return S.conn; },
+    prefs: function () { return S.prefs; }, persist: persist, refresh: function () { refresh(); }, fitur: fitur, ICON: ICON, BULAN: BULAN,
+    akhirBulan: C.akhirBulan, goAgenda: function () { S.prefs.agendaMode = 'kalender'; S.agBulan = thisMonth(); S.agTgl = todayISO(); persist(); goTab('agenda'); }
+  }) : undefined;
+
   // ================= views =================
   var view = null;
   function renderShell() {
@@ -1421,6 +1430,7 @@
   function goTab(id) {
     S.tab = id; S.sub = null;
     if (id === 'agenda' && !S.agenda[S.agBulan]) setTimeout(sync, 0);
+    if (id === 'agenda' && Siklus) Siklus.segarkan();
     $$('[data-tab]').forEach(function (x) { x.setAttribute('aria-current', x.getAttribute('data-tab') === id ? 'page' : 'false'); });
     renderView(); window.scrollTo(0, 0);
   }
@@ -1448,7 +1458,7 @@
   var HomeView = {
     render: function (el) {
       el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Halo, ' + esc(me().nama) + '!</h1></div><div class="top-actions">' + themeBtn() + syncPill() + '</div></div>' +
-        '<div id="home-budget"></div>' +
+        '<div id="home-baru"></div><div id="home-budget"></div>' +
         '<section class="section"><div class="entry" id="entry"></div></section>' +
         '<div id="home-kenangan"></div><div id="home-todo"></div><div id="home-utang"></div><div id="home-reim"></div>' +
         '<section class="section"><div class="section-h"><h2>Catatan hari ini</h2><span class="aside" id="today-total"></span></div><div id="today"></div></section>';
@@ -1456,6 +1466,7 @@
       this.update(el);
     },
     update: function (el) {
+      if (Siklus) Siklus.renderKartuBaru($('#home-baru', el));
       var m = ensureMonth(thisMonth());
       var budgetEl = $('#home-budget', el), todayEl = $('#today', el);
       if (!m) { budgetEl.innerHTML = '<div class="skeleton"></div>'; todayEl.innerHTML = skeleton(2); return; }
@@ -1690,6 +1701,7 @@
         '</div></section>' +
         '<section class="section"><div class="section-h"><h2>Agenda</h2></div><div class="menu">' +
         toggleHtml('set-kenangan', 'Kartu kenangan di Catat', '"N tahun lalu hari ini" dari Momen', S.prefs.kenanganTampil !== false) +
+        (Siklus ? '<button data-s="onb"><span class="main">Lihat pengenalan fitur baru<div class="t2">Agenda, Momen' + (me().id === ((window.SIKLUS_CONFIG || {}).pemilik || 'febie') ? ', Siklus' : '') + '</div></span>' + ICON.right + '</button>' : '') +
         '</div></section>' +
         (typeof Siklus !== 'undefined' ? Siklus.pengaturanHtml() : '') +
         '<section class="section"><div class="menu"><button data-s="beranda"><span class="main">Beranda desktop<div class="t2">Ringkasan, to-do, dan mood dalam satu layar lebar</div></span>' + ICON.right + '</button></div></section>' +
@@ -1701,8 +1713,9 @@
       $$('[data-s]', el).forEach(function (b) { b.addEventListener('click', function () {
         var a = b.getAttribute('data-s');
         if (a === 'sync') sync();
+        else if (a === 'onb') Siklus.onboarding();
         else if (a === 'beranda') location.href = 'beranda.html';
-        else if (a === 'switch') { S.prefs.demoUser = S.prefs.demoUser === 'riki' ? 'febie' : 'riki'; S.bukuView = null; persist(); S.boot = null; renderView(); sync(); }
+        else if (a === 'switch') { S.prefs.demoUser = S.prefs.demoUser === 'riki' ? 'febie' : 'riki'; S.bukuView = null; persist(); S.boot = null; renderView(); if (Siklus) Siklus.keluar(true); sync(); }
         else if (a === 'out') { if (confirm(demo ? 'Keluar dari mode demo? Data demo dihapus.' : 'Putuskan koneksi? Transaksi yang belum terkirim akan hilang dari HP ini.')) disconnect(); }
         else goSub({ type: a });
       }); });
@@ -1896,6 +1909,7 @@
       btn.disabled = true; btn.textContent = 'Menghubungkan…';
       rpc('bootstrap', {}, conn).then(function (boot) {
         S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; S.agenda = {}; S.momenCache = {}; persist(); renderShell(); sync();
+        if (Siklus && fitur('agenda')) setTimeout(function () { Siklus.onboarding(); }, 500);
       }, function (e) {
         btn.disabled = false; btn.textContent = 'Hubungkan';
         $('#c-err').textContent = e.code === 'AUTH' ? 'Kode akses ditolak server.' : e.message;
@@ -1910,6 +1924,8 @@
     demoStore = null;
     S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.sub = null; S.tab = 'home'; S.bukuView = null;
     S.agenda = {}; S.momenCache = {}; S.momenPending = {};
+    if (Siklus) Siklus.keluar(true);
+    LS.del('k_siklus_demo');
     renderConnect();
   }
 

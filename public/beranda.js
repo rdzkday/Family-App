@@ -98,7 +98,7 @@
     };
     return '<section class="apps" aria-label="Aplikasi">' +
       a('./', 'var(--b-riki)', ICON.wallet, 'Kantong', 'Keuangan') +
-      a('#todo', '#C7D3FF', ICON.cal, 'Agenda', 'To-do & catatan, baru tersimpan di browser ini', false, true) +
+      a('./#agenda', '#C7D3FF', ICON.cal, 'Agenda', 'To-do, momen penting, riwayat per bulan') +
       a('#komitmen', 'var(--b-rt)', ICON.heart, 'Komitmen', 'Kesepakatan berdua, baru pengingat tanggal', false, true) +
       a(RUANG_CATAT_URL || '#ruangcatat', '#E4D7FF', ICON.book, 'Ruang Catat', RUANG_CATAT_URL ? 'App terpisah' : 'App terpisah, belum tersambung', !!RUANG_CATAT_URL, !RUANG_CATAT_URL) + '</section>';
   }
@@ -146,7 +146,33 @@
   }
 
   var T = { filter: 'mine', type: 'todo', withTime: false, when: '', text: '' };
+  // Sudah terhubung: to-do diambil dari server (cache app, k_todos), diubah di Agenda. Catatan tetap lokal.
+  function todoServerHtml() {
+    var u = curUser(), me = u ? u.id : '';
+    var list = (LS.get('k_todos', []) || []).filter(function (t) { return !t.dihapus; });
+    var mine = list.filter(function (t) { return t.pemilik === 'bersama' || t.pemilik === me; });
+    var visible = list.filter(function (t) { return T.filter === 'all' || (T.filter === 'B' ? t.pemilik === 'bersama' : (t.pemilik === me || t.pemilik === 'bersama')); })
+      .sort(function (a, b) { return (C.bool(a.selesai) - C.bool(b.selesai)) || String(a.tanggal || '9').localeCompare(String(b.tanggal || '9')); });
+    var chips = [['mine', 'Untukku'], ['B', 'Bersama'], ['all', 'Semua']].map(function (f) {
+      return '<button type="button" class="chip" data-filter="' + f[0] + '" aria-pressed="' + (T.filter === f[0]) + '">' + f[1] + '</button>';
+    }).join('');
+    T.type = 'note';
+    return '<section class="panel" id="todo" aria-label="To-do dan catatan">' +
+      '<div class="panel-h"><div><h2>To-do</h2><span class="aside">' + mine.filter(function (t) { return C.bool(t.selesai); }).length + ' dari ' + mine.length + ' selesai</span></div><div class="chips wrap">' + chips + '</div></div>' +
+      '<div>' + (visible.length ? visible.slice(0, 12).map(function (t) {
+        return '<div class="todo' + (C.bool(t.selesai) ? ' done' : '') + '"><span class="box" aria-hidden="true">' + (C.bool(t.selesai) ? ICON.check : '') + '</span>' +
+          '<span class="t1">' + esc(t.judul) + '</span><span class="who">' + esc(t.pemilik === 'bersama' ? 'Bersama' : namaUser(t.pemilik)) + '</span>' +
+          '<span class="when' + (t.tanggal ? '' : ' none') + '">' + (t.tanggal ? esc(dayLabel(t.tanggal) + (t.jam ? ' ' + t.jam : '')) : 'Tanpa waktu') + '</span></div>';
+      }).join('') : '<div class="empty">Belum ada to-do.</div>') + '</div>' +
+      '<a class="btn small" href="./#agenda" style="margin-top:10px">Tambah & ubah di Agenda</a>' +
+      '<form class="todo-bar" id="todo-form" style="margin-top:14px"><input class="input" id="dq" type="text" autocomplete="off" value="' + esc(T.text) + '" aria-label="Catatan baru" placeholder="Tulis catatan…">' +
+      '<button type="submit" class="btn small">Simpan</button></form>' +
+      (D.notes.length ? '<div class="panel-h" style="margin-top:6px"><h2 style="font-size:15px">Catatan</h2></div><div>' + D.notes.slice(0, 5).map(function (n) {
+        return '<div class="note-row" data-note="' + esc(n.id) + '"><span class="t2">' + esc(dayLabel(n.tgl)) + '</span><span class="main">' + esc(n.text) + '</span><button type="button" class="del" data-del-note aria-label="Hapus" style="opacity:1;color:var(--text-3)">' + ICON.x + '</button></div>';
+      }).join('') + '</div>' : '') + '</section>';
+  }
   function todoHtml() {
+    if (conn) return todoServerHtml();
     var u = curUser(), me = u ? u.id : '';
     var mineAll = D.todos.filter(function (t) { return t.o === 'B' || t.o === me; });
     var done = mineAll.filter(function (t) { return t.done; }).length;
@@ -253,7 +279,7 @@
   render();
   // kalau app di tab lain sinkron, angka di sini ikut segar
   window.addEventListener('storage', function (e) {
-    if (e.key === 'k_boot' || e.key === 'k_months' || e.key === 'k_conn' || e.key === 'k_theme') {
+    if (e.key === 'k_boot' || e.key === 'k_months' || e.key === 'k_conn' || e.key === 'k_theme' || e.key === 'k_todos') {
       boot = LS.get('k_boot', null); months = LS.get('k_months', {}); conn = LS.get('k_conn', null); render();
     }
   });

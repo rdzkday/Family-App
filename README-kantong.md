@@ -6,7 +6,7 @@
 - `kantong/apps-script/`: backend lama (Google Sheets), masih kompatibel, tidak dikembangkan lagi.
 - `kantong-pastel/`, `public/dark/`: varian tampilan lama.
 
-Fitur to-do rumah tangga + sync ke Google Calendar "Rumah Kita": lihat `kantong/PANDUAN.md` §7.
+Fitur to-do rumah tangga + sync ke Google Calendar "Rumah Kita": lihat `kantong/PANDUAN.md` §7. Agenda & Momen: §8. Siklus (project Supabase terpisah di akun Febie, `supabase-siklus/`): §9.
 
 Data keuangan pribadi tidak disertakan di repo ini.
 
@@ -14,7 +14,13 @@ Data keuangan pribadi tidak disertakan di repo ini.
 
 ## Rencana fitur: Agenda + Momen + Siklus
 
-Status: **perencanaan**, keputusan dikunci 16 Nov 2026. Brief v1: Riki (UI/UX). Pengguna: Riki & Febie.
+Status: **dibangun** (16 Nov 2026), menunggu pasang backend. Brief v1: Riki (UI/UX). Pengguna: Riki & Febie.
+
+**Yang berbeda dari rencana awal (setelah dibangun):**
+- Backend Kantong sudah pindah ke Supabase (branch `claude/gallant-clarke-kiuupp`, ikut di-merge), jadi `Momen` & `selesai_at` ada di database Supabase, bukan tab Sheet. Apps Script lama tetap kompatibel.
+- Status pengenalan (onboarding) dan "Tutup" kartu kenangan disimpan per HP (localStorage), bukan tab `Pengaturan`. Persetujuan Siklus (`setuju_at`, `versi_teks`) tetap di server Siklus.
+- Akses Siklus memakai tabel `siklus_anggota` (pemilik/pembaca) + fungsi server, bukan tabel `siklus_pembaca`; catatan dihapus permanen (bukan kolom `dihapus`).
+- `public/dark/` (varian lama, belum punya to-do) **belum** diberi fitur ini. App pastel sudah punya mode terang & gelap; semua fitur baru dites di keduanya.
 
 | Lapisan | Isi | Warna |
 |---|---|---|
@@ -152,26 +158,26 @@ Dampak: kolom `tanggal_selesai` (kosong = satu hari), tampilan pita di kalender.
 
 ### Data
 
-**Sheet, tab `Momen`:** `id, judul, cerita, tanggal, tanggal_selesai, kategori (kita|keluarga|pekerjaan|lainnya), pemilik (riki|febie|bersama), tahunan, gcal_event_id, gcal_status, gcal_error, oleh, dibuat, diubah, dihapus`
-- Nama kolom waktu ikut pola yang ada (`dibuat/diubah/dihapus`).
-- Aksi: `agenda.month` (to-do + Momen 1 bulan), `momen.save`, `momen.delete`. `agenda.month` tidak memakai kunci tulis.
+**Supabase project Kantong** (`supabase/migrations/20261117000000_agenda_momen.sql`):
+- `momen`: `id, judul, cerita, tanggal, tanggal_selesai, kategori (kita|keluarga|pekerjaan|lainnya), pemilik (riki|febie|bersama), tahunan, gcal_event_id, gcal_status, gcal_error, oleh, dibuat, diubah, dihapus`
+- `todo`: tambah `selesai_at`.
+- id user `istri` → `febie` (buku `istri` tetap, kode akses ikut pindah).
+- Aksi API: `agenda.month` (to-do + Momen 1 bulan, tanpa batas 30 hari), `momen.save`, `momen.delete`, `momen.sync`. `bootstrap` menambah `kenangan` dan `fitur`.
 
-**Sheet, tab `Todo`:** tambah `selesai_at`.
+**Supabase project Siklus, akun Febie** (`supabase-siklus/migrations/20261117000000_siklus.sql`):
 
-**Supabase (project akun Febie, region usulan Singapura):**
-
-| Tabel | Kolom | Akses (RLS) |
+| Tabel | Isi | Akses |
 |---|---|---|
-| `siklus` | `id, user_id, mulai, selesai, dibuat, diubah, dihapus` | Febie: semua. Riki: baca saja (jadwal selalu dibagikan) |
-| `siklus_catatan` | `siklus_id, catatan` | Febie: semua. Riki: baca hanya kalau `bagikan_catatan = true` |
-| `siklus_pengaturan` | `user_id, aktif, bagikan_catatan, setuju_at, versi_teks` | Febie saja |
-| `siklus_pembaca` | `pemilik_id, pembaca_id` | Febie saja (daftar siapa yang boleh baca jadwal) |
+| `siklus_anggota` | `user_id, peran (pemilik/pembaca)` | diatur pemilik project lewat SQL Editor |
+| `siklus` | `id, user_id, mulai, selesai, abaikan_jarak` | Febie: semua. Riki: baca jadwal setelah Febie aktif |
+| `siklus_catatan` | `siklus_id, catatan` | Febie: semua. Riki: hanya kalau `bagikan_catatan = true` |
+| `siklus_pengaturan` | `aktif, bagikan_catatan, setuju_at, versi_teks` | Febie |
 
-- Perkiraan **tidak disimpan**, dihitung di HP: hari pertama terakhir + rata-rata 6 siklus terakhir. Kalau < 2 catatan: 28 hari + label "perkiraan kasar". Tampil sebagai rentang ±2 hari.
-- Agenda menggabungkan data Sheet (to-do, Momen) dan Supabase (Siklus) di HP.
-- Ping harian: trigger waktu di Apps Script mengirim request ringan ke Supabase.
-- Siklus tidak pernah dikirim ke Google Calendar dan tidak tampil di Beranda.
-- Modul `supabase.js` dibuat umum (login OTP + request) supaya siap dipakai saat data lain pindah.
+- Semua tabel RLS tanpa policy; akses hanya lewat fungsi `siklus_muat/simpan/hapus/atur/hapus_semua` yang memeriksa `auth.uid()`.
+- Perkiraan **tidak disimpan**, dihitung di HP (`public/siklus.js`, `SiklusCore`).
+- Login: kode OTP 6 angka via email (Supabase Auth), sesi tersimpan di HP.
+- Ping harian: `kantong/apps-script/SiklusPing.gs`.
+- Siklus tidak pernah dikirim ke Google Calendar dan tidak tampil di Catat/Beranda.
 
 ### Onboarding fitur baru
 
@@ -193,7 +199,7 @@ Dampak: kolom `tanggal_selesai` (kosong = satu hari), tampilan pita di kalender.
 
 **Riki** (versi pendek): layar 1, 2, 8 tanpa menyebut Siklus. Setelah Febie mengaktifkan Siklus, chip Siklus muncul di Agenda Riki dengan tombol "Masuk untuk lihat jadwal" (login OTP sekali).
 
-**Data onboarding:** key `onboarding_versi_<user>` di tab `Pengaturan` (Sheet). Persetujuan Siklus (`setuju_at`, `versi_teks`) di Supabase. Versi teks privasi naik → Febie diminta setuju ulang.
+**Data onboarding:** status pengenalan per HP (`k_onb_<user>`). Persetujuan Siklus (`setuju_at`, `versi_teks`) di server Siklus. Versi teks privasi naik → Febie diminta setuju ulang.
 
 ### Kriteria selesai
 
@@ -220,19 +226,24 @@ Fase C
 Umum
 - [ ] Tap target ≥ 44 px, kontras ≥ 4.5:1, `test_core.js` + tes baru lulus.
 
-### Urutan kerja
+### Urutan pasang
 
-0. **Persiapan**: merge `claude/gallant-clarke-kiuupp` → pindahkan to-do aktif dari browser ke Sheet → migrasi ID `istri` → `febie`.
-1. **Fase A**: Agenda bulanan + riwayat to-do (pastel + dark).
-2. **Fase B**: Momen + kartu kenangan + event tahunan.
-3. **Fase C**: Febie membuat project Supabase → tabel + RLS → login OTP → Siklus → onboarding → ping harian.
+1. **Kode**: merge branch ini ke `main` → Vercel otomatis rilis PWA. Tanpa backend baru, app tetap jalan (Agenda menampilkan to-do terbaru + catatan "backend perlu diperbarui").
+2. **Backend Kantong**: `supabase db push` lalu `supabase functions deploy kantong --no-verify-jwt` (PANDUAN §8).
+3. **Pengingat H-1**: Riki & Febie masing-masing atur *All-day event notifications* kalender "Rumah Kita" = 1 hari sebelumnya.
+4. **Siklus**: Febie membuat project di akunnya → SQL → atur Auth & template email → daftarkan 2 email → isi `public/siklus-config.js` → push → pasang ping (PANDUAN §9).
+
+### Tes
+
+`test_core.js` (205 cek), `test_supabase.js` (20), `test_sql.sh`, `test_siklus.js` (32), `test_siklus_sql.sh`: semua lulus. Dicek di browser (mode demo, 390 px, terang & gelap): Agenda, Momen, kenangan, onboarding Febie 8 layar, Siklus pemilik vs pembaca, migrasi to-do browser, Beranda desktop.
 
 ### Catatan terbuka
 
-- Keputusan #15 (semua data pindah ke Supabase) vs #12 (project milik Febie): usulan, data Kantong lain nanti di project terpisah milik Riki, supaya Febie tetap satu-satunya pemilik data Siklus.
-- Pengingat H-1 di Google Calendar kemungkinan hanya berlaku di akun Riki. Febie mungkin perlu mengatur notifikasi kalender "Rumah Kita" di HP-nya. Perlu dites.
+- Keputusan #15 (semua data pindah ke Supabase) vs #12 (project milik Febie): Siklus sudah di project terpisah akun Febie; data Kantong lain tetap di project Riki.
 - Ping harian adalah trik umum, bukan jaminan resmi Supabase.
-- Supabase gratis disebut tidak punya backup otomatis (sumber pihak ketiga). Usulan: tombol "Unduh cadangan (JSON)" di Pengaturan → Siklus, pola sama dengan branch `ruang-catat`.
+- Supabase gratis tidak punya backup otomatis (sumber pihak ketiga) → tombol **Unduh cadangan (JSON)** sudah ada di Pengaturan → Siklus.
+- Siklus butuh internet untuk menyimpan (tidak masuk antrean offline); membaca tetap bisa dari cache HP.
+- `public/dark/`: perlu keputusan, port penuh atau arahkan ke app utama dengan tema gelap.
 
 ### Sumber
 

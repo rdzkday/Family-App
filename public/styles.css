@@ -478,3 +478,46 @@ input.input:disabled { opacity: .5; }
 .lnk { background: none; color: var(--todo-ok); font-weight: 800; text-decoration: underline; min-height: 44px; padding: 0 4px; }
 textarea.input { resize: vertical; min-height: 84px; line-height: 1.45; padding-top: 12px; }
 .lapis .chip[aria-pressed="true"] .ldot { box-shadow: inset 0 0 0 2px var(--ink); }
+
+/* ---------- Siklus ---------- */
+.sk-panel { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; margin-top: 10px; }
+.sk-panel .ldot { margin-top: 5px; }
+.sk-panel b, .sk-info b { font-weight: 800; }
+.sk-sub { display: block; margin-top: 3px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.sk-cat { display: block; margin-top: 6px; font-size: 13px; font-style: italic; color: var(--text-2); }
+.sk-note { display: block; margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--text-2); line-height: 1.45; }
+.sk-info { padding: 16px 18px; border-bottom: 1px dashed var(--line); font-size: 14px; line-height: 1.45; }
+.sk-btn .ldot { width: 10px; height: 10px; }
+.sk-p { font-size: 15px; line-height: 1.55; margin: 0 0 4px; }
+.sk-warn { margin-top: 14px; padding: 12px 14px; border-radius: 16px; background: var(--surface-2); font-size: 14px; line-height: 1.5; border-left: 4px solid var(--l-siklus-ring); }
+.sk-kode { font-size: 22px; letter-spacing: .35em; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* kartu "Ada yang baru" */
+.baru { background: var(--hero); border-radius: var(--r-card); padding: 16px; }
+.baru .eyebrow { display: block; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
+.baru p { margin: 4px 0 12px; font-size: 15px; line-height: 1.45; }
+.baru .act { display: flex; gap: 8px; }
+.baru .act .btn.small { min-height: 44px; flex: 1; }
+
+/* onboarding: layar penuh */
+body.onb-open { overflow: hidden; }
+.onb { position: fixed; inset: 0; z-index: 60; background: var(--bg); overflow-y: auto; }
+.onb-in { max-width: 480px; margin: 0 auto; min-height: 100%; padding: calc(16px + var(--safe-t)) var(--gutter) calc(24px + var(--safe-b)); display: flex; flex-direction: column; }
+.onb-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.onb-prog { display: flex; gap: 6px; }
+.onb-prog i { width: 8px; height: 8px; border-radius: 8px; background: var(--surface-3); transition: width .2s; }
+.onb-prog i.done { background: var(--text-3); }
+.onb-prog i.on { width: 22px; background: var(--text); }
+.onb-body { flex: 1; display: flex; flex-direction: column; padding-top: 24px; }
+.onb-h2 { font-size: 26px; line-height: 1.2; font-weight: 900; letter-spacing: -.02em; margin: 0 0 14px; outline: none; }
+.onb-act { margin-top: auto; padding-top: 24px; display: flex; flex-direction: column; gap: 10px; }
+.onb-act .btn { margin: 0; }
+.onb-list { margin: 0; padding: 0 0 0 20px; display: grid; gap: 10px; font-size: 15px; line-height: 1.5; }
+.onb-seg { margin-top: 12px; }
+.onb-kal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; background: var(--surface); border-radius: var(--r-card); padding: 12px 8px; margin-bottom: 16px; box-shadow: var(--shadow); }
+.onb-kal span { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.onb-kal small { font-size: 11px; font-weight: 800; color: var(--text-2); }
+.onb-kal b { font-size: 15px; }
+.onb-kal i { display: flex; gap: 3px; height: 8px; }
+.onb-kal em, .lg em { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.lg { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; }
