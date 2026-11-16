@@ -326,11 +326,11 @@
   }
 
   // Simpan PDF: di iPhone/Android pakai lembar "Bagikan" (bisa langsung ke WA/Files), di laptop unduh biasa
-  async function savePdf(blob, filename){
+  async function saveFile(blob, filename, title){
     try {
-      const file = new File([blob], filename, {type:'application/pdf'});
+      const file = new File([blob], filename, {type:blob.type});
       if (navigator.canShare && navigator.canShare({files:[file]})){
-        await navigator.share({files:[file], title:'Rangkuman Ruang Catat'});
+        await navigator.share({files:[file], title:title});
         return 'shared';
       }
     } catch(e){ if (e && e.name === 'AbortError') return 'cancelled'; }
@@ -350,6 +350,10 @@
       '<div><h2>Prompt</h2><p class="small muted">Kalau ada lebih dari satu, semuanya muncul berurutan di halaman Hari ini.</p></div>' +
       '<div class="card"><h3>Prompt custom</h3><div class="list">'+list+'</div><label for="newPrompt" class="small muted">Tambah prompt, misalnya titipan dari psikolog</label><input type="text" id="newPrompt" placeholder="Contoh: Apa yang membuatku cemas minggu ini?"><button type="button" class="btn" data-act="add-prompt">Tambah prompt</button>' +
       '<label class="switch"><input type="checkbox" id="randomToo" '+(state.randomToo?'checked':'')+'> Tambahkan 1 prompt acak di akhir</label></div>' +
+      '<div class="card"><h3>Cadangan</h3><p class="small muted">Data hanya ada di perangkat ini. Simpan file cadangan (mis. ke Files/iCloud Drive atau kirim ke diri sendiri) supaya catatan aman kalau ganti HP atau browser di-reset.'+(state.lastBackup ? ' Terakhir dicadangkan: '+fmtLong(state.lastBackup)+'.' : ' Belum pernah dicadangkan.')+'</p>' +
+      '<button type="button" class="btn" data-act="backup">Cadangkan data</button>' +
+      '<div id="restoreZone"><button type="button" class="btn ghost wide" data-act="restore">Pulihkan dari file</button></div>' +
+      '<input type="file" id="restoreFile" accept=".json,application/json" hidden></div>' +
       '<div class="card"><h3>Data</h3><div id="wipeZone"><button type="button" class="btn danger" data-act="wipe">Hapus semua data</button></div></div>';
   }
 
@@ -418,20 +422,62 @@
       case 'share-text': try { await navigator.share({title:'Rangkuman Ruang Catat', text:summaryText()}); } catch(e){ if (!e || e.name !== 'AbortError') toast('Gagal membagikan, pakai Salin'); } break;
       case 'pdf': {
         let blob; try { blob = buildPdf(); } catch(e){ toast('PDF belum bisa dibuat, coba Salin sebagai teks'); return; }
-        const r = await savePdf(blob, 'Rangkuman '+sum.from+' sd '+sum.to+'.pdf');
+        const r = await saveFile(blob, 'Rangkuman '+sum.from+' sd '+sum.to+'.pdf', 'Rangkuman Ruang Catat');
         toast(r === 'cancelled' ? 'Dibatalkan' : r === 'shared' ? 'PDF siap dikirim' : 'PDF diunduh');
         break;
       }
       case 'add-prompt': { const inp = document.getElementById('newPrompt'); const v = inp.value.trim(); if (!v){ toast('Tulis prompt dulu'); inp.focus(); return; } state.custom.push(v); save(); render(); toast('Prompt ditambahkan'); break; }
       case 'wipe': document.getElementById('wipeZone').innerHTML = '<p class="small">Semua catatan, prompt, dan profil akan hilang dari perangkat ini dan tidak bisa dikembalikan.</p><div class="row"><button type="button" class="btn danger" data-act="wipe-yes">Ya, hapus semua</button><button type="button" class="btn ghost" data-act="wipe-no">Batal</button></div>'; break;
       case 'wipe-no': render(); break;
+      case 'backup': {
+        const payload = {app:'ruang-catat', version:2, exportedAt:new Date().toISOString(), data:state};
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+        const r = await saveFile(blob, 'Cadangan Ruang Catat '+todayIso+'.json', 'Cadangan Ruang Catat');
+        if (r === 'cancelled'){ toast('Dibatalkan'); break; }
+        state.lastBackup = todayIso; save(); render(); toast(r === 'shared' ? 'Cadangan siap disimpan' : 'Cadangan diunduh');
+        break;
+      }
+      case 'restore': document.getElementById('restoreFile').click(); break;
+      case 'restore-yes': {
+        if (!pendingRestore) return;
+        state = pendingRestore; pendingRestore = null; save();
+        draftProfile = {name:'',age:'',conditions:[],extraTags:[]}; onboardStep = 0; randomPrompt = null; stepIdx = 0; tab = 'today';
+        render(); view.scrollTop = 0; toast('Data berhasil dipulihkan'); break;
+      }
+      case 'restore-no': pendingRestore = null; render(); break;
       case 'wipe-yes': state = {profile:null, entries:{}, custom:[], randomToo:true, demo:false}; draftProfile = {name:'',age:'',conditions:[],extraTags:[]}; onboardStep = 0; randomPrompt = null; stepIdx = 0; save(); render(); toast('Semua data dihapus'); break;
       case 'clear-demo': state.entries = {}; state.demo = false; randomPrompt = null; stepIdx = 0; save(); render(); toast('Data contoh dihapus'); break;
     }
   });
 
+  // Cek isi file cadangan sebelum menimpa data
+  function readBackup(text){
+    const j = JSON.parse(text);
+    const d = j && j.app === 'ruang-catat' ? j.data : j;
+    if (!d || typeof d !== 'object' || typeof d.entries !== 'object' || !Array.isArray(d.custom)) throw new Error('format');
+    const entries = {};
+    Object.values(d.entries).forEach(e => {
+      if (!e || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !(e.mood >= 1 && e.mood <= 5)) return;
+      entries[e.date] = {date:e.date, mood:Math.round(e.mood), emotions:Array.isArray(e.emotions)?e.emotions.map(String):[], tags:Array.isArray(e.tags)?e.tags.map(String):[],
+        answers:Array.isArray(e.answers)?e.answers.filter(a=>a&&a.prompt).map(a=>({prompt:String(a.prompt), text:String(a.text||'')})):[]};
+    });
+    const pr = d.profile;
+    const profile = pr && typeof pr === 'object' ? {name:String(pr.name||''), age:String(pr.age||''), conditions:Array.isArray(pr.conditions)?pr.conditions.map(String):[], extraTags:Array.isArray(pr.extraTags)?pr.extraTags.map(String):[]} : null;
+    return {profile, entries, custom:d.custom.map(String), randomToo:d.randomToo !== false, demo:!!d.demo, lastBackup:d.lastBackup||null};
+  }
+  let pendingRestore = null;
+
   view.addEventListener('change', ev => {
     const t = ev.target;
+    if (t.id === 'restoreFile' && t.files && t.files[0]){
+      const f = t.files[0]; t.value = '';
+      f.text().then(txt => {
+        try { pendingRestore = readBackup(txt); } catch(e){ toast('File bukan cadangan Ruang Catat'); return; }
+        const n = Object.keys(pendingRestore.entries).length;
+        document.getElementById('restoreZone').innerHTML = '<p class="small">File berisi <b>'+n+' catatan</b>. Data di perangkat ini sekarang ('+Object.keys(state.entries).length+' catatan) akan <b>diganti</b> dengan isi file.</p><div class="row"><button type="button" class="btn" data-act="restore-yes">Ya, pulihkan</button><button type="button" class="btn ghost" data-act="restore-no">Batal</button></div>';
+      }).catch(() => toast('File tidak bisa dibaca'));
+      return;
+    }
     if (t.id === 'randomToo'){ state.randomToo = t.checked; randomPrompt = null; stepIdx = 0; save(); }
     if (t.id === 'nm' && state.profile){ state.profile.name = t.value.trim(); save(); }
     if (t.dataset && t.dataset.sel){ sum.sel[t.dataset.sel] = t.checked; render(); }
