@@ -1,6 +1,6 @@
 // Daily Mood service worker: network-first untuk app shell, fallback ke cache saat offline.
 // Data catatan tidak lewat sini (localStorage + POST ke Supabase).
-const CACHE = 'daily-mood-v6';
+const CACHE = 'daily-mood-v7';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'data.js', 'manifest.webmanifest',
   'vendor/jspdf.umd.min.js', '../fonts/jakarta.woff2',
   'icons/icon.svg', 'icons/icon-32.png', 'icons/icon-192.png', 'icons/apple-touch-icon.png'];
@@ -10,7 +10,7 @@ self.addEventListener('install', (e) => {
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((k) => k.startsWith('ruang-catat-') && k !== CACHE).map((k) => caches.delete(k))))
+    .then((keys) => Promise.all(keys.filter((k) => (k.startsWith('daily-mood-') || k.startsWith('ruang-catat-')) && k !== CACHE).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', (e) => {
