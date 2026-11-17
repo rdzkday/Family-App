@@ -24,7 +24,7 @@ body.br-page .btn.ghost { background: transparent; color: var(--br-text); border
 /* header */
 .br-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .br-date { font-size: 13px; color: var(--br-muted); font-weight: 600; }
-.br-head h1 { margin: 2px 0 0; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.br-head h1 { margin: 2px 0 0; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
 .br-intro { margin: 6px 0 0; color: var(--br-muted); font-size: 14px; line-height: 1.5; }
 .br-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin-left: -8px; padding: 0 8px; color: var(--br-muted); font-size: 14px; font-weight: 700; }
 .br-back svg { width: 18px; height: 18px; }

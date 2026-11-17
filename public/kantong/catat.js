@@ -5,7 +5,7 @@
 // ---------- Catat (home) ----------
 var HomeView = {
   render: function (el) {
-    el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Halo, ' + esc(me().nama) + '!</h1></div><div class="top-actions">' + berandaBtn() + '</div></div>' +
+    el.innerHTML = pageHead('Kantong', longToday()) +
       '<div id="home-budget"></div>' +
       '<section class="section"><div class="entry" id="entry"></div></section>' +
       '<div id="home-utang"></div><div id="home-reim"></div>' +

@@ -104,6 +104,13 @@ function applyTheme() {
   var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', isDark() ? '#0E1014' : '#F7F5FC');
 }
 function setTheme(t) { LS.set('k_theme', t); applyTheme(); }
+var PH_BACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>';
+// header halaman standar: kembali (ke Beranda / atribut custom) + judul + subjudul + aksi kanan
+function pageHead(title, sub, actions, back) {
+  var b = back || ('href="' + (ROOT || './') + '" aria-label="Kembali ke Beranda"');
+  return '<header class="ph"><a class="ph-back" ' + b + '>' + PH_BACK + '</a><div class="ph-text"><h1>' + title + '</h1>' +
+    (sub ? '<p class="ph-sub">' + sub + '</p>' : '') + '</div>' + (actions ? '<div class="ph-actions">' + actions + '</div>' : '') + '</header>';
+}
 function berandaBtn() { if (PAGE === 'beranda') return ''; return '<button class="theme-btn" data-act="beranda" aria-label="Ke Beranda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v8a2 2 0 0 1-2 2h-3v-6h-6v6H6a2 2 0 0 1-2-2z"/></svg></button>'; }
 function themeBtn() { return '<button class="theme-btn" data-act="theme" aria-label="Ganti tema terang/gelap">' + (isDark() ? SUN : MOON) + '</button>'; }
 applyTheme();
