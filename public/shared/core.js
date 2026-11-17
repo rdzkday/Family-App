@@ -404,7 +404,7 @@ var KantongCore = (function () {
       judul: '[' + huruf + '] ' + (selesai ? '\u2713 ' : '') + t.judul,
       tanggal: t.tanggal, jam: t.jam, durasi: num(t.durasi) || TODO_DURASI, seharian: !t.jam,
       pemilik: t.pemilik, pemilikNama: nama, warna: t.pemilik === TODO_BERSAMA ? 'bersama' : idx, selesai: selesai,
-      deskripsi: (todoTipe(t) === 'evaluasi' ? 'Evaluasi bulanan berdua. Buka Beranda untuk lihat kesepakatan yang berlaku.' : 'To-do ' + nama + ' dari Kantong.') +
+      deskripsi: (todoTipe(t) === 'evaluasi' ? 'Evaluasi bulanan berdua. Buka Beranda untuk lihat kesepakatan yang berlaku.' : 'To-do ' + nama + ' dari Family App.') +
         (selesai ? ' Sudah selesai.' : '') + '\nkantong-todo:' + t.id
     };
     if (!spec.seharian) { spec.mulai = t.tanggal + 'T' + t.jam; spec.akhir = addMinutes(t.tanggal, t.jam, spec.durasi); }
