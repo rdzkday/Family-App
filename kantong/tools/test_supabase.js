@@ -274,6 +274,49 @@ function mockGoogle() {
     assert.strictEqual(keDb('KomitmenBab', { nomor: 'IV' }).nomor, 'IV');
     assert.strictEqual(dariDb('KomitmenVersi', { versi: 2 }).versi, 2);
   });
+  await t('tanpa TODO_CAL_ID: email dari app -> robot buat "Rumah Kita", bagikan, sync jalan', async () => {
+    resetTokenCache();
+    const cals = {}, acl = {}, ev = {}; let n = 0, dibuat = 0;
+    const res = (status, j) => ({ ok: status < 300, status, text: async () => JSON.stringify(j), json: async () => j });
+    const gf = async (url, opt) => {
+      if (url.startsWith('https://oauth2')) return res(200, { access_token: 'TOK', expires_in: 3600 });
+      const u = url.replace('https://www.googleapis.com/calendar/v3', '');
+      if (u.startsWith('/users/me/calendarList')) return res(200, { items: Object.keys(cals).map((id) => ({ id, summary: cals[id] })) });
+      if (u === '/calendars' && opt.method === 'POST') { dibuat++; const id = 'auto' + dibuat + '@group.calendar.google.com'; cals[id] = JSON.parse(opt.body).summary; acl[id] = [{ role: 'owner', scope: { type: 'user', value: 'kantong@proj.iam.gserviceaccount.com' } }]; return res(200, { id }); }
+      const m = u.match(/^\/calendars\/([^/]+)\/(acl|events)(?:\/([^/?]+))?/); assert.ok(m, u);
+      const id = decodeURIComponent(m[1]); assert.ok(cals[id], 'kalender ada');
+      if (m[2] === 'acl') {
+        if (opt.method === 'GET') return res(200, { items: acl[id] });
+        if (opt.method === 'POST') { assert.match(u, /sendNotifications=true/); const b = JSON.parse(opt.body); assert.strictEqual(b.role, 'writer'); acl[id].push(b); return res(200, b); }
+        if (opt.method === 'DELETE') { const e = decodeURIComponent(m[3]).replace('user:', ''); acl[id] = acl[id].filter((a) => a.scope.value !== e); return { ok: true, status: 204 }; }
+      }
+      if (opt.method === 'POST') { const i = 'a' + (++n); ev[i] = JSON.parse(opt.body); return res(200, { id: i }); }
+      return res(400, {});
+    };
+    const cal = createCalendarAdapter({ saJson: SA, calendarId: '', fetch: gf });
+    const d2 = { ...deps, calendar: cal };
+    assert.ok(cal, 'adapter tetap ada walau TODO_CAL_ID kosong');
+    const s0 = ok(await call(R, 'kalender.status', {}, d2));
+    assert.strictEqual(s0.siap, false); assert.strictEqual(s0.kunci, true); assert.strictEqual(dibuat, 0, 'status tidak membuat kalender');
+    const t0 = ok(await call(R, 'todo.save', { id: 'td-k0', judul: 'Sebelum', tanggal: '2026-11-26' }, d2));
+    assert.strictEqual(t0.todo.gcal_status, 'gagal'); assert.match(t0.todo.gcal_error, /belum disiapkan/);
+    assert.strictEqual((await call(R, 'kalender.bagikan', { email: 'bukan-email' }, d2)).ok, false);
+    assert.strictEqual((await call(R, 'kalender.bagikan', { email: 'kantong@proj.iam.gserviceaccount.com' }, d2)).ok, false);
+    const s1 = ok(await call(R, 'kalender.bagikan', { email: ' Riki@Gmail.com ' }, d2));
+    assert.strictEqual(s1.siap, true); assert.strictEqual(dibuat, 1);
+    assert.deepStrictEqual(s1.akses, [{ email: 'riki@gmail.com', role: 'writer' }], 'email robot tidak ditampilkan');
+    ok(await call(I, 'kalender.bagikan', { email: 'febie@gmail.com' }, d2));
+    assert.strictEqual(dibuat, 1, 'kalender kedua tidak dibuat');
+    // instance baru (cold start) menemukan kalender lewat calendarList
+    resetTokenCache();
+    const cal2 = createCalendarAdapter({ saJson: SA, calendarId: '', fetch: gf });
+    const t1 = ok(await call(R, 'todo.sync', { id: 'td-k0' }, { ...deps, calendar: cal2 }));
+    const td = t1.todo || (t1.todos || []).find((x) => x.id === 'td-k0');
+    assert.strictEqual(td.gcal_status, 'ok', td.gcal_error); assert.ok(ev[td.gcal_event_id]);
+    const s2 = ok(await call(R, 'kalender.cabut', { email: 'febie@gmail.com' }, d2));
+    assert.deepStrictEqual(s2.akses.map((a) => a.email), ['riki@gmail.com']);
+    assert.deepStrictEqual(ok(await call(R, 'kalender.status', {}, { ...deps, calendar: null })), { siap: false, kunci: false, akses: [] });
+  });
   resetTokenCache();
   console.log(`\n${lulus} test lulus`);
 })().catch((e) => { console.error('GAGAL:', e); process.exit(1); });

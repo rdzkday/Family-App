@@ -86,19 +86,21 @@ Buka app dari home screen → tempel **kode koneksi** → **Hubungkan**.
 
 To-do yang **punya waktu** otomatis masuk ke satu kalender khusus bernama **Rumah Kita**. Tanpa waktu = hanya di app. Server memakai **service account** Google, jadi tidak perlu login Google per orang.
 
-1. Google Calendar web → ⚙ **Settings → Add calendar → Create new calendar** → nama `Rumah Kita`.
-2. console.cloud.google.com → project baru (mis. `kantong`) → **APIs & Services → Enable APIs** → aktifkan **Google Calendar API**.
-3. **IAM & Admin → Service Accounts → Create** (nama `kantong`) → tab **Keys → Add key → JSON**. File JSON terunduh; salin alamat email service account-nya (`kantong@….iam.gserviceaccount.com`).
-4. Google Calendar → Settings → **Rumah Kita → Share with specific people** → tambahkan email service account, izin **Make changes to events**. Tambahkan juga **semua** email Google yang perlu melihat kalender (boleh lebih dari satu per orang, mis. email pribadi & kantor Febie) dengan izin yang sama.
-5. Di halaman yang sama, bagian **Integrate calendar**, salin **Calendar ID**.
-6. Simpan secret ke Edge Function:
+Cukup **satu kali** buat kunci robot. Kalender dibuat robot sendiri dan dibagikan dari dalam app.
+
+1. console.cloud.google.com (akun Gmail pribadi) → project baru `kantong` → **APIs & Services → Enable APIs** → aktifkan **Google Calendar API**.
+2. **IAM & Admin → Service Accounts → Create** (nama `kantong`, tanpa role) → tab **Keys → Add key → JSON**. File JSON terunduh.
+3. Supabase dashboard → **Edge Functions → Secrets** → tambah `GOOGLE_SA_JSON` = seluruh isi file JSON. Atau:
 
 ```bash
-supabase secrets set TODO_CAL_ID='<Calendar ID>'
 supabase secrets set GOOGLE_SA_JSON="$(cat kantong-xxxx.json)"
 ```
 
-7. Pengingat event ikut setelan kalender ini (Settings → Rumah Kita → Event notifications). Atur sekali, berlaku untuk semua to-do.
+4. Hapus file JSON dari Downloads.
+5. Di app: **Beranda → Pengaturan → Agenda → Email penerima kalender** → masukkan email Google → **Bagikan kalender**. Saat email pertama, robot membuat kalender **Rumah Kita** (zona Jakarta). Ulangi untuk email lain. To-do mendatang yang tertunda langsung dikirim.
+6. Tiap orang: buka email undangan → **Add this calendar**. Lalu Google Calendar → Settings → **Rumah Kita → Event notifications → 30 menit** (setelan ini per orang).
+
+Opsional: pakai kalender buatan sendiri dengan `TODO_CAL_ID` (share ke email robot, izin *Make changes to events*). Kalau diisi, robot tidak membuat kalender sendiri.
 
 Aturan yang dijalankan server:
 

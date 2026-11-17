@@ -74,19 +74,23 @@ var ICON = {
 var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
 // Halaman per fitur: beranda (/), kantong (/kantong/), agenda (/agenda/). ROOT = jalur ke folder public dari halaman ini.
-var PAGE = ['beranda', 'kantong', 'agenda'].indexOf(window.KANTONG_PAGE) >= 0 ? window.KANTONG_PAGE : 'kantong';
+var PAGE = ['beranda', 'kantong', 'agenda', 'pengaturan'].indexOf(window.KANTONG_PAGE) >= 0 ? window.KANTONG_PAGE : 'kantong';
 var ROOT = window.KANTONG_ROOT || '';
 var AGENDA_RUTE = ['todo', 'catatan', 'jadwal'];
 function agendaRute() { var h = location.hash.slice(1); return AGENDA_RUTE.indexOf(h) >= 0 ? h : 'todo'; }
 // link lama: kantong#todo, kantong#pengaturan, beranda#todo/#agenda/#setelan
-(function () {
+function alihkanLinkLama() {
   var h = location.hash;
   if (PAGE === 'kantong' && h === '#todo') location.replace(ROOT + 'agenda/');
-  if (PAGE === 'kantong' && h === '#pengaturan') location.replace(ROOT + '#pengaturan/kantong');
+  if (PAGE === 'kantong' && h === '#pengaturan') location.replace(ROOT + 'pengaturan/#kantong');
   if (PAGE === 'beranda' && h === '#todo') location.replace(ROOT + 'agenda/');
   if (PAGE === 'beranda' && h === '#agenda') location.replace(ROOT + 'agenda/#jadwal');
-  if (PAGE === 'beranda' && h === '#setelan') history.replaceState(null, '', '#pengaturan');
-})();
+  // Pengaturan = halaman sendiri (/pengaturan/), link lama #pengaturan[/fitur] & #setelan dialihkan
+  var mp = /^#(?:pengaturan|setelan)(?:\/(\w+))?$/.exec(h);
+  if (PAGE === 'beranda' && mp) location.replace(ROOT + 'pengaturan/' + (mp[1] ? '#' + mp[1] : ''));
+}
+alihkanLinkLama();
+window.addEventListener('hashchange', alihkanLinkLama);
 function themePref() { return LS.get('k_theme', 'dark') === 'light' ? 'light' : 'dark'; }
 function isDark() { return themePref() === 'dark'; }
 function applyTheme() {

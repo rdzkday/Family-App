@@ -2,7 +2,8 @@
 // Keamanan: setiap request wajib membawa kode akses user (hash-nya ada di tabel akses). Tanpa kode, ditolak.
 // Env otomatis: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Secret opsional untuk to-do -> Google Calendar:
 //   GOOGLE_SA_JSON  = isi file JSON kunci service account (utuh)
-//   TODO_CAL_ID     = id kalender "Rumah Kita" (Settings kalender > Integrate calendar > Calendar ID)
+//   TODO_CAL_ID     = (opsional) id kalender buatan sendiri. Kosongkan: robot membuat "Rumah Kita" sendiri,
+//                     lalu kalender dibagikan ke email yang dimasukkan di Pengaturan > Agenda.
 import { handleRequest, corsHeaders } from './api.mjs';
 import { createCalendarAdapter } from './calendar.mjs';
 

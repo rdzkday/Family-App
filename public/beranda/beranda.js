@@ -3,7 +3,7 @@
 'use strict';
 
 // ================= Beranda (index.html) =================
-// Satu pintu: ringkasan Kantong, pengingat evaluasi, to-do & catatan, mood → Daily Mood, Pengaturan semua fitur.
+// Satu pintu: ringkasan Kantong, pengingat evaluasi, to-do & catatan, mood → Daily Mood. Ikon gear → halaman Pengaturan (/pengaturan/).
 // Memakai state, antrean offline, dan sheet yang sama dengan Kantong.
 var DAILY_MOOD_URL = ROOT + 'daily-mood/';
 var MOODS = [['berat', 'Berat', '#F87171', 'M8 16.5c1.2-1.6 2.5-2.3 4-2.3s2.8.7 4 2.3'], ['lelah', 'Lelah', '#FB923C', 'M8.5 15.5c1-.7 2.2-1 3.5-1s2.5.3 3.5 1'],
@@ -75,7 +75,7 @@ document.addEventListener('click', function (e) {
 });
 window.addEventListener('hashchange', function () {
   if (PAGE === 'agenda' && agendaRute() !== S.tab) brGo(agendaRute());
-  if (PAGE === 'beranda') bukaPengaturanDariHash();
+  if (PAGE === 'pengaturan') bukaPengaturanDariHash();
 });
 
 function openTxBaru() {
@@ -92,7 +92,7 @@ var BerandaView = {
       '<header class="br-head"><div><div class="br-date">' + esc(longToday()) + ' ' + new Date().getFullYear() + '</div><h1>' + sapaan() + ', ' + esc(user.nama) + '</h1></div>' +
       (S.conn.mode === 'demo' ? '<div class="br-who" role="group" aria-label="Lihat sebagai (mode demo)">' + db().Users.map(function (u) {
         return '<button type="button" data-who="' + esc(u.id) + '" aria-pressed="' + (u.id === user.id) + '" aria-label="Lihat sebagai ' + esc(u.nama) + '">' + esc(u.nama.charAt(0)) + '</button>';
-      }).join('') + '</div>' : '') + '<a class="br-gear" href="#pengaturan" aria-label="Pengaturan">' + ICON.gear + '</a></header>' +
+      }).join('') + '</div>' : '') + '<a class="br-gear" href="' + ROOT + 'pengaturan/" aria-label="Pengaturan">' + ICON.gear + '</a></header>' +
       '<div id="br-sync"></div>' +
       '<nav class="br-short" aria-label="Pintasan">' +
         '<a href="' + FITUR_URL.kantong + '" style="--c:var(--br-kantong);--cb:var(--br-kantong-bg)"><span class="ic">' + ICON.wallet + '</span>Kantong</a>' +
@@ -108,17 +108,14 @@ var BerandaView = {
       '</div><div class="br-col side">' +
         '<div id="br-eval-d" class="br-eval-slot d"></div>' +
         '<section class="br-card br-mood" id="br-mood" aria-labelledby="br-mood-h"></section>' +
-      '</div></div>' +
-      '<section class="br-atur" id="pengaturan" aria-labelledby="br-atur-h"></section></div>';
+      '</div></div></div>';
     $$('[data-who]', el).forEach(function (b) { b.addEventListener('click', function () {
       if (b.getAttribute('data-who') === user.id) return;
       S.prefs.demoUser = b.getAttribute('data-who'); self.add.pemilik = ''; persist(); S.boot = null; S.todos = null; renderView(); sync();
     }); });
     this.renderAdd(cari('br-add'));
     this.renderMood(cari('br-mood'));
-    Pengaturan.render(cari('pengaturan'));
     this.update(el);
-    bukaPengaturanDariHash();
   },
   update: function (el) {
     if (!$('#br-kantong', el)) return this.render(el);
@@ -129,7 +126,6 @@ var BerandaView = {
     $('#br-eval-d', el).innerHTML = slot === 'd' ? ev : '';
     this.bindEval(el);
     this.renderTodo($('#br-todo', el));
-    Pengaturan.update($('#pengaturan', el));
   },
   renderKantong: function (box) {
     var user = me(), rt = bukuRT(), m = ensureMonth(thisMonth());
