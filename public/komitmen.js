@@ -116,10 +116,17 @@
   var S = { data: null, q: '', filter: 'semua', tab: 'kesepakatan', status: '', fokus: null };
   var ME = (boot && boot.user) || { id: 'riki', nama: 'Riki', buku: 'riki' };
 
-  function demoData() {
-    var st = C.memoryStore(demoSeed());
-    return C.handle(st, ME, 'komitmen.list', {}, '2026-11-17T09:00:00+07:00');
+  // mode contoh: data disimpan di HP (k_km_demo) supaya simulasi tambah/tarik usulan tetap ada setelah reload
+  var DEMO_KEY = 'k_km_demo';
+  function demoStore() { return C.memoryStore(LS.get(DEMO_KEY, null) || demoSeed()); }
+  function demoData() { return C.handle(demoStore(), ME, 'komitmen.list', {}, new Date().toISOString()); }
+  function aksi(action, payload) { // hanya mode contoh untuk sekarang; mode terhubung menyusul di Fase 4b
+    var st = demoStore(), res = C.handle(st, ME, action, payload, new Date().toISOString());
+    LS.set(DEMO_KEY, st.data); S.data = demoData();
+    return res;
   }
+  function resetDemo() { try { localStorage.removeItem(DEMO_KEY); } catch (e) { /* abaikan */ } S.data = demoData(); location.hash = ''; render(); toast('Data contoh dikembalikan'); }
+  function adaSimulasi() { return !!LS.get(DEMO_KEY, null); }
   function fetchList() {
     var ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, 30000);
     return fetch(conn.api, {
@@ -262,7 +269,7 @@
     }
     var html = note ? '<div class="km-note" role="status">' + note + '</div>' : '';
     if (!hits.length) {
-      if (!note) html += '<div class="km-empty" role="status"><p>Tidak ada pasal tentang “' + esc(S.q) + '”.</p><p>Mau jadikan usulan baru? <span class="dev-tag">Fase berikutnya</span></p></div>';
+      if (!note) html += '<div class="km-empty" role="status"><p>Tidak ada pasal tentang “' + esc(S.q) + '”.</p><p>' + (demo ? '<button type="button" class="link" id="usul-dari-cari">Jadikan usulan pasal baru</button>' : 'Mau jadikan usulan baru? <span class="dev-tag">Fase berikutnya</span>') + '</p></div>';
       return html;
     }
     return html + '<p class="bab-h" role="status">' + hits.length + ' pasal ditemukan</p><div class="rows">' + hits.map(function (h) { return rowHtml(h.pasal, h); }).join('') + '</div>';
@@ -289,7 +296,8 @@
     return '<header class="km-head"><a class="back" href="./" aria-label="Kembali ke Beranda">' + ICON.back + '</a>' +
       '<div><h1>Komitmen</h1><p class="sub">' + (d ? jumlahLabel(d) : '&nbsp;') + '</p></div>' +
       (S.status ? '<span class="km-status" role="status">' + esc(S.status) + '</span>' : '') + '</header>' +
-      (demo ? '<div class="km-demo">Data contoh, bukan isi kesepakatan asli.' + (conn ? '' : ' Hubungkan dulu di Kantong untuk melihat data kalian.') + '</div>' : '') +
+      (demo ? '<div class="km-demo">Data contoh, bukan isi kesepakatan asli.' + (conn ? '' : ' Hubungkan dulu di Kantong untuk melihat data kalian.') +
+        (adaSimulasi() ? ' <button type="button" id="demo-reset">Kembalikan data contoh</button>' : '') + '</div>' : '') +
       (d && d.menunggu_ttd ? '<div class="km-banner" role="status">' + ICON.pen + '<span>' + d.menunggu_ttd + ' lembar menunggu tanda tanganmu</span></div>' : '') +
       '<form class="km-search" role="search" id="cari-form"><label for="cari" class="hidden">Cari pasal</label>' + ICON.search +
       '<input class="input" id="cari" type="search" placeholder="Cari kata atau nomor pasal" autocomplete="off" enterkeyhint="search" value="' + esc(S.q) + '">' +
@@ -299,6 +307,7 @@
       }).join('') + '</div>' +
       (S.q.trim() ? '' : '<div class="seg" role="group" aria-label="Modul"><button type="button" data-tab="kesepakatan" aria-pressed="' + (S.tab !== 'definisi') + '">Kesepakatan</button>' +
         '<button type="button" data-tab="definisi" aria-pressed="' + (S.tab === 'definisi') + '">Definisi A–Z</button></div>') +
+      '<button type="button" class="btn baru" id="pasal-baru"' + (demo ? '' : ' disabled') + '>+ Pasal baru' + (demo ? '' : ' <span class="dev-tag">Fase berikutnya</span>') + '</button>' +
       '<div id="items">' + itemsHtml() + '</div>' +
       '<button type="button" class="btn ghost eval" disabled>Mulai evaluasi <span class="dev-tag">Fase berikutnya</span></button>';
   }
@@ -321,7 +330,8 @@
     var ttd = sah && sah.status === 'sah' ? '<div class="ttd" aria-label="' + esc('Disahkan ' + tgl(p.berlaku_sejak) + ' oleh ' + namaPasangan()) + '">' +
       '<figure>' + ttdSvg(sah.ttd_riki) + '<figcaption>' + esc(namaSlot('riki')) + '</figcaption></figure>' +
       '<figure>' + ttdSvg(sah.ttd_febie) + '<figcaption>' + esc(namaSlot('febie')) + '</figcaption></figure></div>' : '';
-    var acts = p.terkunci ? ['+ Keterangan', 'Riwayat'] : ['Ubah', 'Cabut', '+ Keterangan', 'Riwayat'];
+    var acts = p.terkunci ? ['+ Keterangan', 'Riwayat'] : p.status === 'usulan' ? ['Riwayat'] : ['Ubah', 'Cabut', '+ Keterangan', 'Riwayat'];
+    var tarik = demo && p.status === 'usulan' && p.sumber_asal === 'app' ? '<button type="button" class="btn small ghost" id="tarik" data-id="' + esc(p.id) + '">Tarik usulan</button>' : '';
     return '<article class="pasal' + (p.status === 'dicabut' ? ' dicabut' : '') + '" aria-labelledby="pasal-judul">' +
       '<div class="pasal-top"><a class="back" href="#" aria-label="Kembali ke daftar">' + ICON.back + '</a><span class="no">Pasal ' + p.nomor +
       (p.tipe === 'definisi' ? ' · Definisi' : babOf(p.bab_id) ? ' · Bab ' + esc(babOf(p.bab_id).nomor) : '') + '</span></div>' +
@@ -335,12 +345,90 @@
       }).join('') + lihat +
       '<div class="pasal-foot"><div class="m">' + (w ? '<b>' + esc(w) + '</b>' : '') + (p.versi ? ' · Versi ' + p.versi : '') + ' · ' + esc(sumberLabel(p)) +
       (sah && sah.status === 'sah' ? '<br>Disahkan ' + esc(tgl(p.berlaku_sejak)) + ' · ' + esc(namaPasangan()) : '') + '</div>' + ttd + '</div>' +
-      '<div class="pasal-acts">' + acts.map(function (a) { return '<button type="button" class="btn small" disabled>' + a + '</button>'; }).join('') +
-      '<span class="cap">Ubah, cabut, keterangan & riwayat hadir di fase berikutnya.</span></div></article>';
+      '<div class="pasal-acts">' + tarik + acts.map(function (a) { return '<button type="button" class="btn small" disabled>' + a + '</button>'; }).join('') +
+      '<span class="cap">' + (p.status === 'usulan' ? 'Tanda tangan berdua hadir di tahap berikutnya.' : 'Ubah, cabut, keterangan & riwayat hadir di fase berikutnya.') + '</span></div></article>';
   }
   function users() { return (boot && boot.users) || [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'istri', nama: 'Febie', buku: 'istri' }]; }
   function namaSlot(slot) { var u = users().filter(function (x) { return C.slotTtd(x) === slot; })[0]; return u ? u.nama : (slot === 'riki' ? 'Riki' : 'Febie'); }
   function namaPasangan() { return namaSlot('riki') + ' & ' + namaSlot('febie'); }
+
+  // ================= form pasal baru (usulan) =================
+  function bukaFormBaru(awal) {
+    awal = awal || {};
+    var F = { tipe: awal.tipe || 'kesepakatan', ayat: [''] };
+    var babs = S.data.bab || [];
+    var scrim = document.createElement('div'); scrim.className = 'scrim';
+    var sh = document.createElement('div'); sh.className = 'sheet km-form'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.setAttribute('aria-labelledby', 'fb-h');
+    var nomorBaru = S.data.pasal.reduce(function (m, p) { return Math.max(m, p.nomor); }, 0) + 1;   // perkiraan; nomor final dari server
+    sh.innerHTML = '<div class="grab"></div><div class="sheet-h"><h3 id="fb-h">Pasal baru</h3><button type="button" class="iconbtn" data-close aria-label="Tutup">' + ICON.x + '</button></div>' +
+      '<p class="fb-sub">Akan jadi <b>Pasal ' + nomorBaru + '</b> berstatus Usulan. Berlaku setelah ditandatangani berdua.</p>' +
+      '<form id="fb" novalidate>' +
+      '<div class="field"><span class="lbl">Jenis</span><div class="seg" role="group" aria-label="Jenis pasal">' +
+        '<button type="button" data-tipe="kesepakatan">Kesepakatan</button><button type="button" data-tipe="definisi">Definisi</button></div></div>' +
+      '<div class="field"><label for="fb-judul" id="fb-judul-l"></label><input class="input" id="fb-judul" maxlength="120" autocomplete="off" value="' + esc(awal.judul || '') + '"></div>' +
+      '<div class="field" id="fb-bab-w"><label for="fb-bab">Bab</label><select class="input" id="fb-bab">' +
+        babs.map(function (b) { return '<option value="' + esc(b.id) + '">Bab ' + esc(b.nomor) + ' – ' + esc(b.judul) + '</option>'; }).join('') +
+        '<option value="__baru">+ Bab baru…</option></select>' +
+        '<input class="input hidden" id="fb-bab-baru" placeholder="Nama bab baru, misal Pengasuhan Anak" maxlength="60" autocomplete="off" aria-label="Nama bab baru"></div>' +
+      '<div class="field"><span class="lbl" id="fb-ayat-l">Isi ayat</span><div id="fb-ayat"></div>' +
+        '<button type="button" class="btn small ghost" id="fb-ayat-add">+ Tambah ayat</button></div>' +
+      '<div class="field"><label for="fb-kunci">Kata kunci <span class="opt">(opsional, pisahkan dengan koma)</span></label><input class="input" id="fb-kunci" placeholder="misal: uang, belanja" autocomplete="off"></div>' +
+      '<div class="field"><label for="fb-alasan">Alasan <span class="opt">(opsional)</span></label><input class="input" id="fb-alasan" placeholder="Kenapa pasal ini perlu" autocomplete="off"></div>' +
+      '<p class="fb-err" id="fb-err" role="alert"></p>' +
+      '<button type="submit" class="btn">Simpan sebagai usulan</button></form>';
+    document.body.appendChild(scrim); document.body.appendChild(sh);
+    requestAnimationFrame(function () { scrim.classList.add('show'); sh.classList.add('show'); });
+    var prevFocus = document.activeElement;
+    function tutup() {
+      scrim.classList.remove('show'); sh.classList.remove('show');
+      document.removeEventListener('keydown', onKey);
+      setTimeout(function () { scrim.remove(); sh.remove(); if (prevFocus && prevFocus.focus) prevFocus.focus(); }, 280);
+    }
+    function onKey(e) { if (e.key === 'Escape') tutup(); }
+    document.addEventListener('keydown', onKey);
+    scrim.addEventListener('click', tutup);
+    $('[data-close]', sh).addEventListener('click', tutup);
+    function syncAyat() { $$('#fb-ayat textarea', sh).forEach(function (t, i) { F.ayat[i] = t.value; }); }
+    function drawAyat() {
+      $('#fb-ayat', sh).innerHTML = F.ayat.map(function (a, i) {
+        return '<div class="fb-ayat"><span class="n">(' + (i + 1) + ')</span><textarea class="input" rows="2" aria-label="Ayat ' + (i + 1) + '" placeholder="' +
+          (i ? 'Ayat berikutnya' : F.tipe === 'definisi' ? 'misal: Selingkuh adalah …' : 'misal: Kami sepakat …') + '">' + esc(a) + '</textarea>' +
+          (F.ayat.length > 1 ? '<button type="button" class="iconbtn" data-del="' + i + '" aria-label="Hapus ayat ' + (i + 1) + '">' + ICON.x + '</button>' : '') + '</div>';
+      }).join('');
+      $$('[data-del]', sh).forEach(function (b) { b.addEventListener('click', function () { syncAyat(); F.ayat.splice(+b.getAttribute('data-del'), 1); drawAyat(); }); });
+    }
+    function drawTipe() {
+      var def = F.tipe === 'definisi';
+      $$('[data-tipe]', sh).forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-tipe') === F.tipe)); });
+      $('#fb-judul-l', sh).textContent = def ? 'Istilah' : 'Judul';
+      $('#fb-judul', sh).placeholder = def ? 'misal: Waktu pribadi' : 'misal: Tabungan darurat';
+      $('#fb-bab-w', sh).classList.toggle('hidden', def);
+      drawAyat();
+    }
+    $$('[data-tipe]', sh).forEach(function (b) { b.addEventListener('click', function () { syncAyat(); F.tipe = b.getAttribute('data-tipe'); drawTipe(); }); });
+    var sel = $('#fb-bab', sh), babBaru = $('#fb-bab-baru', sh);
+    if (!babs.length) sel.value = '__baru';
+    function syncBab() { babBaru.classList.toggle('hidden', sel.value !== '__baru'); }
+    sel.addEventListener('change', function () { syncBab(); if (sel.value === '__baru') babBaru.focus(); });
+    syncBab();
+    $('#fb-ayat-add', sh).addEventListener('click', function () { syncAyat(); F.ayat.push(''); drawAyat(); var t = $$('#fb-ayat textarea', sh); t[t.length - 1].focus(); });
+    drawTipe();
+    $('#fb', sh).addEventListener('submit', function (e) {
+      e.preventDefault(); syncAyat();
+      var errEl = $('#fb-err', sh);
+      try {
+        var r = aksi('komitmen.usul_baru', {
+          tipe: F.tipe, judul: $('#fb-judul', sh).value, ayat: F.ayat,
+          bab_id: sel.value === '__baru' ? '' : sel.value, bab_baru: sel.value === '__baru' ? babBaru.value : '',
+          kata_kunci: $('#fb-kunci', sh).value, alasan: $('#fb-alasan', sh).value
+        });
+        tutup(); S.q = ''; S.fokus = null; prevFocus = null;
+        toast('Usulan Pasal ' + r.nomor + ' tersimpan');
+        if (location.hash === '#p/' + r.nomor) render(); else location.hash = '#p/' + r.nomor;
+      } catch (ex) { errEl.textContent = ex.message; }
+    });
+    setTimeout(function () { $('#fb-judul', sh).focus(); }, 300);
+  }
 
   // ================= render & event =================
   var root = $('#km');
@@ -362,6 +450,7 @@
     bindRows();
   }
   function bindRows() {
+    var uc = $('#usul-dari-cari', root); if (uc) uc.addEventListener('click', function () { bukaFormBaru({ judul: S.q.trim() }); });
     $$('.row[data-fokus]', root).forEach(function (a) {
       a.addEventListener('click', function () { try { S.fokus = JSON.parse(a.getAttribute('data-fokus')); } catch (e) { S.fokus = null; } });
     });
@@ -384,6 +473,12 @@
     $('#cari-x').addEventListener('click', function () { S.q = ''; S.fokus = null; render(); $('#cari').focus(); });
     $$('[data-filter]', root).forEach(function (b) { b.addEventListener('click', function () { S.filter = b.getAttribute('data-filter'); LS.set('k_km_ui', { filter: S.filter, tab: S.tab }); render(); }); });
     $$('[data-tab]', root).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.getAttribute('data-tab'); LS.set('k_km_ui', { filter: S.filter, tab: S.tab }); render(); }); });
+    var bb = $('#pasal-baru'); if (bb) bb.addEventListener('click', function () { bukaFormBaru({ tipe: S.tab === 'definisi' ? 'definisi' : 'kesepakatan' }); });
+    var dr = $('#demo-reset'); if (dr) dr.addEventListener('click', function () { if (confirm('Hapus semua simulasi dan kembali ke data contoh awal?')) resetDemo(); });
+    var tk = $('#tarik'); if (tk) tk.addEventListener('click', function () {
+      if (!confirm('Tarik usulan ini? Usulan hilang dari daftar dan lembar pengesahannya dibatalkan.')) return;
+      try { aksi('komitmen.tarik_usulan', { pasal_id: tk.getAttribute('data-id') }); toast('Usulan ditarik'); location.hash = ''; } catch (e) { toast(e.message); }
+    });
     bindRows();
   }
   function scrollFokus() {
