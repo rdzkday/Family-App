@@ -93,7 +93,7 @@ function txRow(t, ctxBuku) {
     color = '#C7D3FF'; letter = ICON.swap; amtCls = 'tf'; sign = '';
     if (ctxBuku && ctxBuku !== 'all') sign = t.buku === ctxBuku ? '−' : '+';
   } else {
-    color = k ? k.warna : '#94A3B8'; letter = esc(((k ? k.nama : '?')[0] || '?').toUpperCase());
+    color = k ? k.warna : '#94A3B8'; letter = '';
     if (t.tipe === 'Pemasukan') { amtCls = 'in'; sign = '+'; }
     if (reimStatus(t) === 'paid') amtCls += ' dim';
   }
@@ -114,7 +114,7 @@ function txRow(t, ctxBuku) {
   if (rs === 'paid') tags += '<span class="tag paid">Sudah terbayar</span>';
   if (t.sumber === 'auto') tags += '<span class="tag">Otomatis</span>';
   if (t._pending) tags += '<span class="tag" style="color:var(--accent)">belum terkirim</span>';
-  return '<button class="tx" data-tx="' + esc(t.id) + '"><span class="ic" style="--c:' + color + '">' + letter + '</span>' +
+  return '<button class="tx" data-tx="' + esc(t.id) + '"><span class="ic' + (t.tipe === 'Transfer' ? ' tf' : '') + '" style="--c:' + color + '" aria-hidden="true">' + letter + '</span>' +
     '<span class="main"><span class="t1 sr">' + esc(title) + '</span><span class="t2">' + meta.join('<span class="faint">/</span>') + tags + '</span></span>' +
     '<span class="amt num ' + amtCls + '">' + sign + fmt(t.nominal) + '</span>' +
     (rs && canWrite(t.buku) ? '<span class="paychk" data-pay="' + esc(t.id) + '" role="checkbox" aria-checked="' + (rs === 'paid') + '" aria-label="Sudah terbayar"></span>' : '') + '</button>';

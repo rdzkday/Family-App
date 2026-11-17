@@ -60,12 +60,12 @@
         versi_berlaku_id: berlaku ? berlaku.id : '', dibuat_oleh: 'riki', dibuat_at: T0, diubah_at: T0, dihapus: '' });
     }
     var pra = { sumber: 'pranikah' };
-    P(1, 'b1', 'kesepakatan', '[Contoh] Harta bawaan', null, { pranikah: 1, kunci: 'harta, aset', versi: [{ sumber: 'pranikah', ayat: [
+    P(1, 'b1', 'kesepakatan', 'Harta bawaan', null, { pranikah: 1, kunci: 'harta, aset', versi: [{ sumber: 'pranikah', ayat: [
       '[Contoh teks akta] Harta yang dibawa masing-masing pihak sebelum perkawinan tetap menjadi milik pihak yang membawanya.',
       '[Contoh teks akta] Hasil dari harta bawaan mengikuti pemilik hartanya.'] }] });
-    P(2, 'b1', 'kesepakatan', '[Contoh] Harta selama perkawinan', null, { pranikah: 2, kunci: 'harta', versi: [{ sumber: 'pranikah', ayat: [
+    P(2, 'b1', 'kesepakatan', 'Harta selama perkawinan', null, { pranikah: 2, kunci: 'harta', versi: [{ sumber: 'pranikah', ayat: [
       '[Contoh teks akta] Penghasilan masing-masing pihak selama perkawinan dikelola sesuai kesepakatan kedua pihak.'] }] });
-    P(3, 'b1', 'kesepakatan', '[Contoh] Utang', null, { pranikah: 3, kunci: 'utang, pinjaman', versi: [{ sumber: 'pranikah', ayat: [
+    P(3, 'b1', 'kesepakatan', 'Utang', null, { pranikah: 3, kunci: 'utang, pinjaman', versi: [{ sumber: 'pranikah', ayat: [
       '[Contoh teks akta] Utang yang dibuat sebelum perkawinan menjadi tanggungan pihak yang membuatnya.',
       '[Contoh teks akta] Utang selama perkawinan untuk keperluan rumah tangga ditanggung bersama.'] }] });
     P(4, '', 'definisi', 'Selingkuh', null, { versi: [{ ayat: ['Selingkuh adalah [definisi yang kalian sepakati].', 'Termasuk di dalamnya: [contoh perilaku].', 'Tidak termasuk: [contoh yang disepakati bukan selingkuh].'] }] });
@@ -309,8 +309,6 @@
     return '<header class="ph"><a class="ph-back" href="../" aria-label="Kembali ke Beranda">' + ICON.back + '</a>' +
       '<div class="ph-text"><h1>Komitmen</h1><p class="ph-sub">' + (d ? jumlahLabel(d) : '&nbsp;') + '</p></div>' +
       (S.status ? '<span class="km-status" role="status">' + esc(S.status) + '</span>' : '') + '</header>' +
-      (demo ? '<div class="km-demo">Data contoh, bukan isi kesepakatan asli.' + (conn ? '' : ' Hubungkan dulu di Family App untuk melihat data kalian.') +
-        (adaSimulasi() ? ' <button type="button" id="demo-reset">Kembalikan data contoh</button>' : '') + '</div>' : '') +
       lembarDaftarHtml(d) +
       '<form class="km-search" role="search" id="cari-form"><label for="cari" class="hidden">Cari pasal</label>' + ICON.search +
       '<input class="input" id="cari" type="search" placeholder="Cari kata atau nomor pasal" autocomplete="off" enterkeyhint="search" value="' + esc(S.q) + '">' +
@@ -321,8 +319,7 @@
       (S.q.trim() ? '' : '<div class="seg" role="group" aria-label="Modul"><button type="button" data-tab="kesepakatan" aria-pressed="' + (S.tab !== 'definisi') + '">Kesepakatan</button>' +
         '<button type="button" data-tab="definisi" aria-pressed="' + (S.tab === 'definisi') + '">Definisi A–Z</button></div>') +
       '<button type="button" class="btn baru" id="pasal-baru"' + (S.data ? '' : ' disabled') + '>+ Pasal baru</button>' +
-      '<div id="items">' + itemsHtml() + '</div>' +
-      '<button type="button" class="btn ghost eval" disabled>Mulai evaluasi <span class="dev-tag">Fase berikutnya</span></button>';
+      '<div id="items">' + itemsHtml() + '</div>';
   }
 
   // ================= halaman pasal =================
@@ -636,6 +633,11 @@
     var n = currentNomor(), sid = currentLembar();
     root.setAttribute('data-view', n || sid ? 'pasal' : 'list');
     var y = window.scrollY;
+    var bar = document.getElementById('km-demo');
+    if (demo && !bar) { bar = document.createElement('div'); bar.id = 'km-demo'; bar.className = 'demo-bar'; root.parentNode.insertBefore(bar, root); }
+    if (bar && !demo) { bar.remove(); bar = null; }
+    if (bar) bar.innerHTML = 'Mode demo, data contoh.' + (conn ? '' : ' <a href="../pengaturan/">Hubungkan akun</a>') +
+      (adaSimulasi() ? ' <button type="button" id="demo-reset">Reset contoh</button>' : '');
     root.innerHTML = '<div class="km-list">' + listHtml() + '</div><div class="km-detail">' +
       (n ? pasalHtml(n) : sid ? lembarHtml(sid) : '<div class="km-empty"><p>Pilih pasal untuk membaca isinya.</p></div>') + '</div>';
     bind();

@@ -134,7 +134,7 @@ var BerandaView = {
     var d = db(), s = rt ? C.summarize(d, m.transaksi, m.budget, rt.id) : null;
     var used = s && s.budgetTotal ? s.pengeluaran / s.budgetTotal : 0;
     var pct = Math.round(used * 100);
-    var rtHtml = rt ? '<div class="br-rt"><div class="br-lbl">Sisa dompet ' + esc(rt.nama) + '</div>' +
+    var rtHtml = rt ? '<div class="br-rt"><div class="br-lbl">Saldo dompet ' + esc(rt.nama) + '</div>' +
       '<div class="br-big num">' + rp(saldoBuku(rt.id)) + '</div>' +
       (s.budgetTotal ? '<div class="br-bar' + (used > 1 ? ' over' : '') + '" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.min(pct, 100) + '" aria-label="Budget rumah tangga terpakai ' + pct + ' persen"><i style="width:' + Math.min(100, pct) + '%"></i></div>' +
         '<div class="br-foot"><span>Terpakai ' + pct + '%</span><span>dari budget ' + rp(s.budgetTotal) + '</span></div>'
@@ -244,7 +244,7 @@ var BerandaView = {
         return '<button type="button" role="radio" aria-checked="' + (cur === m[0]) + '" data-mood="' + m[0] + '" style="--c:' + m[2] + '"><span class="face">' + moodSvg(m) + '</span><span>' + m[1] + '</span></button>';
       }).join('') + '</div>' +
       (cur ? '<a class="br-btn violet" href="' + DAILY_MOOD_URL + '?mood=' + cur + '">Simpan & lanjut tulis di Daily Mood</a>'
-        : '<p class="br-help">Pilih satu, lalu lanjut di Daily Mood. Tersimpan di akunmu (Supabase), pasangan tidak bisa membaca.</p>');
+        : '<p class="br-help">Pilih satu, lalu lanjut di Daily Mood. Hanya kamu yang bisa membaca, pasangan tidak.</p>');
     $$('[data-mood]', box).forEach(function (b) { b.addEventListener('click', function () {
       var m = b.getAttribute('data-mood'); self.mood = self.mood === m ? '' : m; self.renderMood(box);
       var nb = $('[data-mood="' + m + '"]', box); if (nb) nb.focus();

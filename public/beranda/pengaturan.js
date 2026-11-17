@@ -263,7 +263,7 @@ var AturMood = {
   render: function (el) {
     this.el = el;
     var st = this.state(), self = this, remote = this.remote();
-    var privasi = remote ? 'Tersimpan di akunmu (Supabase). Hanya kamu yang bisa membaca, pasangan tidak.' : 'Mode demo: tersimpan di HP ini saja.';
+    var privasi = remote ? 'Tersimpan di akunmu. Hanya kamu yang bisa membaca, pasangan tidak.' : 'Mode demo: tersimpan di HP ini saja.';
     if (!st || !st.profile) {
       el.innerHTML = '<p class="br-help">' + (remote && !this.ditarik ? 'Memuat pengaturan…' : 'Daily Mood belum diatur. Kenalan dulu (2 pertanyaan) di Daily Mood, lalu atur detailnya di sini.') + '</p>' +
         '<a class="br-btn violet" style="width:100%;margin-top:10px" href="' + DAILY_MOOD_URL + '">Mulai Daily Mood</a>';
