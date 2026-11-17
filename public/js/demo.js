@@ -1,4 +1,4 @@
-/* Kantong — Data contoh mode demo.
+/* Family App — Data contoh mode demo.
    Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
 'use strict';
 

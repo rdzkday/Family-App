@@ -1,4 +1,4 @@
-// Kantong service worker: network-first untuk app shell (update selalu masuk saat online),
+// Family App service worker: network-first untuk app shell (update selalu masuk saat online),
 // fallback ke cache saat offline. Request API (POST ke Supabase / script.google.com) tidak disentuh.
 const CACHE = 'kantong-v13-todo';
 const SHELL = ['./', 'index.html', 'kantong.html', 'styles.css', 'core.js', 'js/base.js', 'js/ui.js', 'js/transaksi.js', 'js/todo.js', 'js/shell.js', 'js/laporan.js', 'js/pengaturan.js', 'js/beranda.js', 'js/connect.js', 'js/demo.js', 'js/start.js', 'manifest.webmanifest', 'tokens.css', 'beranda.css', 'komitmen.html', 'komitmen.css', 'komitmen.js',

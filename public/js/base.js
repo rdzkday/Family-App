@@ -1,4 +1,4 @@
-/* Kantong — Dasar: util, tema, state, API, antrean offline & sinkron.
+/* Family App — Dasar: util, tema, state, API, antrean offline & sinkron.
    Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
 'use strict';
 var C = KantongCore;

@@ -289,7 +289,7 @@
     return '<header class="km-head"><a class="back" href="./" aria-label="Kembali ke Beranda">' + ICON.back + '</a>' +
       '<div><h1>Komitmen</h1><p class="sub">' + (d ? jumlahLabel(d) : '&nbsp;') + '</p></div>' +
       (S.status ? '<span class="km-status" role="status">' + esc(S.status) + '</span>' : '') + '</header>' +
-      (demo ? '<div class="km-demo">Data contoh, bukan isi kesepakatan asli.' + (conn ? '' : ' Hubungkan dulu di Kantong untuk melihat data kalian.') + '</div>' : '') +
+      (demo ? '<div class="km-demo">Data contoh, bukan isi kesepakatan asli.' + (conn ? '' : ' Hubungkan dulu di Family App untuk melihat data kalian.') + '</div>' : '') +
       (d && d.menunggu_ttd ? '<div class="km-banner" role="status">' + ICON.pen + '<span>' + d.menunggu_ttd + ' lembar menunggu tanda tanganmu</span></div>' : '') +
       '<form class="km-search" role="search" id="cari-form"><label for="cari" class="hidden">Cari pasal</label>' + ICON.search +
       '<input class="input" id="cari" type="search" placeholder="Cari kata atau nomor pasal" autocomplete="off" enterkeyhint="search" value="' + esc(S.q) + '">' +

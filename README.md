@@ -1,4 +1,4 @@
-# Kantong
+# Family App
 
 Aplikasi keuangan + to-do rumah tangga untuk berdua (Riki & Febie). PWA tanpa build step, backend Supabase.
 

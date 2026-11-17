@@ -1,4 +1,4 @@
-/* Kantong — Komponen UI: sheet, tab, toast, baris transaksi.
+/* Family App — Komponen UI: sheet, tab, toast, baris transaksi.
    Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
 'use strict';
 

@@ -1,4 +1,4 @@
-/* Kantong — To-do & catatan rumah tangga.
+/* Family App — To-do & catatan rumah tangga.
    Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
 'use strict';
 

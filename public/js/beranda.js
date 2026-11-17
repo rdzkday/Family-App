@@ -1,4 +1,4 @@
-/* Kantong — Beranda (index.html).
+/* Family App — Beranda (index.html).
    Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
 'use strict';
 
@@ -141,7 +141,7 @@ var SetelanView = {
         link(RUANG_CATAT_URL + '#setting', 'Setting Ruang Catat', 'Profil, kondisi, prompt custom, cadangan data')) +
       '</div>' +
       '<section class="section"><div class="menu">' + item('data-set="out"', '<span style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Putuskan koneksi di HP ini') + '</span>') + '</div>' +
-      '<p class="faint" style="font-size:12px;text-align:center;margin-top:20px">Kantong v' + ((S.boot && S.boot.version) || C.VERSION) + '</p></section>';
+      '<p class="faint" style="font-size:12px;text-align:center;margin-top:20px">Family App v' + ((S.boot && S.boot.version) || C.VERSION) + '</p></section>';
     $$('[data-stp]', el).forEach(function (b) { b.addEventListener('click', function () {
       var id = b.getAttribute('data-stp'), on = !self.buka[id]; self.buka[id] = on;
       b.setAttribute('aria-expanded', String(on)); b.parentNode.classList.toggle('open', on); $('#st-' + id, el).hidden = !on;

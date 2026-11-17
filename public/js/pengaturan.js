@@ -20,7 +20,7 @@ var SettingsView = {
       '</div></section>' +
       '<section class="section"><div class="menu"><button data-s="beranda"><span class="main">Semua setelan<div class="t2">Tema, to-do, Komitmen, Ruang Catat di Beranda › Setelan</div></span>' + ICON.right + '</button></div></section>' +
       '<section class="section"><div class="menu"><button data-s="out"><span class="main" style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Putuskan koneksi di HP ini') + '</span></button></div>' +
-      '<p class="faint" style="font-size:12px;text-align:center;margin-top:20px">Kantong v' + (S.boot.version || C.VERSION) + '</p></section>';
+      '<p class="faint" style="font-size:12px;text-align:center;margin-top:20px">Family App v' + (S.boot.version || C.VERSION) + '</p></section>';
     $$('[data-theme-set]', el).forEach(function (b) { b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme-set')); SettingsView.render(el); }); });
     $$('[data-s]', el).forEach(function (b) { b.addEventListener('click', function () {
       var a = b.getAttribute('data-s');
