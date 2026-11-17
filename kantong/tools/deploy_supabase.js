@@ -12,13 +12,13 @@ const path = require('path');
 const ref = process.argv[2];
 const hanyaCek = process.argv.includes('--cek');
 if (!ref) { console.error('pakai: node kantong/tools/deploy_supabase.js <project_ref> [--cek]'); process.exit(1); }
-const token = process.env.SUPABASE_ACCESS_TOKEN || 'proxy-injected';
+const token = process.env.SUPABASE_ACCESS_TOKEN || ''; // kosong = kredensial disuntik proxy
 const API = 'https://api.supabase.com/v1/projects/' + ref + '/functions';
 const DIR = path.join(__dirname, '..', '..', 'supabase', 'functions', 'kantong');
 const FILES = ['index.ts', 'api.mjs', 'store.mjs', 'calendar.mjs', 'core.mjs'];
 
 async function req(url, opt) {
-  const res = await fetch(url, { ...opt, headers: { Authorization: 'Bearer ' + token, ...(opt && opt.headers) } });
+  const res = await fetch(url, { ...opt, headers: { ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(opt && opt.headers) } });
   const text = await res.text();
   let json = null; try { json = JSON.parse(text); } catch (e) { /* bukan json */ }
   return { status: res.status, ok: res.ok, json, text };
