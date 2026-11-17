@@ -81,7 +81,7 @@ export async function handleRequest(rawBody, deps) {
       const pesan = { terkunci: 'Terlalu banyak percobaan. Coba lagi 15 menit lagi.', nonaktif: 'Akun dinonaktifkan. Hubungi admin.' };
       return { ok: false, code: 'LOGIN', error: (r && pesan[r.alasan]) || 'Username atau password salah' };
     }
-    return { ok: true, data: { token: r.token, user_id: r.user_id, admin: !!r.admin } };
+    return { ok: true, data: { token: r.token, user_id: r.user_id, admin: !!r.admin, wajib_ganti: !!r.wajib_ganti } };
   }
 
   const token = typeof body.token === 'string' ? body.token : '';
@@ -90,6 +90,18 @@ export async function handleRequest(rawBody, deps) {
 
   if (body.action === 'logout') {
     try { await rpc(cfg, 'kantong_logout', { p_hash: hash }); } catch (e) { /* abaikan */ }
+    return { ok: true, data: {} };
+  }
+
+  // User ganti password sendiri (juga dipakai saat password sementara dari admin wajib diganti).
+  if (body.action === 'password.ganti') {
+    const p = body.payload || {};
+    const lama = typeof p.lama === 'string' ? p.lama.slice(0, 200) : '';
+    const baru = typeof p.baru === 'string' ? p.baru.slice(0, 200) : '';
+    let r;
+    try { r = await rpc(cfg, 'kantong_ganti_password', { p_hash: hash, p_lama: lama, p_baru: baru }); }
+    catch (e) { return { ok: false, error: 'Kesalahan server: ' + e.message }; }
+    if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'Gagal', code: r && r.code };
     return { ok: true, data: {} };
   }
 
@@ -106,11 +118,12 @@ export async function handleRequest(rawBody, deps) {
 
   let store, sesiUser;
   try {
-    [store, sesiUser] = await Promise.all([createStore(cfg), rpc(cfg, 'kantong_cek_sesi', { p_hash: hash })]);
+    [store, sesiUser] = await Promise.all([createStore(cfg), rpc(cfg, 'kantong_sesi', { p_hash: hash })]);
   } catch (e) { return { ok: false, error: 'Kesalahan server: ' + e.message }; }
 
   const ak = store.akses.find((a) => a.token_hash === hash);   // kode koneksi lama (transisi)
-  const uid = sesiUser || (ak && ak.user_id);
+  if (sesiUser && sesiUser.wajib_ganti) return { ok: false, error: 'Buat password baru dulu', code: 'GANTI_PW' };
+  const uid = (sesiUser && sesiUser.user_id) || (ak && ak.user_id);
   const u = uid && store.all('Users').find((x) => x.id === uid);
   if (!u) return { ok: false, error: 'Sesi berakhir, silakan masuk lagi', code: 'AUTH' };
   const user = { id: u.id, nama: u.nama, buku: u.buku };

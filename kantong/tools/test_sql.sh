@@ -135,6 +135,24 @@ q "select kantong_admin('$AH','simpan','{\"user_id\":\"tamu\",\"username\":\"tam
 [ "$(q "select kantong_login('tamu','$PW2')->>'alasan'")" = "nonaktif" ] || { echo "akun nonaktif harus ditolak"; exit 1; }
 [ "$(q "select kantong_admin('$AH','hapus','{\"user_id\":\"riki\"}')->>'ok'")" = "false" ] || { echo "admin tidak boleh hapus diri sendiri"; exit 1; }
 [ "$(q "select kantong_admin('$AH','hapus','{\"user_id\":\"tamu\"}')->>'ok'")" = "true" ] || { echo "hapus gagal"; exit 1; }
+# Password sementara dari admin wajib diganti user sendiri
+PW3="$(q "select kantong_admin('$AH','simpan','{\"user_id\":\"tamu2\",\"username\":\"tamu2\"}')->>'password'")"
+L3="$(q "select kantong_login('tamu2','$PW3')")"
+[ "$(echo "$L3" | node -pe 'JSON.parse(require("fs").readFileSync(0)).wajib_ganti')" = "true" ] || { echo "akun baru harus wajib_ganti"; exit 1; }
+H3="$(q "select encode(extensions.digest('$(echo "$L3" | node -pe 'JSON.parse(require("fs").readFileSync(0)).token')','sha256'),'hex')")"
+[ "$(q "select kantong_sesi('$H3')->>'wajib_ganti'")" = "true" ] || { echo "sesi harus tandai wajib_ganti"; exit 1; }
+[ "$(q "select kantong_ganti_password('$H3','salah','barubaru1')->>'ok'")" = "false" ] || { echo "password lama salah harus ditolak"; exit 1; }
+[ "$(q "select kantong_ganti_password('$H3','$PW3','pendek')->>'ok'")" = "false" ] || { echo "password pendek harus ditolak"; exit 1; }
+[ "$(q "select kantong_ganti_password('$H3','$PW3','barubaru1')->>'ok'")" = "true" ] || { echo "ganti password gagal"; exit 1; }
+[ "$(q "select kantong_sesi('$H3')->>'wajib_ganti'")" = "false" ] || { echo "setelah ganti, wajib_ganti harus false"; exit 1; }
+[ "$(q "select kantong_login('tamu2','barubaru1')->>'ok'")" = "true" ] || { echo "password baru harus bisa login"; exit 1; }
+q "select kantong_admin('$AH','reset','{\"user_id\":\"tamu2\"}')" >/dev/null
+[ "$(q "select wajib_ganti from login where user_id='tamu2'")" = "t" ] || { echo "reset admin harus wajib_ganti"; exit 1; }
+q "select kantong_admin('$AH','simpan','{\"user_id\":\"tamu2\",\"username\":\"tamu2\",\"nama\":\"T\"}')" >/dev/null
+q "update login set wajib_ganti = true where user_id='riki'" >/dev/null
+[ "$(q "select kantong_admin('$AH','list','{}')->>'code'")" = "GANTI_PW" ] || { echo "admin berpassword sementara harus ganti dulu"; exit 1; }
+q "update login set wajib_ganti = false where user_id='riki'" >/dev/null
+echo "✓ ganti password: wajib ganti setelah generate admin, cek password lama, sesi lain dicabut"
 echo "✓ admin: list, buat+generate password, reset, nonaktif, hapus, non-admin ditolak"
 echo "✓ login: bcrypt, sesi, logout, kunci 5x salah, anon ditolak"
 

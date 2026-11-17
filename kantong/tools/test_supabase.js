@@ -50,9 +50,15 @@ function mockDb() {
       if (ok) tabel.sesi.push({ token_hash: sha('s'.repeat(64)), user_id: 'istri' });
       return { ok: true, status: 200, text: async () => JSON.stringify(r) };
     }
-    if (m[1] === 'kantong_cek_sesi') {
+    if (m[1] === 'kantong_sesi') {
       const s = tabel.sesi.find((x) => x.token_hash === JSON.parse(opt.body).p_hash);
-      return { ok: true, status: 200, text: async () => JSON.stringify(s ? s.user_id : null) };
+      return { ok: true, status: 200, text: async () => JSON.stringify(s ? { user_id: s.user_id, wajib_ganti: !!s.wajib_ganti } : null) };
+    }
+    if (m[1] === 'kantong_ganti_password') {
+      const a = JSON.parse(opt.body); const s = tabel.sesi.find((x) => x.token_hash === a.p_hash);
+      if (!s || a.p_lama !== 'rahasia123') return { ok: true, status: 200, text: async () => JSON.stringify({ ok: false, error: 'Password lama salah' }) };
+      s.wajib_ganti = false;
+      return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true }) };
     }
     if (m[1] === 'kantong_logout') {
       const h = JSON.parse(opt.body).p_hash; tabel.sesi = tabel.sesi.filter((x) => x.token_hash !== h);
@@ -143,6 +149,11 @@ function mockGoogle() {
     assert.strictEqual(salah.code, 'LOGIN');
     const d = ok(await call('', 'login', { username: 'febie', password: 'rahasia123' }));
     assert.strictEqual(d.user_id, 'istri');
+    assert.strictEqual(ok(await call(d.token, 'bootstrap')).user.id, 'istri');
+    db.tabel.sesi.find((x) => x.user_id === 'istri').wajib_ganti = true;
+    assert.strictEqual((await call(d.token, 'bootstrap')).code, 'GANTI_PW');
+    assert.strictEqual((await call(d.token, 'password.ganti', { lama: 'x', baru: 'barubaru1' })).ok, false);
+    ok(await call(d.token, 'password.ganti', { lama: 'rahasia123', baru: 'barubaru1' }));
     assert.strictEqual(ok(await call(d.token, 'bootstrap')).user.id, 'istri');
     ok(await call(d.token, 'logout'));
     assert.strictEqual((await call(d.token, 'bootstrap')).code, 'AUTH');

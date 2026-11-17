@@ -41,6 +41,7 @@ Data keuangan pribadi tidak disertakan di repo ini.
 1. **Jalankan migrasi** — Supabase › SQL Editor › tempel & Run isi file berurutan:
    - `supabase/migrations/20261119000000_login.sql`
    - `supabase/migrations/20261119100000_admin.sql`
+   - `supabase/migrations/20261120000000_ganti_password.sql`
 2. **Deploy Edge Function** `kantong` (terminal, di folder repo):
    ```bash
    supabase functions deploy kantong --no-verify-jwt --project-ref serskylzlevhjidqrvjm
@@ -57,7 +58,8 @@ Data keuangan pribadi tidak disertakan di repo ini.
 
 ### Admin panel (`/admin/`)
 - Tambah akun (user baru otomatis dapat buku pribadi), ubah nama/username, aktif/nonaktif, jadikan admin.
-- **Reset password** (user lupa) → password acak 12 karakter, tampil sekali, semua HP user itu keluar.
+- **Reset password** (user lupa) → password **sementara** acak 12 karakter, tampil sekali, semua HP user itu keluar. Saat login, user **wajib membuat password baru sendiri** — admin tidak pernah tahu password user.
+- User bisa ganti password kapan saja: **Beranda › Pengaturan › Umum › Ubah password** (perangkat lain otomatis keluar).
 - Keluarkan semua HP, hapus login (data keuangan tetap aman).
 - Pengaman: admin tidak bisa menonaktifkan/menghapus akunnya sendiri; non-admin ditolak server.
 

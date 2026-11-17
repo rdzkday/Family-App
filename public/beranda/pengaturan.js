@@ -76,12 +76,14 @@ var AturUmum = {
         [['dark', 'Gelap'], ['light', 'Terang']].map(function (x) { return '<button type="button" data-theme-set="' + x[0] + '" aria-pressed="' + (themePref() === x[0]) + '">' + x[1] + '</button>'; }).join('') +
       '</div><p class="br-help" style="margin:-6px 0 12px">Berlaku di Beranda, Kantong, Agenda, Komitmen, dan Daily Mood.</p>' +
       aturBaris('Sinkron sekarang', esc(S.lastSync ? 'Terakhir ' + agoLabel(S.lastSync) : 'Belum sinkron di sesi ini') + (S.outbox.length ? ', ' + S.outbox.length + ' belum terkirim' : ''), '', ' data-au="sync"') +
+      (demo ? '' : aturBaris('Ubah password', 'Perangkat lain otomatis keluar', '', ' data-au="pw"')) +
       aturBaris('<span style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Keluar dari akun') + '</span>', '', '', ' data-au="out"') +
       '<p class="faint" style="font-size:12px;text-align:center;margin:12px 0 0">Family App v' + esc((S.boot && S.boot.version) || C.VERSION) + '</p>';
     $$('[data-theme-set]', el).forEach(function (b) { b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme-set')); AturUmum.render(el); }); });
     $$('[data-au]', el).forEach(function (b) { b.addEventListener('click', function () {
       var a = b.getAttribute('data-au');
       if (a === 'sync') { sync(); toast('Menyinkronkan…'); }
+      if (a === 'pw') bukaUbahPassword();
       if (a === 'out' && confirm(demo ? 'Keluar dari mode demo? Data demo dihapus.' : 'Keluar dari akun? Perubahan yang belum terkirim akan hilang dari HP ini.')) disconnect();
     }); });
   }
