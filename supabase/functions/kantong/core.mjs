@@ -679,7 +679,7 @@ var KantongCore = (function () {
       var nomor = (db.KomitmenPasal || []).reduce(function (m, x) { return Math.max(m, num(x.nomor)); }, 0) + 1;   // nomor tidak dipakai ulang
       var rnd = Math.random().toString(36).slice(2, 8);
       var pid2 = 'p-' + rnd, sid = 'sah-' + rnd;
-      store.upsert('Pengesahan', { id: sid, judul: 'Usulan Pasal ' + nomor, jenis: 'luar_evaluasi', evaluasi_id: '', isi_hash: '', status: 'menunggu', dibuat_at: nowU });
+      store.upsert('Pengesahan', { id: sid, judul: 'Usulan Pasal ' + nomor, jenis: 'tunggal', evaluasi_id: '', isi_hash: '', status: 'menunggu', dibuat_at: nowU });
       store.upsert('KomitmenVersi', { id: pid2 + '-v1', pasal_id: pid2, versi: 1, isi_ayat: JSON.stringify(ayat), alasan: String(payload.alasan || '').trim(),
         jenis: 'baru', sumber: 'luar_evaluasi', evaluasi_id: '', pengesahan_id: sid, status: 'usulan', berlaku_sejak: '', dibuat_oleh: user.id, dibuat_at: nowU });
       store.upsert('KomitmenPasal', { id: pid2, nomor: nomor, bab_id: babId, tipe: tipe, judul: judul, kata_kunci: listDari(payload.kata_kunci).join(', '),

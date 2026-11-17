@@ -120,18 +120,27 @@
   var DEMO_KEY = 'k_km_demo';
   function demoStore() { return C.memoryStore(LS.get(DEMO_KEY, null) || demoSeed()); }
   function demoData() { return C.handle(demoStore(), ME, 'komitmen.list', {}, new Date().toISOString()); }
-  function aksi(action, payload) { // hanya mode contoh untuk sekarang; mode terhubung menyusul di Fase 4b
-    var st = demoStore(), res = C.handle(st, ME, action, payload, new Date().toISOString());
-    LS.set(DEMO_KEY, st.data); S.data = demoData();
-    return res;
+  function aksi(action, payload) { // Promise. Mode contoh: di HP; mode terhubung: kirim ke server lalu muat ulang daftar
+    if (demo) {
+      try {
+        var st = demoStore(), res = C.handle(st, ME, action, payload, new Date().toISOString());
+        LS.set(DEMO_KEY, st.data); S.data = demoData();
+        return Promise.resolve(res);
+      } catch (e) { return Promise.reject(e); }
+    }
+    return post(action, payload).then(function (res) {
+      return fetchList().then(function (d) { S.data = d; cache = { data: d, at: Date.now() }; LS.set('k_komitmen', cache); S.status = ''; return res; },
+        function () { return res; });
+    }, function (e) { if (e.offline) e.message = 'Tidak ada koneksi. Usulan belum terkirim.'; throw e; });
   }
   function resetDemo() { try { localStorage.removeItem(DEMO_KEY); } catch (e) { /* abaikan */ } S.data = demoData(); location.hash = ''; render(); toast('Data contoh dikembalikan'); }
   function adaSimulasi() { return !!LS.get(DEMO_KEY, null); }
-  function fetchList() {
+  function fetchList() { return post('komitmen.list', {}); }
+  function post(action, payload) {
     var ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, 30000);
     return fetch(conn.api, {
       method: 'POST', redirect: 'follow', signal: ctrl.signal, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: conn.token, action: 'komitmen.list', payload: {} })
+      body: JSON.stringify({ token: conn.token, action: action, payload: payload || {} })
     }).then(function (r) { clearTimeout(timer); if (!r.ok) throw new Error('Server membalas ' + r.status); return r.json(); },
       function () { clearTimeout(timer); var e = new Error('Tidak ada koneksi'); e.offline = true; throw e; })
       .then(function (j) { if (!j.ok) throw new Error(j.error || 'Gagal'); return j.data; });
@@ -269,7 +278,7 @@
     }
     var html = note ? '<div class="km-note" role="status">' + note + '</div>' : '';
     if (!hits.length) {
-      if (!note) html += '<div class="km-empty" role="status"><p>Tidak ada pasal tentang “' + esc(S.q) + '”.</p><p>' + (demo ? '<button type="button" class="link" id="usul-dari-cari">Jadikan usulan pasal baru</button>' : 'Mau jadikan usulan baru? <span class="dev-tag">Fase berikutnya</span>') + '</p></div>';
+      if (!note) html += '<div class="km-empty" role="status"><p>Tidak ada pasal tentang “' + esc(S.q) + '”.</p><p>' + '<button type="button" class="link" id="usul-dari-cari">Jadikan usulan pasal baru</button>' + '</p></div>';
       return html;
     }
     return html + '<p class="bab-h" role="status">' + hits.length + ' pasal ditemukan</p><div class="rows">' + hits.map(function (h) { return rowHtml(h.pasal, h); }).join('') + '</div>';
@@ -307,7 +316,7 @@
       }).join('') + '</div>' +
       (S.q.trim() ? '' : '<div class="seg" role="group" aria-label="Modul"><button type="button" data-tab="kesepakatan" aria-pressed="' + (S.tab !== 'definisi') + '">Kesepakatan</button>' +
         '<button type="button" data-tab="definisi" aria-pressed="' + (S.tab === 'definisi') + '">Definisi A–Z</button></div>') +
-      '<button type="button" class="btn baru" id="pasal-baru"' + (demo ? '' : ' disabled') + '>+ Pasal baru' + (demo ? '' : ' <span class="dev-tag">Fase berikutnya</span>') + '</button>' +
+      '<button type="button" class="btn baru" id="pasal-baru"' + (S.data ? '' : ' disabled') + '>+ Pasal baru</button>' +
       '<div id="items">' + itemsHtml() + '</div>' +
       '<button type="button" class="btn ghost eval" disabled>Mulai evaluasi <span class="dev-tag">Fase berikutnya</span></button>';
   }
@@ -331,7 +340,7 @@
       '<figure>' + ttdSvg(sah.ttd_riki) + '<figcaption>' + esc(namaSlot('riki')) + '</figcaption></figure>' +
       '<figure>' + ttdSvg(sah.ttd_febie) + '<figcaption>' + esc(namaSlot('febie')) + '</figcaption></figure></div>' : '';
     var acts = p.terkunci ? ['+ Keterangan', 'Riwayat'] : p.status === 'usulan' ? ['Riwayat'] : ['Ubah', 'Cabut', '+ Keterangan', 'Riwayat'];
-    var tarik = demo && p.status === 'usulan' && p.sumber_asal === 'app' ? '<button type="button" class="btn small ghost" id="tarik" data-id="' + esc(p.id) + '">Tarik usulan</button>' : '';
+    var tarik = p.status === 'usulan' && p.sumber_asal === 'app' ? '<button type="button" class="btn small ghost" id="tarik" data-id="' + esc(p.id) + '">Tarik usulan</button>' : '';
     return '<article class="pasal' + (p.status === 'dicabut' ? ' dicabut' : '') + '" aria-labelledby="pasal-judul">' +
       '<div class="pasal-top"><a class="back" href="#" aria-label="Kembali ke daftar">' + ICON.back + '</a><span class="no">Pasal ' + p.nomor +
       (p.tipe === 'definisi' ? ' · Definisi' : babOf(p.bab_id) ? ' · Bab ' + esc(babOf(p.bab_id).nomor) : '') + '</span></div>' +
@@ -415,17 +424,17 @@
     drawTipe();
     $('#fb', sh).addEventListener('submit', function (e) {
       e.preventDefault(); syncAyat();
-      var errEl = $('#fb-err', sh);
-      try {
-        var r = aksi('komitmen.usul_baru', {
+      var errEl = $('#fb-err', sh), btn = $('#fb button[type=submit]', sh);
+      errEl.textContent = ''; btn.disabled = true; btn.textContent = 'Menyimpan…';
+      aksi('komitmen.usul_baru', {
           tipe: F.tipe, judul: $('#fb-judul', sh).value, ayat: F.ayat,
           bab_id: sel.value === '__baru' ? '' : sel.value, bab_baru: sel.value === '__baru' ? babBaru.value : '',
           kata_kunci: $('#fb-kunci', sh).value, alasan: $('#fb-alasan', sh).value
-        });
-        tutup(); S.q = ''; S.fokus = null; prevFocus = null;
-        toast('Usulan Pasal ' + r.nomor + ' tersimpan');
-        if (location.hash === '#p/' + r.nomor) render(); else location.hash = '#p/' + r.nomor;
-      } catch (ex) { errEl.textContent = ex.message; }
+        }).then(function (r) {
+          tutup(); S.q = ''; S.fokus = null; prevFocus = null;
+          toast('Usulan Pasal ' + r.nomor + ' tersimpan');
+          if (location.hash === '#p/' + r.nomor) render(); else location.hash = '#p/' + r.nomor;
+        }, function (ex) { errEl.textContent = ex.message; btn.disabled = false; btn.textContent = 'Simpan sebagai usulan'; });
     });
     setTimeout(function () { $('#fb-judul', sh).focus(); }, 300);
   }
@@ -477,7 +486,9 @@
     var dr = $('#demo-reset'); if (dr) dr.addEventListener('click', function () { if (confirm('Hapus semua simulasi dan kembali ke data contoh awal?')) resetDemo(); });
     var tk = $('#tarik'); if (tk) tk.addEventListener('click', function () {
       if (!confirm('Tarik usulan ini? Usulan hilang dari daftar dan lembar pengesahannya dibatalkan.')) return;
-      try { aksi('komitmen.tarik_usulan', { pasal_id: tk.getAttribute('data-id') }); toast('Usulan ditarik'); location.hash = ''; } catch (e) { toast(e.message); }
+      tk.disabled = true;
+      aksi('komitmen.tarik_usulan', { pasal_id: tk.getAttribute('data-id') }).then(function () { toast('Usulan ditarik'); if (location.hash) location.hash = ''; else render(); },
+        function (e) { tk.disabled = false; toast(e.message); });
     });
     bindRows();
   }
