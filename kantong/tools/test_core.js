@@ -3,7 +3,7 @@
  * Semua data di sini sintetis, aman dipakai di repo publik.
  */
 var path = require('path');
-var C = require(path.join(__dirname, '..', '..', 'public', 'core.js'));
+var C = require(path.join(__dirname, '..', '..', 'public', 'shared', 'core.js'));
 
 var lulus = 0, gagal = 0;
 function ok(nama, syarat, info) {

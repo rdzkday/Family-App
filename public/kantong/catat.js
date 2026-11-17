@@ -1,54 +1,11 @@
-/* Kantong — Shell halaman Kantong + tab Catat.
-   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
+/* Kantong — Tab Catat (halaman awal Kantong).
+   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
-
-// ================= views =================
-var view = null;
-function renderShell() {
-  var app = $('#app');
-  if (!S.conn) { renderConnect(); return; }
-  if (PAGE === 'beranda') { renderBerandaShell(app); return; }
-  app.innerHTML = (S.conn.mode === 'demo' ? '<div class="demo-bar">Ini versi demo dengan data contoh. <button data-act="leave-demo">Keluar dari demo</button></div>' : '') +
-    '<main id="view" class="view"></main>' +
-    '<footer class="tabbar"><nav>' + [['home', 'Catat', ICON.home], ['ringkasan', 'Ringkasan', ICON.chart], ['riwayat', 'Riwayat', ICON.list], ['pengaturan', 'Pengaturan', ICON.gear]].map(function (x) {
-      return '<button data-tab="' + x[0] + '" aria-current="' + (S.tab === x[0] ? 'page' : 'false') + '">' + x[2] + x[1] + '</button>';
-    }).join('') + '</nav></footer>';
-  $$('[data-tab]', app).forEach(function (b) { b.addEventListener('click', function () { goTab(b.getAttribute('data-tab')); }); });
-  renderView();
-}
-function goTab(id) {
-  S.tab = id; S.sub = null;
-  $$('[data-tab]').forEach(function (x) { x.setAttribute('aria-current', x.getAttribute('data-tab') === id ? 'page' : 'false'); });
-  renderView(); window.scrollTo(0, 0);
-}
-function renderView() {
-  if (PAGE === 'beranda' && !S.boot) { $('#view').innerHTML = '<div class="br-wrap"><div class="br-card br-skel"></div><div class="br-card br-skel"></div></div>'; return; }
-  if (!S.boot) { $('#view').innerHTML = '<div class="topbar"><div><h1>Memuat data…</h1></div>' + syncPill() + '</div>' + skeleton(5); return; }
-  if (!S.bukuView) S.bukuView = me().buku;
-  var v = { home: HomeView, todo: TodoView, ringkasan: RingkasanView, riwayat: RiwayatView, pengaturan: SettingsView,
-    beranda: BerandaView, agenda: AgendaView, setelan: SetelanView }[S.tab] || (PAGE === 'beranda' ? BerandaView : HomeView);
-  if (PAGE === 'beranda') $('#view').classList.toggle('br-narrow', S.tab !== 'beranda');
-  view = v; v.render($('#view'));
-}
-function refresh() {
-  if (!S.conn || !$('#view')) { if (!S.conn) renderConnect(); return; }
-  if (!view || !S.boot) { renderView(); return; }
-  if (view.update) view.update($('#view')); else view.render($('#view'));
-}
-document.addEventListener('click', function (e) {
-  var t = e.target.closest('[data-act]'); if (!t) return;
-  var a = t.getAttribute('data-act');
-  if (a === 'sync') sync();
-  if (a === 'theme') { setTheme(isDark() ? 'light' : 'dark'); t.outerHTML = themeBtn(); }
-  if (a === 'leave-demo') { if (confirm('Keluar dari mode demo?')) disconnect(); }
-  if (a === 'goto-todo') location.href = './#todo';
-  if (a === 'beranda') location.href = './';
-});
 
 // ---------- Catat (home) ----------
 var HomeView = {
   render: function (el) {
-    el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Halo, ' + esc(me().nama) + '!</h1></div><div class="top-actions">' + berandaBtn() + syncPill() + '</div></div>' +
+    el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Halo, ' + esc(me().nama) + '!</h1></div><div class="top-actions">' + berandaBtn() + '</div></div>' +
       '<div id="home-budget"></div>' +
       '<section class="section"><div class="entry" id="entry"></div></section>' +
       '<div id="home-utang"></div><div id="home-reim"></div>' +

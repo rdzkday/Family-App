@@ -1,5 +1,5 @@
 /* Kantong — Komponen UI: sheet, tab, toast, baris transaksi.
-   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
+   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 
 // ================= UI primitives =================
@@ -137,4 +137,13 @@ function bindTxRows(root) {
       openTxSheet(t);
     });
   });
+}
+
+// tombol saklar (dipakai form Kantong, Agenda)
+function toggleHtml(id, label, sub, on) {
+  return '<button type="button" class="field toggle" role="switch" id="' + id + '" aria-checked="' + !!on + '"><span><span style="display:block;font-weight:500">' + label + '</span>' + (sub ? '<span class="faint" style="font-size:12px">' + sub + '</span>' : '') + '</span><span class="sw"></span></button>';
+}
+function bindToggle(el, id, obj, key) {
+  var t = $('#' + id, el); if (!t) return;
+  t.addEventListener('click', function () { obj[key] = !obj[key]; t.setAttribute('aria-checked', String(obj[key])); });
 }

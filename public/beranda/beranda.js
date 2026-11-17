@@ -1,11 +1,11 @@
-/* Kantong — Beranda (index.html).
-   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
+/* Beranda (index.html) + shell navigasi yang juga dipakai halaman Agenda.
+   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 
 // ================= Beranda (index.html) =================
-// Satu pintu: ringkasan Kantong, pengingat evaluasi, to-do & catatan, mood → Ruang Catat.
+// Satu pintu: ringkasan Kantong, pengingat evaluasi, to-do & catatan, mood → Daily Mood, Pengaturan semua fitur.
 // Memakai state, antrean offline, dan sheet yang sama dengan Kantong.
-var RUANG_CATAT_URL = 'ruang-catat/';
+var DAILY_MOOD_URL = ROOT + 'daily-mood/';
 var MOODS = [['berat', 'Berat', '#F87171', 'M8 16.5c1.2-1.6 2.5-2.3 4-2.3s2.8.7 4 2.3'], ['lelah', 'Lelah', '#FB923C', 'M8.5 15.5c1-.7 2.2-1 3.5-1s2.5.3 3.5 1'],
   ['biasa', 'Biasa', '#FCD34D', 'M8.5 15h7'], ['baik', 'Baik', '#86EFAC', 'M8.5 14.5c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2'], ['senang', 'Senang', '#7DD3A8', 'M8 13.5c1 2 2.4 3 4 3s3-1 4-3']];
 function moodSvg(m) {
@@ -42,85 +42,41 @@ function brSyncLine() {
 }
 function renderBerandaShell(app) {
   document.body.classList.add('br-page');
-  var nav = [['beranda', 'Beranda', ICON.house], ['kantong', 'Kantong', ICON.wallet], ['todo', 'To-do', ICON.check], ['agenda', 'Agenda', ICON.cal], ['komitmen', 'Komitmen', ICON.heart]];
+  var nav = [['beranda', 'Beranda', ICON.house], ['kantong', 'Kantong', ICON.wallet], ['agenda', 'Agenda', ICON.check], ['komitmen', 'Komitmen', ICON.heart], ['mood', 'Mood', ICON.book]];
+  var aktif = PAGE === 'agenda' ? 'agenda' : 'beranda';
   app.innerHTML = (S.conn.mode === 'demo' ? '<div class="br-demo">Mode demo, data contoh. <button data-act="leave-demo">Keluar</button></div>' : '') +
     '<main id="view" class="br-view"></main>' +
     '<nav class="br-nav" aria-label="Menu utama">' + nav.map(function (x) {
-      return '<button type="button" data-brnav="' + x[0] + '" aria-current="' + (S.tab === x[0] ? 'page' : 'false') + '">' +
+      return '<button type="button" data-brnav="' + x[0] + '" aria-current="' + (aktif === x[0] ? 'page' : 'false') + '">' +
         '<span class="ic">' + x[2] + '</span><span>' + x[1] + '</span></button>';
     }).join('') + '</nav>';
   $$('[data-brnav]', app).forEach(function (b) { b.addEventListener('click', function () { brNav(b.getAttribute('data-brnav')); }); });
   renderView();
 }
+var FITUR_URL = { beranda: ROOT || './', kantong: ROOT + 'kantong/', agenda: ROOT + 'agenda/', komitmen: ROOT + 'komitmen/', mood: DAILY_MOOD_URL };
 function brNav(id) {
-  if (id === 'kantong') { location.href = 'kantong.html'; return; }
-  if (id === 'komitmen') { location.href = 'komitmen.html'; return; }
-  brGo(id);
+  if (PAGE === 'agenda' && id === 'agenda') { brGo('todo'); return; }
+  if (PAGE === 'beranda' && id === 'beranda') { window.scrollTo(0, 0); return; }
+  location.href = FITUR_URL[id];
 }
+// pindah tab di halaman Agenda (#todo, #catatan, #jadwal)
 function brGo(id) {
-  if (BERANDA_RUTE.indexOf(id) < 0) id = 'beranda';
+  if (PAGE !== 'agenda') return;
+  if (AGENDA_RUTE.indexOf(id) < 0) id = 'todo';
   S.tab = id; S.sub = null;
-  if (location.hash.slice(1) !== (id === 'beranda' ? '' : id)) history.replaceState(history.state, '', id === 'beranda' ? location.pathname : '#' + id);
-  $$('[data-brnav]').forEach(function (x) { if (x.hasAttribute('aria-current')) x.setAttribute('aria-current', x.getAttribute('data-brnav') === id ? 'page' : 'false'); });
+  var h = id === 'todo' ? '' : id;
+  if (location.hash.slice(1) !== h) history.replaceState(history.state, '', h ? '#' + h : location.pathname);
   renderView(); window.scrollTo(0, 0);
 }
 document.addEventListener('click', function (e) {
-  if (PAGE !== 'beranda') return;
+  if (PAGE !== 'agenda') return;
   var a = e.target.closest('[data-brgo]'); if (!a) return;
   e.preventDefault(); brGo(a.getAttribute('data-brgo'));
 });
-window.addEventListener('hashchange', function () { if (PAGE === 'beranda' && berandaRute() !== S.tab) brGo(berandaRute()); });
-
-// ---------- Agenda: to-do & evaluasi yang punya waktu, dikelompokkan per hari ----------
-var AgendaView = {
-  render: function (el) {
-    var today = todayISO();
-    var list = todoSorted(todos().filter(function (t) { return C.todoTipe(t) !== 'catatan' && t.tanggal && !C.bool(t.selesai) && t.tanggal >= C.addDays(today, -7); }));
-    var html = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Agenda</h1></div><div class="top-actions">' + syncPill() + '</div></div>' +
-      '<p class="muted" style="margin:-8px 0 12px;font-size:14px">To-do berwaktu & evaluasi bulanan. Semuanya masuk Google Calendar "Rumah Kita".</p>' +
-      '<button type="button" class="br-btn primary" id="ag-new" style="width:100%">' + ICON.plus + 'Tambah agenda</button>';
-    if (S.todos === null) html += skeleton(3);
-    else if (!list.length) html += '<div class="list" style="margin-top:14px"><div class="empty">Belum ada agenda. To-do yang diberi waktu muncul di sini.</div></div>';
-    else {
-      var hari = null, buka = false;
-      list.forEach(function (t) {
-        if (t.tanggal !== hari) {
-          if (buka) html += '</div>';
-          hari = t.tanggal; buka = true;
-          var lbl = t.tanggal < today ? 'Terlewat · ' : '';
-          html += '<div class="br-day' + (t.tanggal === today ? ' today' : '') + '">' + lbl + esc(todoWaktuLabel({ tanggal: t.tanggal, jam: '' }).replace(' · seharian', '')) + '</div><div class="list todo-list">';
-        }
-        html += todoRow(t);
-      });
-      if (buka) html += '</div>';
-    }
-    el.innerHTML = html;
-    bindTodoRows(el);
-    $('#ag-new', el).addEventListener('click', function () { openTodoSheet(null, { aturWaktu: true }); });
-  }
-};
-
-// ---------- Setelan Beranda: tema berlaku di semua halaman ----------
-var SetelanView = {
-  render: function (el) {
-    var demo = S.conn.mode === 'demo';
-    el.innerHTML = '<div class="topbar"><div><h1>Setelan</h1></div></div>' +
-      '<section class="section br-set"><div class="section-h"><h2>Tema</h2></div><div class="menu" style="padding-top:16px"><div class="seg" role="group" aria-label="Tema">' +
-        [['dark', 'Gelap'], ['light', 'Terang']].map(function (x) { return '<button data-theme-set="' + x[0] + '" aria-pressed="' + (themePref() === x[0]) + '">' + x[1] + '</button>'; }).join('') +
-      '</div><p class="faint" style="font-size:12.5px;margin:10px 0 14px">Berlaku di Beranda, Kantong, Komitmen, dan Ruang Catat.</p></div></section>' +
-      '<section class="section"><div class="menu">' +
-        '<a class="menu-a" href="kantong.html#pengaturan"><span class="main">Pengaturan Kantong<div class="t2">Kantong, kategori, budget</div></span>' + ICON.right + '</a>' +
-        '<button data-set="sync"><span class="main">Sinkron sekarang<div class="t2">' + esc(S.lastSync ? 'Terakhir ' + agoLabel(S.lastSync) : 'Belum pernah') + '</div></span>' + ICON.right + '</button>' +
-      '</div></section>' +
-      '<section class="section"><div class="menu"><button data-set="out"><span class="main" style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Putuskan koneksi di HP ini') + '</span></button></div></section>';
-    $$('[data-theme-set]', el).forEach(function (b) { b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme-set')); SetelanView.render(el); }); });
-    $$('[data-set]', el).forEach(function (b) { b.addEventListener('click', function () {
-      var a = b.getAttribute('data-set');
-      if (a === 'sync') { sync(); toast('Menyinkronkan…'); }
-      if (a === 'out' && confirm(demo ? 'Keluar dari mode demo? Data demo dihapus.' : 'Putuskan koneksi? Perubahan yang belum terkirim akan hilang dari HP ini.')) disconnect();
-    }); });
-  }
-};
+window.addEventListener('hashchange', function () {
+  if (PAGE === 'agenda' && agendaRute() !== S.tab) brGo(agendaRute());
+  if (PAGE === 'beranda') bukaPengaturanDariHash();
+});
 
 function openTxBaru() {
   openSheet('Catat transaksi', function (sh) { txForm(sh.el, null, { onDone: function () { sh.close(); } }); });
@@ -136,13 +92,13 @@ var BerandaView = {
       '<header class="br-head"><div><div class="br-date">' + esc(longToday()) + ' ' + new Date().getFullYear() + '</div><h1>' + sapaan() + ', ' + esc(user.nama) + '</h1></div>' +
       (S.conn.mode === 'demo' ? '<div class="br-who" role="group" aria-label="Lihat sebagai (mode demo)">' + db().Users.map(function (u) {
         return '<button type="button" data-who="' + esc(u.id) + '" aria-pressed="' + (u.id === user.id) + '" aria-label="Lihat sebagai ' + esc(u.nama) + '">' + esc(u.nama.charAt(0)) + '</button>';
-      }).join('') + '</div>' : '') + '<button type="button" class="br-gear" data-brgo="setelan" aria-label="Setelan">' + ICON.gear + '</button></header>' +
+      }).join('') + '</div>' : '') + '<a class="br-gear" href="#pengaturan" aria-label="Pengaturan">' + ICON.gear + '</a></header>' +
       '<div id="br-sync"></div>' +
       '<nav class="br-short" aria-label="Pintasan">' +
-        '<a href="kantong.html" style="--c:var(--br-kantong);--cb:var(--br-kantong-bg)"><span class="ic">' + ICON.wallet + '</span>Kantong</a>' +
-        '<a href="#agenda" data-brgo="agenda" style="--c:var(--br-agenda);--cb:var(--br-agenda-bg)"><span class="ic">' + ICON.cal + '</span>Agenda</a>' +
-        '<a href="komitmen.html" style="--c:var(--br-komit);--cb:var(--br-komit-bg)"><span class="ic">' + ICON.heart + '</span>Komitmen</a>' +
-        '<a href="' + RUANG_CATAT_URL + '" style="--c:var(--br-catat);--cb:var(--br-catat-bg)"><span class="ic">' + ICON.book + '</span><span>Ruang Catat <i class="ext">' + ICON.ext + '</i></span></a>' +
+        '<a href="' + FITUR_URL.kantong + '" style="--c:var(--br-kantong);--cb:var(--br-kantong-bg)"><span class="ic">' + ICON.wallet + '</span>Kantong</a>' +
+        '<a href="' + FITUR_URL.agenda + '" style="--c:var(--br-agenda);--cb:var(--br-agenda-bg)"><span class="ic">' + ICON.check + '</span>Agenda</a>' +
+        '<a href="' + FITUR_URL.komitmen + '" style="--c:var(--br-komit);--cb:var(--br-komit-bg)"><span class="ic">' + ICON.heart + '</span>Komitmen</a>' +
+        '<a href="' + DAILY_MOOD_URL + '" style="--c:var(--br-catat);--cb:var(--br-catat-bg)"><span class="ic">' + ICON.book + '</span><span>Daily Mood</span></a>' +
       '</nav>' +
       '<div class="br-grid"><div class="br-col main">' +
         '<section class="br-card br-kantong" id="br-kantong" aria-labelledby="br-kantong-h"></section>' +
@@ -152,14 +108,17 @@ var BerandaView = {
       '</div><div class="br-col side">' +
         '<div id="br-eval-d" class="br-eval-slot d"></div>' +
         '<section class="br-card br-mood" id="br-mood" aria-labelledby="br-mood-h"></section>' +
-      '</div></div></div>';
+      '</div></div>' +
+      '<section class="br-atur" id="pengaturan" aria-labelledby="br-atur-h"></section></div>';
     $$('[data-who]', el).forEach(function (b) { b.addEventListener('click', function () {
       if (b.getAttribute('data-who') === user.id) return;
       S.prefs.demoUser = b.getAttribute('data-who'); self.add.pemilik = ''; persist(); S.boot = null; S.todos = null; renderView(); sync();
     }); });
     this.renderAdd(cari('br-add'));
     this.renderMood(cari('br-mood'));
+    Pengaturan.render(cari('pengaturan'));
     this.update(el);
+    bukaPengaturanDariHash();
   },
   update: function (el) {
     if (!$('#br-kantong', el)) return this.render(el);
@@ -170,10 +129,11 @@ var BerandaView = {
     $('#br-eval-d', el).innerHTML = slot === 'd' ? ev : '';
     this.bindEval(el);
     this.renderTodo($('#br-todo', el));
+    Pengaturan.update($('#pengaturan', el));
   },
   renderKantong: function (box) {
     var user = me(), rt = bukuRT(), m = ensureMonth(thisMonth());
-    var head = '<div class="br-card-h"><h2 id="br-kantong-h"><span class="br-ic" style="--c:var(--br-kantong);--cb:var(--br-kantong-bg)">' + ICON.wallet + '</span>Kantong</h2><a class="br-lnk" href="kantong.html">Buka</a></div>';
+    var head = '<div class="br-card-h"><h2 id="br-kantong-h"><span class="br-ic" style="--c:var(--br-kantong);--cb:var(--br-kantong-bg)">' + ICON.wallet + '</span>Kantong</h2><a class="br-lnk" href="' + FITUR_URL.kantong + '">Buka</a></div>';
     if (!m) { box.innerHTML = head + '<div class="br-skel-line"></div><div class="br-skel-line"></div>'; return; }
     var d = db(), s = rt ? C.summarize(d, m.transaksi, m.budget, rt.id) : null;
     var used = s && s.budgetTotal ? s.pengeluaran / s.budgetTotal : 0;
@@ -213,7 +173,7 @@ var BerandaView = {
     return '<section class="br-card br-eval" aria-labelledby="br-eval-h"><div class="br-eval-top"><span class="br-ic" style="--c:var(--br-komit);--cb:var(--br-komit-bg)">' + ICON.heart + '</span>' +
       '<div><h2 id="br-eval-h">' + esc(p.todo.judul) + ' · ' + esc(brSisa(p.menit)) + '</h2><div class="br-eval-d">' + esc(brTanggal(p.todo)) + info + '</div></div></div>' +
       '<p>Siapkan catatan: mana kesepakatan yang jalan, mana yang perlu dibahas ulang.</p>' +
-      '<div class="br-eval-act"><a class="br-btn amber" href="komitmen.html">Lihat kesepakatan</a>' +
+      '<div class="br-eval-act"><a class="br-btn amber" href="' + FITUR_URL.komitmen + '">Lihat kesepakatan</a>' +
       '<button type="button" class="br-btn ghost" data-eval-tunda="' + esc(p.todo.id) + '">Ingatkan nanti</button></div></section>';
   },
   bindEval: function (el) {
@@ -238,9 +198,9 @@ var BerandaView = {
         return '<button type="button" data-brtf="' + x[0] + '" aria-pressed="' + (f === x[0]) + '">' + x[1] + '</button>';
       }).join('') + '</div>' +
       (tampil.length ? '<div class="br-todos">' + tampil.map(brTodoRow).join('') + '</div>' : '<div class="br-empty">' + (buka.length + beres.length ? '' : 'Belum ada to-do. Tulis satu di bawah.') + '</div>') +
-      (buka.length > 6 ? '<a class="br-more" href="#todo" data-brgo="todo">+' + (buka.length - 6) + ' to-do lainnya</a>' : '') +
+      (buka.length > 6 ? '<a class="br-more" href="' + FITUR_URL.agenda + '">+' + (buka.length - 6) + ' to-do lainnya</a>' : '') +
       (notes.length ? '<div class="br-sub" style="margin-top:6px">Catatan</div><div class="br-todos">' + notes.slice(0, 3).map(brNoteRow).join('') + '</div>' +
-        (notes.length > 3 ? '<a class="br-more" href="#todo" data-brgo="todo">Semua catatan (' + notes.length + ')</a>' : '') : '');
+        (notes.length > 3 ? '<a class="br-more" href="' + FITUR_URL.agenda + '#catatan">Semua catatan (' + notes.length + ')</a>' : '') : '');
     $$('[data-brtf]', box).forEach(function (b) { b.addEventListener('click', function () {
       S.prefs.todoFilter = b.getAttribute('data-brtf'); persist(); BerandaView.renderTodo(box);
     }); });
@@ -282,13 +242,13 @@ var BerandaView = {
   },
   renderMood: function (box) {
     var self = this, cur = this.mood;
-    box.innerHTML = '<div class="br-card-h"><h2 id="br-mood-h"><span class="br-ic" style="--c:var(--br-catat);--cb:var(--br-catat-bg)">' + ICON.book + '</span>Ruang Catat</h2></div>' +
+    box.innerHTML = '<div class="br-card-h"><h2 id="br-mood-h"><span class="br-ic" style="--c:var(--br-catat);--cb:var(--br-catat-bg)">' + ICON.book + '</span>Daily Mood</h2><a class="br-lnk" href="' + DAILY_MOOD_URL + '">Buka</a></div>' +
       '<p class="br-q">Gimana rasanya hari ini?</p>' +
       '<div class="br-moods" role="radiogroup" aria-label="Mood hari ini">' + MOODS.map(function (m) {
         return '<button type="button" role="radio" aria-checked="' + (cur === m[0]) + '" data-mood="' + m[0] + '" style="--c:' + m[2] + '"><span class="face">' + moodSvg(m) + '</span><span>' + m[1] + '</span></button>';
       }).join('') + '</div>' +
-      (cur ? '<a class="br-btn violet" href="' + RUANG_CATAT_URL + '?mood=' + cur + '">Lanjut tulis di Ruang Catat <i class="ext">' + ICON.ext + '</i></a>'
-        : '<p class="br-help">Pilih satu, lalu lanjut menulis di Ruang Catat. Mood tidak disimpan di Beranda.</p>');
+      (cur ? '<a class="br-btn violet" href="' + DAILY_MOOD_URL + '?mood=' + cur + '">Simpan & lanjut tulis di Daily Mood</a>'
+        : '<p class="br-help">Pilih satu, lalu lanjut di Daily Mood. Tersimpan di akunmu (Supabase), pasangan tidak bisa membaca.</p>');
     $$('[data-mood]', box).forEach(function (b) { b.addEventListener('click', function () {
       var m = b.getAttribute('data-mood'); self.mood = self.mood === m ? '' : m; self.renderMood(box);
       var nb = $('[data-mood="' + m + '"]', box); if (nb) nb.focus();

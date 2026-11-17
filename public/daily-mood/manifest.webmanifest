@@ -1,6 +1,6 @@
 {
-  "name": "Ruang Catat — Jurnal Mood",
-  "short_name": "Ruang Catat",
+  "name": "Daily Mood — Jurnal Mood",
+  "short_name": "Daily Mood",
   "lang": "id",
   "start_url": "./",
   "scope": "./",

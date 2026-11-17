@@ -1,5 +1,5 @@
 /* Kantong — Transaksi: pemilih kategori, reimburse, talangan, form transaksi.
-   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
+   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 
 // ================= pemilih kategori =================

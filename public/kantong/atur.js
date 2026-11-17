@@ -1,71 +1,29 @@
-/* Kantong — Tab Pengaturan.
-   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
+/* Kantong — Pengaturan Kantong: daftar kantong, kategori, budget bulanan.
+   Ditampilkan di Beranda (bagian Pengaturan > Kantong, expand-collapse). Form dibuka sebagai sheet.
+   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 
-// ---------- Pengaturan ----------
-var SettingsView = {
-  render: function (el) {
-    if (S.sub) return ({ kantong: KantongList, kategori: KategoriList, budget: BudgetEdit })[S.sub.type].render(el);
-    var demo = S.conn.mode === 'demo';
-    var host = demo ? 'Mode demo, tersimpan di HP ini' : (/supabase\.(co|in)\//.test(S.conn.api || '') ? 'Terhubung ke Supabase' : 'Terhubung ke server');
-    el.innerHTML = '<div class="topbar"><div><h1>Pengaturan</h1></div>' + syncPill() + '</div>' +
-      '<div class="menu"><div style="padding:16px;border-bottom:1px solid var(--surface-2)"><div style="font-weight:700;font-size:17px">' + esc(me().nama) + '</div><div class="faint" style="font-size:13px">' + host + '</div></div>' +
-      '<button data-s="sync"><span class="main">Sinkron sekarang<div class="t2">' + (S.lastSync ? 'Terakhir ' + new Date(S.lastSync).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Belum sinkron di sesi ini') + (S.outbox.length ? ', ' + S.outbox.length + ' belum terkirim' : '') + '</div></span></button>' +
-      (demo ? '<button data-s="switch"><span class="main">Masuk sebagai ' + esc((db().Users.filter(function (u) { return u.id !== me().id; })[0] || { nama: 'pengguna lain' }).nama) + '<div class="t2">Coba aturan baca/tulis antar buku</div></span></button>' : '') +
-      '</div>' +
-      '<section class="section"><div class="menu">' +
-      '<button data-s="budget"><span class="main">Budget bulanan<div class="t2">Atur budget per kategori</div></span>' + ICON.right + '</button>' +
-      '<button data-s="kategori"><span class="main">Kategori<div class="t2">' + db().Kategori.filter(function (k) { return C.bool(k.aktif) && k.id !== C.KAT_REIMBURSE; }).length + ' kategori aktif</div></span>' + ICON.right + '</button>' +
-      '<button data-s="kantong"><span class="main">Kantong<div class="t2">Cash, debit, e-wallet, kartu kredit</div></span>' + ICON.right + '</button>' +
-      '</div></section>' +
-      '<section class="section"><div class="menu"><button data-s="beranda"><span class="main">Beranda<div class="t2">To-do, kesepakatan, mood, dan Setelan (tema)</div></span>' + ICON.right + '</button></div></section>' +
-      '<section class="section"><div class="menu"><button data-s="out"><span class="main" style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Putuskan koneksi di HP ini') + '</span></button></div>' +
-      '<p class="faint" style="font-size:12px;text-align:center;margin-top:20px">Kantong v' + (S.boot.version || C.VERSION) + '</p></section>';
-    $$('[data-theme-set]', el).forEach(function (b) { b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme-set')); SettingsView.render(el); }); });
-    $$('[data-s]', el).forEach(function (b) { b.addEventListener('click', function () {
-      var a = b.getAttribute('data-s');
-      if (a === 'sync') sync();
-      else if (a === 'beranda') location.href = './';
-      else if (a === 'switch') { S.prefs.demoUser = S.prefs.demoUser === 'riki' ? 'istri' : 'riki'; S.bukuView = null; persist(); S.boot = null; renderView(); sync(); }
-      else if (a === 'out') { if (confirm(demo ? 'Keluar dari mode demo? Data demo dihapus.' : 'Putuskan koneksi? Transaksi yang belum terkirim akan hilang dari HP ini.')) disconnect(); }
-      else goSub({ type: a });
-    }); });
-  },
-  update: function (el) { if (!S.sub || S.sub.type !== 'budget') this.render(el); }
-};
-function subHeader(title, el) {
-  return '<button class="back" data-back>' + ICON.left + 'Pengaturan</button><div class="topbar"><div><h1>' + esc(title) + '</h1></div>' + syncPill() + '</div>';
-}
-function bindBack(el) { $('[data-back]', el).addEventListener('click', backSub); }
 function settingCall(action, payload, okMsg) {
   return rpc(action, payload).then(function (d) { toast(okMsg); return sync().then(function () { return d; }); })
     .catch(function (e) { toast(e.offline ? 'Perlu koneksi internet untuk menyimpan pengaturan' : e.message, true); throw e; });
 }
 
-var KantongList = {
+var AturKantong = {
   render: function (el) {
     var d = db(), saldo = S.boot.saldo || {};
-    el.innerHTML = subHeader('Kantong', el) + d.Buku.slice().sort(function (a, b) { return a.urutan - b.urutan; }).map(function (b) {
+    el.innerHTML = d.Buku.slice().sort(function (a, b) { return a.urutan - b.urutan; }).map(function (b) {
       var ks = d.Kantong.filter(function (k) { return k.buku === b.id; });
-      return '<section class="section"><div class="section-h"><h2 style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:' + bukuColor(b.id) + '"></span>' + esc(b.nama) + '</h2>' +
+      return '<div class="atur-grp"><div class="section-h"><h2 style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:' + bukuColor(b.id) + '"></span>' + esc(b.nama) + '</h2>' +
         (canWrite(b.id) ? '<button class="btn small ghost" data-addk="' + esc(b.id) + '">+ Tambah</button>' : '<span class="aside">hanya lihat</span>') + '</div><div class="list">' +
         (ks.length ? ks.map(function (k) {
           var v = saldo[k.id] || 0;
           return '<button class="wallet" data-k="' + esc(k.id) + '"' + (C.bool(k.aktif) ? '' : ' style="opacity:.45"') + '><span class="main"><span class="t1" style="display:block">' + esc(k.nama) + '</span><span class="t2">' + k.jenis + (C.bool(k.aktif) ? '' : ', nonaktif') + '</span></span><span class="amt num' + (v < 0 ? ' neg' : '') + '">' + rp(v) + '</span></button>';
-        }).join('') : '<div class="empty">Belum ada kantong.</div>') + '</div></section>';
+        }).join('') : '<div class="empty">Belum ada kantong.</div>') + '</div></div>';
     }).join('');
-    bindBack(el);
     $$('[data-k]', el).forEach(function (b) { b.addEventListener('click', function () { openKantongSheet(C.byId(db().Kantong)[b.getAttribute('data-k')]); }); });
     $$('[data-addk]', el).forEach(function (b) { b.addEventListener('click', function () { openKantongSheet(null, b.getAttribute('data-addk')); }); });
   }
 };
-function toggleHtml(id, label, sub, on) {
-  return '<button type="button" class="field toggle" role="switch" id="' + id + '" aria-checked="' + !!on + '"><span><span style="display:block;font-weight:500">' + label + '</span>' + (sub ? '<span class="faint" style="font-size:12px">' + sub + '</span>' : '') + '</span><span class="sw"></span></button>';
-}
-function bindToggle(el, id, obj, key) {
-  var t = $('#' + id, el); if (!t) return;
-  t.addEventListener('click', function () { obj[key] = !obj[key]; t.setAttribute('aria-checked', String(obj[key])); });
-}
 function openKantongSheet(k, bukuId) {
   var editable = canWrite(k ? k.buku : bukuId);
   var f = k ? { id: k.id, nama: k.nama, jenis: k.jenis, limit: k.limit, aktif: C.bool(k.aktif) } : { nama: '', jenis: 'Debit', limit: 0, aktif: true, buku: bukuId };
@@ -99,10 +57,10 @@ function openKantongSheet(k, bukuId) {
   });
 }
 
-var KategoriList = {
+var AturKategori = {
   render: function (el) {
     var d = db();
-    el.innerHTML = subHeader('Kategori', el) +
+    el.innerHTML =
       '<div class="seg" style="margin-bottom:16px">' + ['Pengeluaran', 'Pemasukan'].map(function (t) { return '<button data-ct="' + t + '" aria-pressed="' + (S.catTab === t) + '">' + t + '</button>'; }).join('') + '</div>' +
       '<div class="list">' + d.Kategori.filter(function (k) { return k.tipe === S.catTab && k.id !== C.KAT_REIMBURSE; }).sort(function (a, b) { return C.bool(b.aktif) - C.bool(a.aktif) || a.urutan - b.urutan; }).map(function (k) {
         return '<button class="wallet" data-c="' + esc(k.id) + '"' + (C.bool(k.aktif) ? '' : ' style="opacity:.45"') + '><span style="width:12px;height:12px;border-radius:4px;background:' + k.warna + ';flex:none"></span><span class="main"><span class="t1" style="display:block">' + esc(k.nama) + '</span><span class="t2" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">' +
@@ -110,7 +68,6 @@ var KategoriList = {
           (C.bool(k.hitung) ? '' : '<span class="tag">tidak dihitung</span>') + (C.bool(k.aktif) ? '' : '<span class="tag">nonaktif</span>') + '</span></span>' + ICON.right.replace('<svg', '<svg width="18" height="18" style="color:var(--text-3)"') + '</button>';
       }).join('') + '</div>' +
       '<button class="btn ghost" id="add-cat">+ Tambah kategori ' + S.catTab.toLowerCase() + '</button>';
-    bindBack(el);
     var self = this;
     $$('[data-ct]', el).forEach(function (b) { b.addEventListener('click', function () { S.catTab = b.getAttribute('data-ct'); self.render(el); }); });
     $$('[data-c]', el).forEach(function (b) { b.addEventListener('click', function () { openKategoriSheet(kategoriOf(b.getAttribute('data-c'))); }); });
@@ -160,10 +117,10 @@ var BudgetEdit = {
     var d = db(), self = this;
     var writable = C.writableBuku(d, me());
     if (!this.buku || !writable.some(function (b) { return b.id === self.buku; })) this.buku = me().buku;
-    el.innerHTML = subHeader('Budget bulanan', el) +
+    this.el = el;
+    el.innerHTML =
       '<div class="buku-tabs">' + writable.map(function (b) { return '<button data-bb="' + esc(b.id) + '" aria-pressed="' + (self.buku === b.id) + '" style="--c:' + bukuColor(b.id) + '"><i></i>' + esc(b.nama) + '</button>'; }).join('') + '</div>' +
       monthBar() + '<div id="be"></div>';
-    bindBack(el);
     $$('[data-bb]', el).forEach(function (b) { b.addEventListener('click', function () { self.buku = b.getAttribute('data-bb'); self.render(el); }); });
     $$('[data-month]', el).forEach(function (b) { b.addEventListener('click', function () { S.bulan = shiftMonth(S.bulan, +b.getAttribute('data-month')); self.render(el); }); });
     var m = ensureMonth(S.bulan), box = $('#be', el);
@@ -191,10 +148,6 @@ var BudgetEdit = {
   },
   update: function (el) { if (this.waiting) this.render(el); }
 };
-// Pengaturan memakai sub-view; update hanya untuk sub-view yang menunggu data
-var _sr = SettingsView.update;
-SettingsView.update = function (el) {
-  if (S.sub && S.sub.type === 'budget') return BudgetEdit.update(el);
-  if (S.sub) return ({ kantong: KantongList, kategori: KategoriList })[S.sub.type].render(el);
-  return _sr.call(SettingsView, el);
-};
+function openBudgetSheet() {
+  openSheet('Budget bulanan', function (sh) { BudgetEdit.render(sh.el); });
+}

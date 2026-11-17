@@ -1,0 +1,5 @@
+/beranda.html   /             302
+/kantong.html   /kantong/     302
+/komitmen.html  /komitmen/    302
+/ruang-catat    /daily-mood/  302
+/ruang-catat/*  /daily-mood/:splat  302

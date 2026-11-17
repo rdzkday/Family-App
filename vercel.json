@@ -23,15 +23,11 @@
     }
   ],
   "redirects": [
-    {
-      "source": "/dark/(.*)",
-      "destination": "/",
-      "permanent": false
-    },
-    {
-      "source": "/beranda.html",
-      "destination": "/",
-      "permanent": false
-    }
+    { "source": "/dark/(.*)", "destination": "/", "permanent": false },
+    { "source": "/beranda.html", "destination": "/", "permanent": false },
+    { "source": "/kantong.html", "destination": "/kantong/", "permanent": false },
+    { "source": "/komitmen.html", "destination": "/komitmen/", "permanent": false },
+    { "source": "/ruang-catat", "destination": "/daily-mood/", "permanent": false },
+    { "source": "/ruang-catat/:path*", "destination": "/daily-mood/:path*", "permanent": false }
   ]
 }

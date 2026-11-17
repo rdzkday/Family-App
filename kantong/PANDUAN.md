@@ -1,6 +1,6 @@
 # Kantong: panduan pasang (Supabase)
 
-Backend memakai **Supabase** (Postgres + Edge Function). Logika bisnis ada di `public/core.js`, jadi aturan akses, hitungan, dan to-do sama persis dengan versi Google Sheets sebelumnya. Total sekitar 30 menit, cukup sekali.
+Backend memakai **Supabase** (Postgres + Edge Function). Logika bisnis ada di `public/shared/core.js`, jadi aturan akses, hitungan, dan to-do sama persis dengan versi Google Sheets sebelumnya. Total sekitar 30 menit, cukup sekali.
 
 | Folder/file | Fungsinya |
 |---|---|
@@ -109,7 +109,7 @@ Aturan yang dijalankan server:
 
 - Judul event diberi awalan `[R]`, `[F]` (inisial nama di tabel `users`), atau `[B]` untuk bersama; warnanya berbeda per pemilik.
 - Ubah waktu → event pindah. Hapus waktu → event dihapus, to-do tetap. Hapus to-do → event ikut dihapus.
-- Centang selesai → event dibiarkan, judulnya diberi tanda ✓. Mau event dihapus saat dicentang? Ganti `TODO_SELESAI_EVENT` di `public/core.js` menjadi `'hapus'`, lalu `node kantong/tools/build_core.js` dan deploy ulang.
+- Centang selesai → event dibiarkan, judulnya diberi tanda ✓. Mau event dihapus saat dicentang? Ganti `TODO_SELESAI_EVENT` di `public/shared/core.js` menjadi `'hapus'`, lalu `node kantong/tools/build_core.js` dan deploy ulang.
 - Sync satu arah: app → kalender. Mengubah event langsung di Google Calendar **tidak** kembali ke app.
 - Offline: to-do tersimpan di HP, dikirim saat online lagi; request ulang tidak membuat event dobel.
 - Gagal masuk kalender (secret belum diisi, kalender belum di-share): to-do tetap tersimpan, barisnya merah dengan tombol **Coba lagi**.
@@ -118,22 +118,22 @@ Aturan yang dijalankan server:
 
 ## Beranda
 
-| Halaman | URL | Isi |
-|---|---|---|
-| Beranda | `/` | Ringkasan Kantong, pengingat evaluasi, to-do & catatan, mood |
-| Kantong | `/kantong.html` (`#todo` = tab To-do) | App keuangan lengkap, sama seperti sebelumnya |
-| Komitmen | `/komitmen.html` | Lihat §8 |
-| To-do | `/#todo` | To-do & catatan (bukan lagi tab Kantong) |
-| Agenda | `/#agenda` | To-do berwaktu & evaluasi per hari |
-| Setelan | `/#setelan` | Tema gelap/terang untuk semua halaman |
-| Ruang Catat | `/ruang-catat/?mood=…` | Jurnal mood, tersimpan di Supabase (tabel `jurnal`), hanya pemiliknya yang bisa baca |
+| Fitur | URL | Isi | Kode |
+|---|---|---|---|
+| Beranda | `/` | Ringkasan Kantong, pengingat evaluasi, to-do & catatan, mood, **Pengaturan** semua fitur (expand-collapse) | `public/beranda/` |
+| Kantong | `/kantong/` | Catat, Ringkasan, Riwayat. Pengaturan kantong/kategori/budget ada di Beranda | `public/kantong/` |
+| Agenda | `/agenda/` (`#catatan`, `#jadwal`) | To-do, Catatan, Jadwal (to-do berwaktu & evaluasi) | `public/agenda/` |
+| Komitmen | `/komitmen/` | Lihat §8 | `public/komitmen/` |
+| Daily Mood | `/daily-mood/?mood=…` | Jurnal mood (dulu Ruang Catat), tersimpan di Supabase (tabel `jurnal`), hanya pemiliknya yang bisa baca | `public/daily-mood/` |
+
+URL lama (`/kantong.html`, `/komitmen.html`, `/ruang-catat/`, `/#todo`, `/#agenda`, `/#setelan`, `/kantong.html#pengaturan`) otomatis dialihkan.
 
 - **Catatan**: tidak punya centang, tidak pernah masuk kalender. Bisa pribadi atau Bersama.
 - **Evaluasi bulanan**: buat to-do → nyalakan **Agenda evaluasi bulanan** → atur tanggal & jam. Masuk Google Calendar sebagai `[B] Evaluasi bulanan`. Kartu pengingat muncul di Beranda mulai 6 jam sebelumnya; **Ingatkan nanti** = sembunyi 1 jam.
 
 ## 8. Komitmen (kamus kesepakatan)
 
-- Halaman: `komitmen.html` (dari Beranda → Komitmen). Brief: `claude/komitmen-brief.md`.
+- Halaman: `/komitmen/` (dari Beranda → Komitmen). Brief: `claude/komitmen-brief.md`.
 - Butuh migrasi `20261117000000_komitmen.sql` + deploy ulang Edge Function (core baru).
 - Fase 4a sudah ada: baca, cari (nomor + isi), filter, A–Z. Usul/ubah/TTD menyusul (4b).
 - Isi asli kesepakatan & perjanjian pranikah **hanya** di database. Jangan taruh di repo.
@@ -158,7 +158,7 @@ Aturan ini dijalankan di server (`core.js` di Edge Function), bukan cuma di tamp
 
 ## Cara update nanti
 
-- **Logika (`public/core.js`)**: ubah, lalu `node kantong/tools/build_core.js` supaya salinan untuk Edge Function (`core.mjs`) ikut. `node kantong/tools/test_core.js` menolak kalau salinan tidak sinkron.
+- **Logika (`public/shared/core.js`)**: ubah, lalu `node kantong/tools/build_core.js` supaya salinan untuk Edge Function (`core.mjs`) ikut. `node kantong/tools/test_core.js` menolak kalau salinan tidak sinkron.
 - **API**: `supabase functions deploy kantong --no-verify-jwt`. URL tidak berubah, kode koneksi tetap berlaku.
 - **Skema**: tambah file di `supabase/migrations/`, lalu `supabase db push`.
 - **PWA**: push ke `main`. HP otomatis memuat versi baru saat online.
