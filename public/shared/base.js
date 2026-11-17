@@ -76,8 +76,6 @@ var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wi
 // Halaman per fitur: beranda (/), kantong (/kantong/), agenda (/agenda/). ROOT = jalur ke folder public dari halaman ini.
 var PAGE = ['beranda', 'kantong', 'agenda', 'pengaturan'].indexOf(window.KANTONG_PAGE) >= 0 ? window.KANTONG_PAGE : 'kantong';
 var ROOT = window.KANTONG_ROOT || '';
-var AGENDA_RUTE = ['todo', 'catatan', 'jadwal'];
-function agendaRute() { var h = location.hash.slice(1); return AGENDA_RUTE.indexOf(h) >= 0 ? h : 'todo'; }
 // link lama: kantong#todo, kantong#pengaturan, beranda#todo/#agenda/#setelan
 function alihkanLinkLama() {
   var h = location.hash;
@@ -106,9 +104,14 @@ function pageHead(title, sub, actions, back) {
   return '<header class="ph"><a class="ph-back" ' + b + '>' + PH_BACK + '</a><div class="ph-text"><h1>' + title + '</h1>' +
     (sub ? '<p class="ph-sub">' + sub + '</p>' : '') + '</div>' + (actions ? '<div class="ph-actions">' + actions + '</div>' : '') + '</header>';
 }
-function berandaBtn() { if (PAGE === 'beranda') return ''; return '<button class="theme-btn" data-act="beranda" aria-label="Ke Beranda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v8a2 2 0 0 1-2 2h-3v-6h-6v6H6a2 2 0 0 1-2-2z"/></svg></button>'; }
 function themeBtn() { return '<button class="theme-btn" data-act="theme" aria-label="Ganti tema terang/gelap">' + (isDark() ? SUN : MOON) + '</button>'; }
 applyTheme();
+
+// ================= registry halaman =================
+// Halaman fitur yang punya tab mendaftar di file modulnya: daftarHalaman('agenda', [[id, label, View], ...]).
+// Tab pertama = default (tanpa hash); tab lain disimpan di hash (#ringkasan, #catatan, ...).
+var HALAMAN = {};
+function daftarHalaman(id, tabs) { HALAMAN[id] = { tabs: tabs }; }
 
 // ================= state =================
 var S = {
@@ -118,7 +121,8 @@ var S = {
   outbox: LS.get('k_outbox', []),
   todos: LS.get('k_todos', null),        // null = belum pernah dimuat
   prefs: LS.get('k_prefs', { lastKantong: {}, demoUser: 'riki' }),
-  tab: PAGE === 'beranda' ? 'beranda' : PAGE === 'agenda' ? agendaRute() : (({ '#ringkasan': 'ringkasan', '#riwayat': 'riwayat' })[location.hash] || 'home'), sub: null, bukuView: null, bulan: thisMonth(),
+  tab: null, sub: null,   // tab diisi start.js dari hash (lihat HALAMAN di shell.js)
+  bukuView: null, bulan: thisMonth(),
   syncing: false, again: false, lastError: null, catTab: 'Pengeluaran'
 };
 function persist() {
@@ -263,9 +267,12 @@ function sync(extraMonths) {
   var want = {}; want[thisMonth()] = 1; want[S.bulan] = 1;
   (extraMonths || []).concat(S.wantMonths || []).forEach(function (b) { want[b] = 1; });
   S.wantMonths = [];
+  // data tiap fitur hanya diambil kalau fiturnya aktif (shared/fitur.js)
   var batch = ops.map(function (o) { return { opId: o.opId, action: o.action, payload: o.payload }; })
-    .concat([{ opId: '_boot', action: 'bootstrap' }, { opId: '_todo', action: 'todo.list' }, { opId: '_komit', action: 'komitmen.list' }])
-    .concat(Object.keys(want).map(function (b) { return { opId: '_m_' + b, action: 'month', payload: { bulan: b } }; }));
+    .concat([{ opId: '_boot', action: 'bootstrap' }])
+    .concat(Fitur.aktif('agenda') ? [{ opId: '_todo', action: 'todo.list' }] : [])
+    .concat(Fitur.aktif('komitmen') ? [{ opId: '_komit', action: 'komitmen.list' }] : [])
+    .concat(Fitur.aktif('kantong') ? Object.keys(want).map(function (b) { return { opId: '_m_' + b, action: 'month', payload: { bulan: b } }; }) : []);
   return rpc('batch', { ops: batch }).then(function (d) {
     var sent = {}; ops.forEach(function (o) { sent[o.opId] = 1; });
     d.results.forEach(function (r) {

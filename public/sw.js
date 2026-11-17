@@ -1,10 +1,11 @@
-// Service worker Beranda/Kantong/Agenda/Komitmen: network-first untuk app shell (update selalu masuk saat online),
-// fallback ke cache saat offline. Request API (POST ke Supabase) tidak disentuh. Daily Mood punya SW sendiri.
-const CACHE = 'kantong-v23-header';
+// Service worker Family App (semua fitur): network-first untuk app shell (update selalu masuk saat online),
+// fallback ke cache saat offline. Request API (POST ke Supabase) tidak disentuh. Satu SW untuk semua fitur (termasuk Daily Mood).
+const CACHE = 'kantong-v24-modular';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest',
-  'shared/core.js', 'shared/base.js', 'shared/ui.js', 'shared/shell.js', 'shared/connect.js', 'shared/demo.js', 'shared/start.js',
-  'shared/tokens.css', 'shared/styles.css',
-  'beranda/beranda.js', 'beranda/pengaturan.js', 'beranda/beranda.css', 'daily-mood/data.js',
+  'shared/fitur.js', 'shared/core.js', 'shared/base.js', 'shared/ui.js', 'shared/shell.js', 'shared/connect.js', 'shared/demo.js', 'shared/start.js',
+  'shared/tokens.css', 'shared/styles.css', 'shared/nav.css',
+  'beranda/beranda.js', 'beranda/pengaturan.js', 'beranda/beranda.css',
+  'daily-mood/', 'daily-mood/index.html', 'daily-mood/app.js', 'daily-mood/data.js', 'daily-mood/styles.css', 'daily-mood/vendor/jspdf.umd.min.js',
   'kantong/', 'kantong/index.html', 'kantong/transaksi.js', 'kantong/laporan.js', 'kantong/catat.js', 'kantong/atur.js',
   'pengaturan/', 'pengaturan/index.html',
   'agenda/', 'agenda/index.html', 'agenda/todo.js', 'agenda/agenda.js',

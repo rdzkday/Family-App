@@ -1,7 +1,7 @@
 /*
  * Komitmen — Fase 4a baca & cari + Fase 4b usul (baru/ubah/cabut/keterangan), Lembar Pengesahan & TTD (claude/komitmen-brief.md §6, §8, §9).
  * Data dari aksi `komitmen.list`, disimpan di cache HP (localStorage) supaya baca & cari jalan offline.
- * Mode demo / belum terhubung: data contoh di bawah (placeholder, BUKAN isi kesepakatan asli).
+ * Mode demo / belum terhubung: mulai kosong, tersimpan di HP ini saja (k_km_demo2).
  */
 (function () {
   'use strict';
@@ -40,71 +40,13 @@
     pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13 7l4 4"/></svg>'
   };
 
-  // ================= data contoh (placeholder) =================
+  // ================= mode demo: mulai kosong =================
+  // Hanya user (untuk tanda tangan); bab, pasal, dan lembar dibuat sendiri lewat "+ Pasal baru".
   function demoSeed() {
-    var T0 = '2026-09-14T20:00:00+07:00', T1 = '2026-10-12T21:00:00+07:00', T2 = '2026-11-10T21:00:00+07:00';
-    var bab = function (id, nomor, judul, u) { return { id: id, nomor: nomor, judul: judul, urutan: u, dibuat_at: T0, dihapus: '' }; };
-    var pasal = [], versi = [];
-    function P(nomor, bab_id, tipe, judul, ayat, o) {
-      o = o || {};
-      var id = 'p' + nomor, vs = o.versi || [{ ayat: ayat, sah: o.sah || 'sah-pra', at: o.at || T0, sumber: o.sumber || 'evaluasi' }];
-      vs.forEach(function (v, i) {
-        var last = i === vs.length - 1;
-        versi.push({ id: id + '-v' + (i + 1), pasal_id: id, versi: i + 1, isi_ayat: JSON.stringify(v.ayat || []), alasan: v.alasan || '',
-          jenis: v.jenis || (i ? 'ubah' : 'baru'), sumber: v.sumber || 'evaluasi', evaluasi_id: '', pengesahan_id: v.sah || 'sah-pra',
-          status: v.status || (last ? 'berlaku' : 'digantikan'), berlaku_sejak: v.status === 'usulan' ? '' : (v.at || T0), dibuat_oleh: 'riki', dibuat_at: v.at || T0 });
-      });
-      var berlaku = versi.filter(function (v) { return v.pasal_id === id && v.status === 'berlaku'; }).pop();
-      pasal.push({ id: id, nomor: nomor, bab_id: bab_id, tipe: tipe, judul: judul, kata_kunci: o.kunci || '', sumber_asal: o.pranikah ? 'pranikah' : 'app',
-        rujukan_asli: o.pranikah ? 'Pasal ' + o.pranikah + ' Perjanjian Pranikah' : '', terkunci: !!o.pranikah, status: o.status || 'berlaku',
-        versi_berlaku_id: berlaku ? berlaku.id : '', dibuat_oleh: 'riki', dibuat_at: T0, diubah_at: T0, dihapus: '' });
-    }
-    var pra = { sumber: 'pranikah' };
-    P(1, 'b1', 'kesepakatan', 'Harta bawaan', null, { pranikah: 1, kunci: 'harta, aset', versi: [{ sumber: 'pranikah', ayat: [
-      '[Contoh teks akta] Harta yang dibawa masing-masing pihak sebelum perkawinan tetap menjadi milik pihak yang membawanya.',
-      '[Contoh teks akta] Hasil dari harta bawaan mengikuti pemilik hartanya.'] }] });
-    P(2, 'b1', 'kesepakatan', 'Harta selama perkawinan', null, { pranikah: 2, kunci: 'harta', versi: [{ sumber: 'pranikah', ayat: [
-      '[Contoh teks akta] Penghasilan masing-masing pihak selama perkawinan dikelola sesuai kesepakatan kedua pihak.'] }] });
-    P(3, 'b1', 'kesepakatan', 'Utang', null, { pranikah: 3, kunci: 'utang, pinjaman', versi: [{ sumber: 'pranikah', ayat: [
-      '[Contoh teks akta] Utang yang dibuat sebelum perkawinan menjadi tanggungan pihak yang membuatnya.',
-      '[Contoh teks akta] Utang selama perkawinan untuk keperluan rumah tangga ditanggung bersama.'] }] });
-    P(4, '', 'definisi', 'Selingkuh', null, { versi: [{ ayat: ['Selingkuh adalah [definisi yang kalian sepakati].', 'Termasuk di dalamnya: [contoh perilaku].', 'Tidak termasuk: [contoh yang disepakati bukan selingkuh].'] }] });
-    P(5, '', 'definisi', 'Lawan jenis', null, { versi: [{ ayat: ['Lawan jenis adalah [definisi yang kalian sepakati].', 'Termasuk: [contoh, misal rekan kerja, teman lama].'] }] });
-    P(6, '', 'definisi', 'Waktu berkualitas', null, { kunci: 'quality time', versi: [{ ayat: ['Waktu berkualitas adalah [definisi yang kalian sepakati].'] }] });
-    P(7, 'b3', 'kesepakatan', 'Chat pribadi dengan lawan jenis', null, { kunci: 'whatsapp, dm, pesan', versi: [
-      { ayat: ['[Contoh versi lama] Chat pribadi dengan lawan jenis dibatasi.'], sah: 'sah-pra' },
-      { ayat: ['[Contoh] Chat pribadi dengan lawan jenis hanya untuk urusan [yang disepakati].', '[Contoh] Percakapan yang bisa dianggap selingkuh tidak disembunyikan dari pasangan.'],
-        sah: 'sah-okt', at: T1, alasan: 'Diperjelas batasannya' }] });
-    P(8, 'b3', 'kesepakatan', 'Bertemu berdua dengan lawan jenis', null, { versi: [{ ayat: ['[Contoh] Bertemu berdua dengan lawan jenis diberitahukan ke pasangan [kapan/bagaimana].'], sah: 'sah-okt', at: T1 }] });
-    P(9, 'b4', 'kesepakatan', 'Pengeluaran besar', null, { kunci: 'belanja, uang', versi: [{ ayat: ['[Contoh] Pengeluaran di atas [nominal] dibicarakan berdua dulu.', '[Contoh] Darurat kesehatan dikecualikan.'], sah: 'sah-okt', at: T1 }] });
-    P(10, 'b4', 'kesepakatan', 'Catatan belanja harian', null, { status: 'dicabut', versi: [
-      { ayat: ['[Contoh] Semua belanja harian dicatat di buku tulis.'], sah: 'sah-pra' },
-      { jenis: 'cabut', ayat: [], sah: 'sah-okt', at: T1, alasan: 'Sudah pakai app Kantong' }] });
-    P(11, 'b5', 'kesepakatan', 'Malam tanpa HP', null, { kunci: 'kencan, quality time', versi: [{ ayat: ['[Contoh] Satu malam per minggu tanpa HP, berdua saja.'], sah: 'sah-okt', at: T1 }] });
-    P(12, 'b5', 'kesepakatan', 'Liburan tahunan', null, { status: 'usulan', versi: [{ ayat: ['[Contoh usulan] Liburan berdua minimal sekali setahun.'], sah: 'sah-nov', status: 'usulan', at: T2 }] });
-    var ket = [
-      { id: 'k1', pasal_id: 'p2', isi: '[Contoh keterangan] Cara kalian menjalankan pasal ini, tanpa mengubah teks aslinya.', menggantikan_id: '', jenis: 'baru', evaluasi_id: '',
-        pengesahan_id: 'sah-okt', status: 'berlaku', berlaku_sejak: T1, dibuat_oleh: 'istri', dibuat_at: T1 },
-      { id: 'k2', pasal_id: 'p3', isi: '[Contoh keterangan] Pinjaman ke teman atau keluarga, termasuk lawan jenis, diberitahukan ke pasangan.', menggantikan_id: '', jenis: 'baru',
-        evaluasi_id: '', pengesahan_id: 'sah-okt', status: 'berlaku', berlaku_sejak: T1, dibuat_oleh: 'riki', dibuat_at: T1 },
-      { id: 'k3', pasal_id: 'p9', isi: '[Contoh keterangan] Keterangan juga bisa ditempel di pasal biasa, misal cara menghitung batas nominal.', menggantikan_id: '',
-        jenis: 'baru', evaluasi_id: '', pengesahan_id: 'sah-okt', status: 'berlaku', berlaku_sejak: T1, dibuat_oleh: 'istri', dibuat_at: T1 }
-    ];
-    var S1 = 'M14 78 C 30 30, 46 30, 52 72 S 70 100, 84 52 S 112 22, 120 70 C 126 96, 150 92, 168 60 S 200 40, 214 70 L 286 64';
-    var S2 = 'M16 70 C 40 20, 60 110, 86 60 C 100 34, 118 34, 124 62 C 130 92, 160 88, 176 56 C 188 34, 206 44, 210 66 C 214 86, 250 80, 284 52';
-    var sah = function (id, judul, jenis, at, riki, febie) {
-      return { id: id, judul: judul, jenis: jenis, evaluasi_id: '', ttd_riki: riki ? S1 : '', ttd_riki_at: riki ? at : '', ttd_febie: febie ? S2 : '', ttd_febie_at: febie ? at : '',
-        isi_hash: riki && febie ? 'contoh' : '', status: riki && febie ? 'sah' : 'menunggu', dibuat_at: at };
-    };
     return {
       Buku: [{ id: 'riki', nama: 'Riki', tipe: 'Pribadi', pemilik: 'riki', urutan: 1 }, { id: 'istri', nama: 'Febie', tipe: 'Pribadi', pemilik: 'istri', urutan: 2 }],
       Users: [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'istri', nama: 'Febie', buku: 'istri' }],
-      KomitmenBab: [bab('b1', 'I', 'Perjanjian Pranikah', 1), bab('b3', 'II', 'Batasan dengan Lawan Jenis', 2),
-        bab('b4', 'III', 'Keuangan', 3), bab('b5', 'IV', 'Waktu Bersama', 4)],
-      KomitmenPasal: pasal, KomitmenVersi: versi, KomitmenKeterangan: ket,
-      Pengesahan: [sah('sah-pra', 'Perjanjian Pranikah', 'pranikah', T0, true, true), sah('sah-okt', 'Evaluasi Okt 2026', 'evaluasi', T1, true, true),
-        sah('sah-nov', 'Evaluasi Nov 2026', 'evaluasi', T2, false, true)],
-      Evaluasi: []
+      KomitmenBab: [], KomitmenPasal: [], KomitmenVersi: [], KomitmenKeterangan: [], Pengesahan: [], Evaluasi: []
     };
   }
 
@@ -116,8 +58,8 @@
   var S = { data: null, q: '', filter: 'semua', tab: 'kesepakatan', status: '', fokus: null };
   var ME = (boot && boot.user) || { id: 'riki', nama: 'Riki', buku: 'riki' };
 
-  // mode contoh: data disimpan di HP (k_km_demo) supaya simulasi tambah/tarik usulan tetap ada setelah reload
-  var DEMO_KEY = 'k_km_demo';
+  // mode demo: data disimpan di HP supaya isian tetap ada setelah reload
+  var DEMO_KEY = 'k_km_demo2';
   function demoStore() { return C.memoryStore(LS.get(DEMO_KEY, null) || demoSeed()); }
   function demoData() { return C.handle(demoStore(), ME, 'komitmen.list', {}, new Date().toISOString()); }
   function aksi(action, payload, sebagai) { // Promise. Mode contoh: di HP; mode terhubung: kirim ke server lalu muat ulang daftar
@@ -137,7 +79,7 @@
     if (demo) { try { return Promise.resolve(C.handle(demoStore(), ME, action, payload, new Date().toISOString())); } catch (e) { return Promise.reject(e); } }
     return post(action, payload);
   }
-  function resetDemo() { try { localStorage.removeItem(DEMO_KEY); } catch (e) { /* abaikan */ } S.data = demoData(); location.hash = ''; render(); toast('Data contoh dikembalikan'); }
+  function resetDemo() { try { localStorage.removeItem(DEMO_KEY); } catch (e) { /* abaikan */ } S.data = demoData(); location.hash = ''; render(); toast('Data demo dikosongkan'); }
   function adaSimulasi() { return !!LS.get(DEMO_KEY, null); }
   function fetchList() { return post('komitmen.list', {}); }
   function post(action, payload) {
@@ -290,7 +232,7 @@
   function itemsHtml() {
     if (!S.data) return '<div class="km-empty"><p>' + esc(S.status || 'Memuat…') + '</p></div>';
     if (!S.data.pasal.length) {
-      return '<div class="km-empty"><p>Belum ada kesepakatan. Mulai dari evaluasi bulanan pertama kalian.</p></div>';
+      return '<div class="km-empty"><p>Belum ada kesepakatan. Tulis yang pertama lewat <b>+ Pasal baru</b>.</p></div>';
     }
     if (S.q.trim()) return hasilCari();
     var def = S.tab === 'definisi';
@@ -636,8 +578,8 @@
     var bar = document.getElementById('km-demo');
     if (demo && !bar) { bar = document.createElement('div'); bar.id = 'km-demo'; bar.className = 'demo-bar'; root.parentNode.insertBefore(bar, root); }
     if (bar && !demo) { bar.remove(); bar = null; }
-    if (bar) bar.innerHTML = 'Mode demo, data contoh.' + (conn ? '' : ' <a href="../pengaturan/">Hubungkan akun</a>') +
-      (adaSimulasi() ? ' <button type="button" id="demo-reset">Reset contoh</button>' : '');
+    if (bar) bar.innerHTML = 'Mode demo, data hanya di HP ini.' + (conn ? '' : ' <a href="../">Masuk</a>') +
+      (adaSimulasi() ? ' <button type="button" id="demo-reset">Kosongkan</button>' : '');
     root.innerHTML = '<div class="km-list">' + listHtml() + '</div><div class="km-detail">' +
       (n ? pasalHtml(n) : sid ? lembarHtml(sid) : '<div class="km-empty"><p>Pilih pasal untuk membaca isinya.</p></div>') + '</div>';
     bind();
@@ -676,7 +618,7 @@
     $$('[data-filter]', root).forEach(function (b) { b.addEventListener('click', function () { S.filter = b.getAttribute('data-filter'); LS.set('k_km_ui', { filter: S.filter, tab: S.tab }); render(); }); });
     $$('[data-tab]', root).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.getAttribute('data-tab'); LS.set('k_km_ui', { filter: S.filter, tab: S.tab }); render(); }); });
     var bb = $('#pasal-baru'); if (bb) bb.addEventListener('click', function () { bukaFormBaru({ tipe: S.tab === 'definisi' ? 'definisi' : 'kesepakatan' }); });
-    var dr = $('#demo-reset'); if (dr) dr.addEventListener('click', function () { if (confirm('Hapus semua simulasi dan kembali ke data contoh awal?')) resetDemo(); });
+    var dr = $('#demo-reset'); if (dr) dr.addEventListener('click', function () { if (confirm('Hapus semua isian Komitmen di mode demo?')) resetDemo(); });
     var tk = $('#tarik'); if (tk) tk.addEventListener('click', function () {
       if (!confirm('Tarik usulan ini? Usulan hilang dari daftar dan lembar pengesahannya dibatalkan.')) return;
       tk.disabled = true;
@@ -729,6 +671,9 @@
   });
   window.addEventListener('storage', function (e) { if (e.key === 'k_theme') location.reload(); });
 
+  // fitur dimatikan admin → tutup halaman; aktif → pasang menu bawah bersama (shared/fitur.js)
+  if (!Fitur.jaga('komitmen')) return;
+  document.body.insertAdjacentHTML('beforeend', Fitur.navHtml('komitmen'));
   var ui = LS.get('k_km_ui', null);
   if (ui) { S.filter = ['semua', 'pranikah', 'usulan', 'dicabut'].indexOf(ui.filter) >= 0 ? ui.filter : 'semua'; S.tab = ui.tab === 'definisi' || ui.tab === 'az' ? 'definisi' : 'kesepakatan'; }
   load();

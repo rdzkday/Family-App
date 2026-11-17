@@ -1,0 +1,21 @@
+/* Menu bawah bersama semua halaman (dibuat oleh Fitur.navHtml di shared/fitur.js). Butuh shared/tokens.css. */
+:root { --safe-b: env(safe-area-inset-bottom, 0px); --nav-h: 68px; }
+.br-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(var(--n, 5), 1fr); align-items: center;
+  padding: 6px 8px calc(var(--safe-b) + 6px); background: color-mix(in srgb, var(--br-bg) 92%, transparent); border-top: 1px solid var(--br-divider);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+.br-nav a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 56px;
+  color: var(--br-nav-text); font-size: 11px; font-weight: 700; text-decoration: none; }
+.br-nav .ic svg { width: 24px; height: 24px; display: block; }
+.br-nav a[aria-current="page"] { color: var(--br-text); }
+.br-nav a[aria-current="page"] .ic { color: var(--br-kantong); }
+.br-nav a:focus-visible { outline: 2px solid var(--br-agenda); outline-offset: -2px; border-radius: 12px; }
+@media (min-width: 900px) { .br-nav { left: 50%; right: auto; bottom: 16px; transform: translateX(-50%); width: min(560px, calc(100% - 32px));
+  border: 1px solid var(--br-divider); border-radius: 20px; padding: 4px 8px; } }
+
+/* halaman fitur yang dimatikan admin */
+.fitur-off { max-width: 420px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 72px) 24px 120px; text-align: center;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: var(--br-text); }
+.fitur-off h1 { font-size: 22px; font-weight: 800; margin: 0 0 8px; }
+.fitur-off p { color: var(--br-muted); font-size: 14px; margin: 0 0 20px; line-height: 1.5; }
+.fitur-off-btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 20px; border-radius: 999px; background: var(--br-surface);
+  border: 1px solid var(--br-border); color: var(--br-text); font-weight: 700; text-decoration: none; }

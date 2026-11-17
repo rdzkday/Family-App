@@ -218,22 +218,10 @@ function openTodoSheet(t, init) {
     if (!t) { var j = $('#td-judul', sh.el) || $('#td-isi', sh.el); if (j && !f.judul && !f.isi) setTimeout(function () { j.focus(); }, 300); }
   });
 }
-// kartu kecil di Beranda: to-do hari ini & yang terlewat (milikku + bersama)
-function renderHomeTodo(root) {
-  if (!root) return;
-  var today = todayISO();
-  var list = todoSorted(todos().filter(function (t) { return canWriteTodo(t) && !C.bool(t.selesai) && t.tanggal && t.tanggal <= today; }));
-  root.innerHTML = list.length
-    ? '<section class="section"><div class="section-h"><h2>To-do hari ini</h2><button type="button" class="aside lnk" data-act="goto-todo">Lihat semua</button></div>' +
-      '<div class="list todo-list">' + list.slice(0, 3).map(todoRow).join('') + '</div>' +
-      (list.length > 3 ? '<p class="faint" style="font-size:12px;text-align:center;margin:8px 0 0">+' + (list.length - 3) + ' lainnya di Agenda</p>' : '') + '</section>'
-    : '';
-  bindTodoRows(root);
-}
 var TodoView = {
   render: function (el) {
     var self = this;
-    el.innerHTML = agendaHead('todo') +
+    el.innerHTML = agendaHead() +
       '<div class="seg" role="group" aria-label="Filter to-do">' + [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) {
         return '<button type="button" data-tf="' + x[0] + '" aria-pressed="' + (todoFilter() === x[0]) + '">' + x[1] + '</button>';
       }).join('') + '</div>' +

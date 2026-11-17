@@ -5,7 +5,7 @@
 // ---------- Catat (home) ----------
 var HomeView = {
   render: function (el) {
-    el.innerHTML = pageHead('Kantong', longToday()) +
+    el.innerHTML = fiturHead(longToday()) +
       '<div id="home-budget"></div>' +
       '<section class="section"><div class="entry" id="entry"></div></section>' +
       '<div id="home-utang"></div><div id="home-reim"></div>' +
@@ -45,3 +45,6 @@ var HomeView = {
     bindTxRows(re);
   }
 };
+
+// ---------- daftar halaman Kantong (shared/shell.js) ----------
+daftarHalaman('kantong', [['home', 'Catat', HomeView], ['ringkasan', 'Ringkasan', RingkasanView], ['riwayat', 'Riwayat', RiwayatView]]);

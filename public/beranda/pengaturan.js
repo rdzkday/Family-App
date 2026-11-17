@@ -1,17 +1,18 @@
-/* Pengaturan semua fitur (halaman /pengaturan/, akses dari gear Beranda), expand-collapse per fitur:
-   Umum · Kantong · Agenda · Komitmen · Daily Mood. Menggantikan tab Pengaturan Kantong & halaman Setelan.
+/* Pengaturan (halaman /pengaturan/, akses dari gear Beranda), expand-collapse per bagian:
+   Umum selalu ada; bagian fitur hanya muncul kalau fiturnya aktif (shared/fitur.js).
    Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 
 var CHEVRON = '<svg class="atur-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
-var ATUR_FITUR = [
-  // id, judul, ikon, warna, keterangan, isi
+var ATUR_BAGIAN = [
+  // id (= id fitur, kecuali 'umum'), judul, ikon, warna, keterangan, isi
   ['umum', 'Umum', 'gear', '--br-muted', 'Tema, akun, sinkron', function (b) { AturUmum.render(b); }],
   ['kantong', 'Kantong', 'wallet', '--br-kantong', 'Kantong, kategori, budget bulanan', function (b) { AturKantongFitur.render(b); }],
   ['agenda', 'Agenda', 'check', '--br-agenda', 'Filter default, Google Calendar, evaluasi', function (b) { AturAgenda.render(b); }],
   ['komitmen', 'Komitmen', 'heart', '--br-komit', 'Kesepakatan & tanda tangan', function (b) { AturKomitmen.render(b); }],
   ['mood', 'Daily Mood', 'book', '--br-catat', 'Profil, kondisi, prompt, cadangan', function (b) { AturMood.render(b); }]
 ];
+function aturDaftar() { return ATUR_BAGIAN.filter(function (f) { return f[0] === 'umum' || Fitur.aktif(f[0]); }); }
 // bagian yang aman digambar ulang saat data sinkron (tidak ada kolom isian yang sedang diketik)
 var ATUR_SEGAR = { umum: 1, kantong: 1, agenda: 1, komitmen: 1 };
 
@@ -23,7 +24,7 @@ var Pengaturan = {
     var buka = aturBuka();
     box.className = 'br-card br-atur';
     box.innerHTML =
-      '<div class="atur">' + ATUR_FITUR.map(function (f) {
+      '<div class="atur">' + aturDaftar().map(function (f) {
         var on = !!buka[f[0]];
         return '<div class="atur-item" data-atur="' + f[0] + '">' +
           '<button type="button" class="atur-head" aria-expanded="' + on + '" aria-controls="atur-b-' + f[0] + '" id="atur-h-' + f[0] + '">' +
@@ -31,7 +32,7 @@ var Pengaturan = {
             '<span class="main"><span class="t1">' + f[1] + '</span><span class="t2">' + f[4] + '</span></span>' + CHEVRON + '</button>' +
           '<div class="atur-body" id="atur-b-' + f[0] + '" role="region" aria-labelledby="atur-h-' + f[0] + '"' + (on ? '' : ' hidden') + '></div></div>';
       }).join('') + '</div>';
-    ATUR_FITUR.forEach(function (f) { if (buka[f[0]]) f[5]($('#atur-b-' + f[0], box)); });
+    aturDaftar().forEach(function (f) { if (buka[f[0]]) f[5]($('#atur-b-' + f[0], box)); });
     $$('.atur-head', box).forEach(function (h) { h.addEventListener('click', function () {
       Pengaturan.toggle(box, h.closest('[data-atur]').getAttribute('data-atur'));
     }); });
@@ -43,12 +44,12 @@ var Pengaturan = {
     if (!h || !b) return;
     h.setAttribute('aria-expanded', String(on));
     b.hidden = !on;
-    if (on) ATUR_FITUR.filter(function (f) { return f[0] === id; })[0][5](b); else b.innerHTML = '';
+    if (on) ATUR_BAGIAN.filter(function (f) { return f[0] === id; })[0][5](b); else b.innerHTML = '';
   },
   update: function (box) {
     if (!box) return;
     var buka = aturBuka();
-    ATUR_FITUR.forEach(function (f) {
+    aturDaftar().forEach(function (f) {
       if (!buka[f[0]] || !ATUR_SEGAR[f[0]]) return;
       if (f[0] === 'kantong' && BudgetEdit.waiting && BudgetEdit.el) BudgetEdit.render(BudgetEdit.el);
       var b = $('#atur-b-' + f[0], box); if (b && !b.contains(document.activeElement)) f[5](b);
@@ -58,7 +59,7 @@ var Pengaturan = {
 // Halaman Pengaturan (/pengaturan/): diakses dari ikon gear di Beranda. Kembali (kanan atas) → Beranda.
 var PengaturanView = {
   render: function (el) {
-    el.innerHTML = pageHead('Pengaturan', 'Semua fitur') +
+    el.innerHTML = pageHead('Pengaturan', esc(me().nama)) +
       '<section id="pengaturan" aria-label="Pengaturan semua fitur"></section>';
     Pengaturan.render($('#pengaturan', el));
     bukaPengaturanDariHash();
@@ -68,7 +69,7 @@ var PengaturanView = {
 // #<fitur> (misal #kantong, #mood): buka bagian itu lalu gulir ke sana
 function bukaPengaturanDariHash() {
   var m = /^#(\w+)$/.exec(location.hash), box = $('#pengaturan');
-  if (!m || !box || !ATUR_FITUR.some(function (f) { return f[0] === m[1]; })) return;
+  if (!m || !box || !aturDaftar().some(function (f) { return f[0] === m[1]; })) return;
   Pengaturan.toggle(box, m[1], true);
   setTimeout(function () { var t = $('[data-atur="' + m[1] + '"]', box); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
 }
@@ -80,11 +81,11 @@ function aturBaris(label, sub, kanan, attr) {
 var AturUmum = {
   render: function (el) {
     var demo = S.conn.mode === 'demo';
-    var host = demo ? 'Mode demo, data contoh di HP ini' : (/supabase\.(co|in)\//.test(S.conn.api || '') ? 'Terhubung ke Supabase' : 'Terhubung ke server');
+    var host = demo ? 'Mode demo, data hanya di HP ini' : (/supabase\.(co|in)\//.test(S.conn.api || '') ? 'Terhubung ke Supabase' : 'Terhubung ke server');
     el.innerHTML = '<div class="atur-akun"><b>' + esc(me().nama) + '</b><span>' + host + '</span></div>' +
       '<div class="atur-lbl">Tema</div><div class="seg" role="group" aria-label="Tema">' +
         [['dark', 'Gelap'], ['light', 'Terang']].map(function (x) { return '<button type="button" data-theme-set="' + x[0] + '" aria-pressed="' + (themePref() === x[0]) + '">' + x[1] + '</button>'; }).join('') +
-      '</div><p class="br-help" style="margin:-6px 0 12px">Berlaku di Beranda, Kantong, Agenda, Komitmen, dan Daily Mood.</p>' +
+      '</div><p class="br-help" style="margin:-6px 0 12px">Berlaku di semua fitur.</p>' +
       aturBaris('Sinkron sekarang', esc(S.lastSync ? 'Terakhir ' + agoLabel(S.lastSync) : 'Belum sinkron di sesi ini') + (S.outbox.length ? ', ' + S.outbox.length + ' belum terkirim' : ''), '', ' data-au="sync"') +
       (demo ? '' : aturBaris('Ubah password', 'Perangkat lain otomatis keluar', '', ' data-au="pw"')) +
       aturBaris('<span style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Keluar dari akun') + '</span>', '', '', ' data-au="out"') +
@@ -159,7 +160,7 @@ var AturAgenda = {
       }
       if (a === 'email') openKalenderSheet(el);
       if (a === 'eval') openTodoSheet(null, { tipe: 'evaluasi', pemilik: C.TODO_BERSAMA });
-      if (a === 'buka') location.href = FITUR_URL.agenda;
+      if (a === 'buka') location.href = Fitur.url('agenda');
     }); });
     if (!kal) muatKalender().then(function (d) { if (d && el.isConnected) AturAgenda.render(el); });
   }
@@ -213,9 +214,8 @@ var AturKomitmen = {
     var kc = LS.get('k_komitmen', null), d = kc && kc.data;
     el.innerHTML = (d ? '<div class="atur-stats"><div><b class="num">' + (d.berlaku || 0) + '</b><span>kesepakatan aktif</span></div><div><b class="num">' + (d.menunggu_ttd || 0) + '</b><span>menunggu tanda tanganmu</span></div></div>'
         : '<p class="br-help">Data komitmen belum dimuat. Tunggu sinkron atau buka Komitmen.</p>') +
-      aturBaris('Buka Komitmen', 'Baca & cari pasal, definisi A–Z', '', ' data-km="buka"') +
-      '<p class="br-help" style="margin-top:8px">Usul, ubah, dan tanda tangan pasal menyusul (Fase 4b).</p>';
-    $('[data-km="buka"]', el).addEventListener('click', function () { location.href = FITUR_URL.komitmen; });
+      aturBaris('Buka Komitmen', 'Baca, cari, dan usulkan pasal', '', ' data-km="buka"');
+    $('[data-km="buka"]', el).addEventListener('click', function () { location.href = Fitur.url('komitmen'); });
   }
 };
 
@@ -268,7 +268,7 @@ var AturMood = {
     var privasi = remote ? 'Tersimpan di akunmu. Hanya kamu yang bisa membaca, pasangan tidak.' : 'Mode demo: tersimpan di HP ini saja.';
     if (!st || !st.profile) {
       el.innerHTML = '<p class="br-help">' + (remote && !this.ditarik ? 'Memuat pengaturan…' : 'Daily Mood belum diatur. Kenalan dulu (2 pertanyaan) di Daily Mood, lalu atur detailnya di sini.') + '</p>' +
-        '<a class="br-btn violet" style="width:100%;margin-top:10px" href="' + DAILY_MOOD_URL + '">Mulai Daily Mood</a>';
+        '<a class="br-btn violet" style="width:100%;margin-top:10px" href="' + Fitur.url('mood') + '">Mulai Daily Mood</a>';
       this.tarik(); return;
     }
     var p = st.profile; p.conditions = p.conditions || []; p.extraTags = p.extraTags || []; st.custom = st.custom || [];
@@ -295,7 +295,7 @@ var AturMood = {
       toggleHtml('dm-acak', 'Tambahkan 1 prompt acak di akhir', '', st.randomToo !== false) +
       '<div class="atur-lbl">Cadangan</div>' +
       aturBaris('Unduh cadangan (JSON)', st.lastBackup ? 'Terakhir ' + esc(st.lastBackup) : 'Salinan semua catatan di HP ini', '', ' data-dm="backup"') +
-      '<a class="br-btn violet" style="width:100%;margin-top:12px" href="' + DAILY_MOOD_URL + '">Buka Daily Mood</a>';
+      '<a class="br-btn violet" style="width:100%;margin-top:12px" href="' + Fitur.url('mood') + '">Buka Daily Mood</a>';
 
     function ubah(fn, pesan, gambar) { var s = self.state(); fn(s); self.simpan(s, pesan); if (gambar !== false) self.render(el); }
     $('#dm-nama', el).addEventListener('change', function () { var v = this.value.trim(); ubah(function (s) { s.profile.name = v; }, 'Nama disimpan', false); });

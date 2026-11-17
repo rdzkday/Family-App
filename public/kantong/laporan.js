@@ -48,7 +48,7 @@ var RingkasanView = {
   render: function (el) {
     if (S.sub && S.sub.type === 'cat') return CatDetail.render(el);
     var self = this;
-    el.innerHTML = pageHead('Ringkasan', 'Kantong') + bukuTabs(true) + monthBar() + '<div id="rk"></div>';
+    el.innerHTML = fiturHead(longToday()) + bukuTabs(true) + monthBar() + '<div id="rk"></div>';
     bindNav(el, function () { self.render(el); });
     this.update(el);
   },
@@ -156,7 +156,7 @@ var RiwayatView = {
   q: '', onlyWait: false,
   render: function (el) {
     var self = this;
-    el.innerHTML = pageHead('Riwayat', 'Kantong') + bukuTabs(true) + monthBar() +
+    el.innerHTML = fiturHead(longToday()) + bukuTabs(true) + monthBar() +
       '<input class="input" id="q" type="search" placeholder="Cari keterangan atau kategori" value="' + esc(this.q) + '" aria-label="Cari">' +
       '<div class="chips wrap" style="margin-top:10px"><button type="button" class="chip" id="rw-wait" aria-pressed="' + this.onlyWait + '">Menunggu reimburse</button></div>' +
       '<div id="rw"></div>';

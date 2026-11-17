@@ -1,4 +1,6 @@
 (function(){
+  // fitur dimatikan admin → tutup halaman (shared/fitur.js)
+  if (!window.Fitur.jaga('mood')) return;
   // tema dari Beranda › Pengaturan (sama untuk semua halaman)
   try { if (JSON.parse(localStorage.getItem('k_theme')) === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
   const KEY = window.DM_DATA.KEY;
@@ -31,26 +33,13 @@
   // `let` supaya tanggal ikut ganti kalau app dibiarkan terbuka lewat tengah malam
   let todayIso = iso(new Date());
 
-  function seedEntries(){
-    const t = new Date(), E = {};
-    const plan = [
-      [9,4,['Lega','Bangga'],['Kerjaan'],[['Apa yang membuat hari ini terasa lebih ringan?','Presentasi ke klien lancar, akhirnya bisa napas.']]],
-      [8,3,['Lelah'],['Tidur'],[]],
-      [7,2,['Cemas','Lelah'],['Kerjaan','Tidur'],[['Apa yang terjadi sebelum perasaan ini muncul?','Revisi mendadak jam 9 malam. Susah tidur lagi.']]],
-      [6,1,['Sedih','Kecewa'],['Pasangan'],[['Pikiran apa yang paling sering muncul hari ini?','Beda pendapat soal rencana akhir tahun, merasa tidak didengar.']]],
-      [5,2,['Cemas'],['Uang','Rumah'],[]],
-      [4,3,['Tenang'],['Teman'],[['Siapa yang kamu temui hari ini, dan bagaimana rasanya?','Makan siang sama teman lama. Lumayan menghibur.']]],
-      [2,4,['Bersyukur','Tenang'],['Kesehatan'],[['Satu hal kecil yang kamu syukuri hari ini?','Jalan pagi 20 menit sebelum kerja.']]],
-      [1,3,['Lelah','Cemas'],['Kerjaan'],[]]
-    ];
-    plan.forEach(p => { const k = iso(addDays(t,-p[0])); E[k] = {date:k,mood:p[1],emotions:p[2],tags:p[3],answers:p[4].map(a=>({prompt:a[0],text:a[1]}))}; });
-    return E;
-  }
-  function fresh(){ return {profile:null, entries:seedEntries(), custom:['Apa yang ingin kamu bahas di sesi berikutnya?','Kapan hari ini kamu merasa paling tenang?'], randomToo:true, demo:true}; }
+  // mulai kosong (tanpa data contoh)
+  function fresh(){ return {profile:null, entries:{}, custom:[], randomToo:true, demo:false}; }
 
   let state;
   try { state = JSON.parse(localStorage.getItem(KEY)) || null; } catch(e){ state = null; }
-  if (!state) { state = fresh(); try { const c = JSON.parse(localStorage.getItem('k_conn')); if (c && c.mode === 'remote') { state.entries = {}; state.demo = false; } } catch (e) {} }
+  if (!state) state = fresh();
+  if (state.demo) { state.entries = {}; state.demo = false; }   // data contoh versi lama di HP dibuang
   function simpanLokal(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){ toast('Gagal menyimpan, memori perangkat penuh?'); } }
   function save(){ simpanLokal(); antreKirim(); }
 
@@ -197,10 +186,6 @@
     return steps;
   }
 
-  function demoBanner(){
-    if (!state.demo) return '';
-    return '<div class="demo"><span>Ada data contoh supaya kamu bisa langsung coba. Hapus untuk mulai dari kosong.</span><button class="btn ghost sm" type="button" data-act="clear-demo">Hapus contoh</button></div>';
-  }
 
   function conditionPicker(p){
     return CONDITIONS.map(g => {
@@ -236,7 +221,7 @@
 
   function renderToday(){
     const e = state.entries[todayIso];
-    let html = demoBanner() + '<div><p class="muted small">'+fmtLong(todayIso)+'</p><h1>'+greeting()+'</h1></div>' +
+    let html = '<div><p class="muted small">'+fmtLong(todayIso)+'</p><h2 class="greet">'+greeting()+'</h2></div>' +
       '<div class="card"><h3>Gimana perasaanmu hari ini?</h3><div class="moods" role="group" aria-label="Pilih mood">' +
       MOODS.map(m => '<button type="button" class="mood'+(e && e.mood!==m.v ? ' dim' : '')+'" data-mood="'+m.v+'" aria-pressed="'+(!!e && e.mood===m.v)+'">'+face(m.v)+m.label+'</button>').join('') +
       '</div><p class="small muted">'+(e ? 'Tersimpan. Sisanya opsional, isi kalau mau.' : 'Satu ketukan sudah cukup.')+'</p></div>';
@@ -281,7 +266,7 @@
         (se.tags.length ? '<div class="chips">'+se.tags.map(t=>'<span class="chip" style="cursor:default">'+esc(t)+'</span>').join('')+'</div>' : '') +
         (se.answers.filter(a=>a.text).map(a => '<div class="qa"><i>'+esc(a.prompt)+'</i><span>'+esc(a.text)+'</span></div>').join('') || '<p class="small muted">Hanya mood, tanpa tulisan.</p>') + '</div></div>'
       : '<p class="muted">'+fmtLong(selDay)+': belum ada catatan. Tidak apa-apa.</p>';
-    view.innerHTML = demoBanner() +
+    view.innerHTML =
       '<div class="card"><div class="calhead"><button type="button" class="iconbtn" data-act="prev" aria-label="Bulan sebelumnya">‹</button><h2>'+BULAN[m]+' '+y+'</h2><button type="button" class="iconbtn" data-act="next" aria-label="Bulan berikutnya">›</button></div><div class="cal">'+cells+'</div></div>' +
       '<button type="button" class="btn wide" data-act="start-sum">Buat rangkuman</button>' +
       '<div class="card">'+detail+'</div>';
@@ -476,7 +461,6 @@
         toast(r === 'cancelled' ? 'Dibatalkan' : r === 'shared' ? 'PDF siap dikirim' : 'PDF diunduh');
         break;
       }
-      case 'clear-demo': state.entries = {}; state.demo = false; randomPrompt = null; stepIdx = 0; save(); render(); toast('Data contoh dihapus'); break;
     }
   });
 
@@ -499,8 +483,9 @@
     if (now !== todayIso){ saveAnswer(); todayIso = now; selDay = now; randomPrompt = null; stepIdx = 0; render(); }
   });
 
-  if ('serviceWorker' in navigator){
-    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js', {scope:'./'}).catch(()=>{}); });
+  // service worker app utama (scope /) juga meng-cache Daily Mood
+  if ('serviceWorker' in navigator && location.protocol === 'https:'){
+    window.addEventListener('load', () => { navigator.serviceWorker.register('../sw.js').catch(()=>{}); });
   }
 
   // Mood dari Beranda: ?mood=berat|lelah|biasa|baik|senang (urutan 1–5 sama dengan MOODS di sini)
@@ -519,6 +504,7 @@
 
 
   render();
+  document.body.insertAdjacentHTML('beforeend', Fitur.navHtml('mood'));   // menu bawah bersama (shared/fitur.js)
   tandaSinkron();
   if (REMOTE) {
     antreKirim();                 // data lama di HP ikut terkirim sekali (kalau bukan data contoh)

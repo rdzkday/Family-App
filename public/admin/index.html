@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Admin Akun · Family App</title>
+<title>Panel Admin · Family App</title>
 <link rel="icon" href="../icons/icon-32.png">
 <style>
 @font-face { font-family: 'Plus Jakarta Sans'; src: url('../fonts/jakarta.woff2') format('woff2'); font-weight: 200 800; font-display: swap; }
@@ -55,6 +55,17 @@ dialog h2 { margin: 0 0 4px; font-size: 18px; }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px;
   border-radius: 10px; font-weight: 600; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.on { opacity: 1; }
+h2.sec { font-size: 16px; font-weight: 800; margin: 28px 0 10px; }
+h2.sec:first-of-type { margin-top: 0; }
+.fitur { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 24px; }
+.fitur label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 12px 0; border-top: 1px solid var(--border); cursor: pointer; }
+.fitur label span b { display: block; color: var(--text); font-size: 15px; }
+.fitur label span small { font-weight: 600; font-size: 13px; }
+.sw { appearance: none; -webkit-appearance: none; flex: none; width: 44px; height: 26px; border-radius: 99px; background: var(--border); position: relative; cursor: pointer; transition: background .15s; margin: 0; }
+.sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.sw:checked { background: var(--accent); }
+.sw:checked::after { transform: translateX(18px); }
+.sw:disabled { opacity: .5; }
 @media (max-width: 700px) {
   thead { display: none; }
   tr { display: block; border-top: 1px solid var(--border); padding: 12px 0; }
@@ -94,11 +105,12 @@ dialog h2 { margin: 0 0 4px; font-size: 18px; }
   <div class="row"><button type="button" class="btn" id="pw-salin">Salin</button><button type="button" class="btn primary" data-close>Selesai</button></div>
 </dialog>
 
+<script src="../shared/fitur.js"></script>
 <script>
 'use strict';
 var API = window.KANTONG_API || 'https://serskylzlevhjidqrvjm.supabase.co/functions/v1/kantong';
 var KEY = 'admin_token';
-var S = { token: get(), saya: '', akun: [] };
+var S = { token: get(), saya: '', akun: [], fitur: null };
 function get() { try { return sessionStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
 function put(v) { try { v ? sessionStorage.setItem(KEY, v) : sessionStorage.removeItem(KEY); } catch (e) {} }
 function $(s) { return document.querySelector(s); }
@@ -129,7 +141,7 @@ function admin(aksi, data) { return call('admin', { aksi: aksi, data: data || {}
 // ---------- login ----------
 function renderLogin(pesan) {
   $('#app').innerHTML = '<form class="card login" id="f-login" novalidate>' +
-    '<h1>Admin Akun</h1><p class="muted" style="margin:0">Family App · khusus admin</p>' +
+    '<h1>Panel Admin</h1><p class="muted" style="margin:0">Family App · khusus admin</p>' +
     '<label for="l-user">Username</label><input type="text" id="l-user" autocomplete="username" autocapitalize="none" spellcheck="false">' +
     '<label for="l-pass">Password</label><input type="password" id="l-pass" autocomplete="current-password">' +
     '<div class="err" id="l-err" role="alert">' + esc(pesan || '') + '</div>' +
@@ -184,10 +196,30 @@ function renderGantiPw(lama, wajib) {
   });
 }
 
-// ---------- daftar akun ----------
+// ---------- muat: fitur + akun ----------
 function muat() {
-  return admin('list').then(function (d) { S.saya = d.saya; S.akun = d.akun; renderDaftar(); })
-    .catch(function (e) { if (e.code !== 'AUTH') toast(e.message); });
+  return Promise.all([admin('list'), admin('fitur').catch(function () { return { fitur: null }; })]).then(function (r) {
+    S.saya = r[0].saya; S.akun = r[0].akun; S.fitur = r[1].fitur; renderDaftar();
+  }).catch(function (e) { if (e.code !== 'AUTH') toast(e.message); });
+}
+// Fitur aktif untuk seluruh rumah tangga. Daftar & keterangan dari registry yang sama dengan app (shared/fitur.js).
+function fiturHtml() {
+  if (!S.fitur) return '<div class="card"><p class="muted" style="margin:0">Setelan fitur belum tersedia di server.</p></div>';
+  return '<div class="card"><p class="muted" style="margin:0 0 8px;font-size:14px">Fitur yang dimatikan hilang dari menu semua user. Datanya tetap tersimpan dan muncul lagi saat dinyalakan.</p>' +
+    '<div class="fitur">' + Fitur.DAFTAR.map(function (f) {
+      return '<label><span><b>' + esc(f.nama) + '</b><small class="muted">' + esc(f.ket) + '</small></span>' +
+        '<input type="checkbox" class="sw" data-fitur="' + f.id + '"' + (S.fitur[f.id] !== false ? ' checked' : '') + ' aria-label="' + esc(f.nama) + ' aktif"></label>';
+    }).join('') + '</div></div>';
+}
+function ubahFitur(ev) {
+  var c = ev.target.closest('[data-fitur]'); if (!c) return;
+  var baru = {}; Fitur.DAFTAR.forEach(function (f) { baru[f.id] = S.fitur[f.id] !== false; });
+  var id = c.dataset.fitur, nama = Fitur.info(id).nama;
+  baru[id] = c.checked; c.disabled = true;
+  admin('fitur', { fitur: baru }).then(function (d) {
+    S.fitur = d.fitur; c.disabled = false;
+    toast(nama + (c.checked ? ' dinyalakan' : ' dimatikan') + '. Berlaku di HP setelah sinkron berikutnya.');
+  }).catch(function (e) { c.checked = !c.checked; c.disabled = false; toast(e.message); });
 }
 function renderDaftar() {
   var baris = S.akun.map(function (a) {
@@ -209,15 +241,18 @@ function renderDaftar() {
       '<td><span class="muted" style="font-size:13px">' + a.sesi + ' perangkat · ' + waktu(a.terakhir) + '</span></td>' +
       '<td class="aksi">' + aksi + '</td></tr>';
   }).join('');
-  $('#app').innerHTML = '<div class="top"><div><h1>Akun</h1><p class="muted" style="margin:0">' + S.akun.length + ' user · ' +
-      S.akun.filter(function (a) { return a.aktif; }).length + ' aktif</p></div>' +
-    '<div class="act"><button class="btn primary" id="tambah">+ Tambah akun</button><button class="btn" id="ubahpw">Ubah password saya</button><button class="btn" id="keluar">Keluar</button></div></div>' +
+  $('#app').innerHTML = '<div class="top"><div><h1>Panel Admin</h1><p class="muted" style="margin:0">Family App</p></div>' +
+    '<div class="act"><button class="btn" id="ubahpw">Ubah password saya</button><button class="btn" id="keluar">Keluar</button></div></div>' +
+    '<h2 class="sec">Fitur</h2>' + fiturHtml() +
+    '<div class="top" style="margin:28px 0 10px"><div><h2 class="sec" style="margin:0">Akun</h2><p class="muted" style="margin:0;font-size:14px">' + S.akun.length + ' user · ' +
+      S.akun.filter(function (a) { return a.aktif; }).length + ' aktif</p></div><button class="btn primary" id="tambah">+ Tambah akun</button></div>' +
     '<div class="card"><table><thead><tr><th>User</th><th>Username</th><th>Status</th><th>Sesi · terakhir aktif</th><th></th></tr></thead>' +
     '<tbody>' + baris + '</tbody></table></div>';
   $('#tambah').onclick = function () { bukaForm(null); };
   $('#ubahpw').onclick = function () { renderGantiPw('', false); };
   $('#keluar').onclick = function () { call('logout').catch(function () {}); put(''); S.token = ''; renderLogin(); };
   $('#app').querySelector('tbody').addEventListener('click', aksiBaris);
+  var fl = $('#app').querySelector('.fitur'); if (fl) fl.addEventListener('change', ubahFitur);
 }
 function cari(id) { return S.akun.filter(function (a) { return a.user_id === id; })[0]; }
 

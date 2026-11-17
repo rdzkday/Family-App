@@ -43,6 +43,7 @@ function mockDb() {
     assert.ok(m, 'url rpc tidak dikenal: ' + url);
     assert.strictEqual(opt.headers.Authorization, 'Bearer SERVICE', 'service key harus dikirim');
     if (m[1] === 'kantong_muat') return { ok: true, status: 200, text: async () => JSON.stringify(tabel) };
+    if (m[1] === 'kantong_fitur') return { ok: true, status: 200, text: async () => JSON.stringify(tabel.fitur || {}) };
     if (m[1] === 'kantong_login') {
       const a = JSON.parse(opt.body);
       const ok = a.p_username === 'febie' && a.p_password === 'rahasia123';
@@ -316,6 +317,18 @@ function mockGoogle() {
     const s2 = ok(await call(R, 'kalender.cabut', { email: 'febie@gmail.com' }, d2));
     assert.deepStrictEqual(s2.akses.map((a) => a.email), ['riki@gmail.com']);
     assert.deepStrictEqual(ok(await call(R, 'kalender.status', {}, { ...deps, calendar: null })), { siap: false, kunci: false, akses: [] });
+  });
+  await t('fitur modular: aksi fitur mati ditolak server, bootstrap membawa setelan', async () => {
+    db.tabel.fitur = { kantong: true, agenda: false, komitmen: true, mood: true };
+    const boot = ok(await call(R, 'bootstrap', {}));
+    assert.deepStrictEqual(boot.fitur, db.tabel.fitur);
+    const r = await call(R, 'todo.list', {});
+    assert.strictEqual(r.ok, false); assert.strictEqual(r.error, 'Fitur Agenda tidak aktif');
+    const k = await call(R, 'kalender.status', {});
+    assert.strictEqual(k.ok, false); assert.strictEqual(k.error, 'Fitur Agenda tidak aktif');
+    ok(await call(R, 'month', { bulan: '2026-11' }));
+    delete db.tabel.fitur;
+    ok(await call(R, 'todo.list', {}));
   });
   resetTokenCache();
   console.log(`\n${lulus} test lulus`);

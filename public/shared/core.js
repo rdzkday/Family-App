@@ -35,7 +35,7 @@ var KantongCore = (function () {
   var KAT_SETORAN_MASUK = 'setoran-rt-in'; // pemasukan otomatis di sisi dompet bersama
   var TIPE_TX = ['Pengeluaran', 'Pemasukan', 'Transfer'];
   var JENIS_KANTONG = ['Cash', 'Debit', 'E-wallet', 'Kredit'];
-  var VERSION = '1.6.0';
+  var VERSION = '1.7.0';
   // ---------- to-do ----------
   var TODO_BERSAMA = 'bersama';          // pemilik to-do bersama (selain itu: id user)
   var TODO_DURASI = 30;                  // menit, dipakai kalau jam diisi tapi durasi kosong
@@ -48,6 +48,32 @@ var KantongCore = (function () {
 
   // ---------- util ----------
   function err(msg) { var e = new Error(msg); e.userFacing = true; return e; }
+
+  // ---------- fitur modular ----------
+  // Fitur yang bisa dinyalakan/dimatikan admin (tabel app_setting, kunci 'fitur'). Beranda & Pengaturan selalu ada.
+  // aksi: prefiks/nama aksi milik fitur itu. Fitur nonaktif = aksinya ditolak.
+  var FITUR = [
+    { id: 'kantong', nama: 'Kantong', aksi: ['month', 'tx.', 'budget.', 'kantong.', 'kategori.', 'talangan.'] },
+    { id: 'agenda', nama: 'Agenda', aksi: ['todo.', 'kalender.'] },
+    { id: 'komitmen', nama: 'Komitmen', aksi: ['komitmen.', 'pengesahan.'] },
+    { id: 'mood', nama: 'Daily Mood', aksi: ['jurnal.'] }
+  ];
+  function fiturDariAksi(action) {
+    action = String(action || '');
+    for (var i = 0; i < FITUR.length; i++) {
+      for (var j = 0; j < FITUR[i].aksi.length; j++) {
+        var a = FITUR[i].aksi[j];
+        if (a.slice(-1) === '.' ? action.indexOf(a) === 0 : action === a) return FITUR[i];
+      }
+    }
+    return null;
+  }
+  // setelan: { kantong: true, ... } atau null (semua aktif). Fitur yang tidak disebut dianggap aktif.
+  function fiturAktif(setelan, id) { return !setelan || setelan[id] !== false; }
+  function cekFitur(setelan, action) {
+    var f = fiturDariAksi(action);
+    if (f && !fiturAktif(setelan, f.id)) throw err('Fitur ' + f.nama + ' tidak aktif');
+  }
   function isDate(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s); }
   function isMonth(s) { return typeof s === 'string' && /^\d{4}-\d{2}$/.test(s); }
   function isTime(s) { return typeof s === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(s); }
@@ -915,6 +941,7 @@ var KantongCore = (function () {
   // store: { all(table) -> array, upsert(table, obj) -> obj, calendar?: { upsert, remove } }
   function handle(store, user, action, payload, nowIso) {
     payload = payload || {};
+    cekFitur(store.fitur || null, action);
     var db = {};
     Object.keys(SCHEMA).forEach(function (t) { db[t] = store.all(t); });
     var today = nowIso.slice(0, 10);
@@ -931,7 +958,8 @@ var KantongCore = (function () {
           buku: sortBy(db.Buku, 'urutan'), users: db.Users,
           kategori: sortBy(db.Kategori, 'urutan'), kantong: sortBy(db.Kantong, 'urutan'),
           saldo: computeSaldo(db).saldo, bulan: Object.keys(months).sort().reverse(),
-          utang: computeUtang(db), talangan: computeTalangan(db)
+          utang: computeUtang(db), talangan: computeTalangan(db),
+          fitur: store.fitur || null
         };
       }
       case 'month': {
@@ -1181,7 +1209,7 @@ var KantongCore = (function () {
   }
 
   return {
-    VERSION: VERSION, SCHEMA: SCHEMA, TIPE_TX: TIPE_TX, JENIS_KANTONG: JENIS_KANTONG,
+    VERSION: VERSION, SCHEMA: SCHEMA, FITUR: FITUR, fiturDariAksi: fiturDariAksi, fiturAktif: fiturAktif, cekFitur: cekFitur, TIPE_TX: TIPE_TX, JENIS_KANTONG: JENIS_KANTONG,
     canWrite: canWrite, writableBuku: writableBuku, computeSaldo: computeSaldo,
     effectiveBudget: effectiveBudget, summarize: summarize, txInBuku: txInBuku,
     bukuOfKantong: bukuOfKantong, scopeOf: scopeOf, bool: bool, num: num, byId: byId,

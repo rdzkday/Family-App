@@ -84,7 +84,7 @@ function utangAntara(store, bersama, pribadi) {
 }
 
 // ---------------------------------------------------------------- versi & salinan core
-eq('versi core naik ke 1.6.0', C.VERSION, '1.6.0');
+eq('versi core naik ke 1.7.0', C.VERSION, '1.7.0');
 (function () {
   // core.mjs (Edge Function Supabase) harus persis hasil build_core.js
   var fs = require('fs'), build = require(path.join(__dirname, 'build_core.js'));
@@ -846,6 +846,31 @@ function komCall(st, uid, action, payload) {
   eq('lewat belum disiapkan tampil netral', C.todoTidakDikirimLewat(kemarin, T), true);
   eq('mendatang belum disiapkan tetap error', C.todoTidakDikirimLewat(besok, T), false);
   eq('lewat gagal 403 tetap error', C.todoTidakDikirimLewat(Object.assign({}, kemarin, { gcal_error: 'Google Calendar 403' }), T), false);
+})();
+
+// ---------- fitur modular: aksi fitur nonaktif ditolak ----------
+(function () {
+  console.log('\nFitur modular');
+  eq('aksi tx milik kantong', C.fiturDariAksi('tx.save').id, 'kantong');
+  eq('aksi month milik kantong', C.fiturDariAksi('month').id, 'kantong');
+  eq('aksi todo milik agenda', C.fiturDariAksi('todo.list').id, 'agenda');
+  eq('aksi kalender milik agenda', C.fiturDariAksi('kalender.status').id, 'agenda');
+  eq('aksi pengesahan milik komitmen', C.fiturDariAksi('pengesahan.sign').id, 'komitmen');
+  eq('aksi jurnal milik mood', C.fiturDariAksi('jurnal.save').id, 'mood');
+  eq('bootstrap bukan milik fitur', C.fiturDariAksi('bootstrap'), null);
+  eq('monthly bukan aksi month', C.fiturDariAksi('monthly'), null);
+  eq('setelan null = semua aktif', C.fiturAktif(null, 'agenda'), true);
+  eq('fitur tak disebut = aktif', C.fiturAktif({ kantong: false }, 'agenda'), true);
+  var st = setup([]), u = usr(st, 'riki');
+  st.fitur = { kantong: true, agenda: false, komitmen: true, mood: true };
+  lempar('todo.list ditolak saat agenda mati', function () { C.handle(st, u, 'todo.list', {}, NOW); });
+  ok('month tetap jalan saat agenda mati', !!C.handle(st, u, 'month', { bulan: BL }, NOW).bulan);
+  var boot = C.handle(st, u, 'bootstrap', {}, NOW);
+  eq('bootstrap membawa setelan fitur', boot.fitur.agenda, false);
+  var b = C.handle(st, u, 'batch', { ops: [{ opId: 'a', action: 'todo.list' }, { opId: 'b', action: 'month', payload: { bulan: BL } }] }, NOW);
+  eq('batch: op fitur mati gagal', b.results[0].ok, false);
+  eq('batch: pesan jelas', b.results[0].error, 'Fitur Agenda tidak aktif');
+  eq('batch: op lain tetap jalan', b.results[1].ok, true);
 })();
 
 console.log('\n' + lulus + ' cek lulus, ' + gagal + ' gagal.');

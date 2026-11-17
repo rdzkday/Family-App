@@ -2,13 +2,8 @@
    Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 
-// judul + tab di atas setiap view Agenda
-function agendaHead(aktif) {
-  return pageHead('Agenda', longToday(), syncPill()) +
-    '<div class="seg ag-tabs" role="tablist" aria-label="Bagian Agenda">' + [['todo', 'To-do'], ['catatan', 'Catatan'], ['jadwal', 'Jadwal']].map(function (x) {
-      return '<button type="button" role="tab" data-brgo="' + x[0] + '" aria-selected="' + (aktif === x[0]) + '" aria-pressed="' + (aktif === x[0]) + '">' + x[1] + '</button>';
-    }).join('') + '</div>';
-}
+// judul + tab di atas setiap view Agenda (tab didaftarkan di bawah)
+function agendaHead() { return fiturHead(longToday(), syncPill()); }
 function agendaFilterSeg(attr) {
   return '<div class="seg" role="group" aria-label="Filter">' + [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) {
     return '<button type="button" ' + attr + '="' + x[0] + '" aria-pressed="' + (todoFilter() === x[0]) + '">' + x[1] + '</button>';
@@ -18,7 +13,7 @@ function agendaFilterSeg(attr) {
 // ---------- Catatan: teks bebas, tidak masuk kalender ----------
 var CatatanView = {
   render: function (el) {
-    el.innerHTML = agendaHead('catatan') + agendaFilterSeg('data-cf') +
+    el.innerHTML = agendaHead() + agendaFilterSeg('data-cf') +
       '<button type="button" class="br-btn primary" id="ct-new" style="width:100%">' + ICON.plus + 'Tulis catatan</button>' +
       '<div id="ct-list" style="margin-top:14px"></div>';
     $$('[data-cf]', el).forEach(function (b) { b.addEventListener('click', function () {
@@ -44,7 +39,7 @@ var JadwalView = {
   render: function (el) {
     var today = todayISO();
     var list = todoSorted(todos().filter(function (t) { return C.todoTipe(t) !== 'catatan' && t.tanggal && !C.bool(t.selesai) && t.tanggal >= C.addDays(today, -7); }));
-    var html = agendaHead('jadwal') +
+    var html = agendaHead() +
       '<p class="muted" style="margin:0 0 12px;font-size:14px">To-do berwaktu & evaluasi bulanan. Semuanya masuk Google Calendar "Rumah Kita".</p>' +
       '<button type="button" class="br-btn primary" id="ag-new" style="width:100%">' + ICON.plus + 'Tambah jadwal</button>';
     if (S.todos === null) html += skeleton(3);
@@ -67,3 +62,6 @@ var JadwalView = {
     $('#ag-new', el).addEventListener('click', function () { openTodoSheet(null, { aturWaktu: true }); });
   }
 };
+
+// ---------- daftar halaman (shared/shell.js) ----------
+daftarHalaman('agenda', [['todo', 'To-do', TodoView], ['catatan', 'Catatan', CatatanView], ['jadwal', 'Jadwal', JadwalView]]);
