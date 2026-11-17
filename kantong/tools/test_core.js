@@ -84,7 +84,7 @@ function utangAntara(store, bersama, pribadi) {
 }
 
 // ---------------------------------------------------------------- versi & salinan core
-eq('versi core naik ke 1.3.0', C.VERSION, '1.3.0');
+eq('versi core naik ke 1.4.0', C.VERSION, '1.4.0');
 (function () {
   // core.mjs (Supabase) dan Core.gs (Apps Script) harus persis hasil build_core.js
   var fs = require('fs'), build = require(path.join(__dirname, 'build_core.js'));
@@ -526,6 +526,86 @@ function todoById(store, id) { return C.byId(store.all('Todo'))[id]; }
   todoCall(st, 'u-riki', 'todo.save', { id: 'l3', judul: 'Belum selesai' }, '2026-09-01T10:00:00+07:00');
   var ids = todoCall(st, 'u-riki', 'todo.list', {}).todos.map(function (t) { return t.id; }).sort().join(',');
   eq('todo.list: selesai lama disembunyikan, yang belum selesai tetap', ids, 'l2,l3');
+})();
+
+// ================================================================ catatan, evaluasi, komitmen, jurnal (Beranda)
+(function () {
+  var st = todoStore();
+  var r = todoCall(st, 'u-riki', 'todo.save', { id: 'c1', tipe: 'catatan', isi: 'Ide kado Ibu\nsyal rajut', tanggal: '2026-11-20', jam: '10:00' });
+  eq('catatan: judul dari baris pertama', r.todo.judul, 'Ide kado Ibu');
+  eq('catatan: isi utuh', r.todo.isi, 'Ide kado Ibu\nsyal rajut');
+  eq('catatan: waktu dibuang', r.todo.tanggal + '|' + r.todo.jam, '|');
+  eq('catatan: tidak pernah masuk kalender', Object.keys(st.calendar.events).length, 0);
+  eq('catatan: tipe tersimpan', todoById(st, 'c1').tipe, 'catatan');
+  lempar('catatan: tidak bisa dicentang', function () { todoCall(st, 'u-riki', 'todo.done', { id: 'c1', selesai: true }); });
+  lempar('catatan kosong ditolak', function () { todoCall(st, 'u-riki', 'todo.save', { id: 'c2', tipe: 'catatan', isi: '  ' }); });
+  var b = todoCall(st, 'u-febie', 'todo.save', { id: 'c3', tipe: 'catatan', isi: 'Daftar belanja', pemilik: 'bersama' });
+  eq('catatan bersama boleh', b.todo.pemilik, 'bersama');
+  lempar('catatan pribadi orang lain tidak bisa diubah', function () { todoCall(st, 'u-febie', 'todo.save', { id: 'c1', tipe: 'catatan', isi: 'x' }); });
+  var lama = todoCall(st, 'u-riki', 'todo.save', { id: 'o1', judul: 'Baris lama tanpa tipe' });
+  st.data.Todo.forEach(function (x) { if (x.id === 'o1') x.tipe = ''; });
+  eq('baris lama tanpa tipe dianggap to-do', C.todoTipe(todoById(st, 'o1')), 'todo');
+  ok('tipe ngawur ditolak', (function () { try { todoCall(st, 'u-riki', 'todo.save', { id: 'z', judul: 'x', tipe: 'rahasia' }); return false; } catch (e) { return true; } })());
+  void lama;
+})();
+
+(function () {
+  var st = todoStore();
+  lempar('evaluasi tanpa tanggal ditolak', function () { todoCall(st, 'u-riki', 'todo.save', { id: 'e0', tipe: 'evaluasi' }); });
+  var r = todoCall(st, 'u-riki', 'todo.save', { id: 'e1', tipe: 'evaluasi', tanggal: '2026-11-29', jam: '19:00', durasi: 60 });
+  eq('evaluasi: judul default', r.todo.judul, 'Evaluasi bulanan');
+  eq('evaluasi: default bersama', r.todo.pemilik, 'bersama');
+  eq('evaluasi: masuk kalender', r.todo.gcal_status, 'ok');
+  eq('evaluasi: prefix [B]', st.calendar.events[r.todo.gcal_event_id].judul, '[B] Evaluasi bulanan');
+  var todos = st.all('Todo');
+  eq('pengingat: 7 jam sebelum belum muncul', C.evaluasiPengingat(todos, '2026-11-29T12:00'), null);
+  var p = C.evaluasiPengingat(todos, '2026-11-29T13:00');
+  ok('pengingat: tepat 6 jam sebelum muncul', !!p);
+  eq('pengingat: sisa menit', p && p.menit, 360);
+  ok('pengingat: selama acara masih muncul', !!C.evaluasiPengingat(todos, '2026-11-29T19:30'));
+  eq('pengingat: setelah acara selesai hilang', C.evaluasiPengingat(todos, '2026-11-29T20:00'), null);
+  todoCall(st, 'u-febie', 'todo.done', { id: 'e1', selesai: true });
+  eq('pengingat: evaluasi selesai tidak muncul', C.evaluasiPengingat(st.all('Todo'), '2026-11-29T15:00'), null);
+  todoCall(st, 'u-riki', 'todo.save', { id: 'e2', tipe: 'evaluasi', tanggal: '2026-12-27' });
+  ok('pengingat: seharian muncul mulai 18.00 hari sebelumnya', !!C.evaluasiPengingat(st.all('Todo'), '2026-12-26T18:00') && !C.evaluasiPengingat(st.all('Todo'), '2026-12-26T17:59'));
+  todoCall(st, 'u-riki', 'todo.save', { id: 'b1', judul: 'To-do biasa', tanggal: '2026-12-27', jam: '09:00' });
+  eq('pengingat: to-do biasa tidak dihitung', C.evaluasiPengingat(st.all('Todo'), '2026-12-27T08:00').todo.id, 'e2');
+})();
+
+(function () {
+  var st = todoStore();
+  var a = todoCall(st, 'u-riki', 'komitmen.save', { id: 'k1', judul: '  Quality time   tiap Jumat ', isi: 'HP disimpan' });
+  eq('komitmen: judul dirapikan', a.komitmen.judul, 'Quality time tiap Jumat');
+  eq('komitmen: berlaku sejak hari ini', a.komitmen.berlaku_sejak, '2026-11-02');
+  todoCall(st, 'u-febie', 'komitmen.save', { id: 'k2', judul: 'Bahas uang tiap tgl 1', berlaku_sejak: '2026-11-01' });
+  eq('komitmen: Febie boleh tulis', C.komitmenAktif(dbOf(st)).length, 2);
+  todoCall(st, 'u-febie', 'komitmen.save', { id: 'k3', judul: 'Bahas uang tiap Sabtu pertama', mengganti: 'k2' });
+  var aktif = C.komitmenAktif(dbOf(st)).map(function (k) { return k.id; }).sort().join(',');
+  eq('komitmen: yang diganti tidak aktif lagi', aktif, 'k1,k3');
+  eq('komitmen: riwayat tetap ada di list', todoCall(st, 'u-riki', 'komitmen.list', {}).komitmen.length, 3);
+  eq('komitmen: tidak bocor ke todo.list', todoCall(st, 'u-riki', 'todo.list', {}).todos.length, 0);
+  todoCall(st, 'u-riki', 'komitmen.delete', { id: 'k3' });
+  eq('komitmen: hapus pengganti, yang lama berlaku lagi', C.komitmenAktif(dbOf(st)).map(function (k) { return k.id; }).sort().join(','), 'k1,k2');
+  eq('komitmen: hapus idempoten', todoCall(st, 'u-riki', 'komitmen.delete', { id: 'k3' }).id, 'k3');
+  lempar('komitmen kosong ditolak', function () { todoCall(st, 'u-riki', 'komitmen.save', { id: 'k9', judul: ' ' }); });
+  lempar('komitmen tidak bisa mengganti dirinya', function () { todoCall(st, 'u-riki', 'komitmen.save', { id: 'k1', judul: 'x', mengganti: 'k1' }); });
+  todoCall(st, 'u-riki', 'todo.save', { id: 't1', judul: 'To-do' });
+  eq('to-do tidak bocor ke komitmen.list', todoCall(st, 'u-riki', 'komitmen.list', {}).komitmen.filter(function (k) { return k.id === 't1'; }).length, 0);
+})();
+
+(function () {
+  var st = todoStore();
+  var j = todoCall(st, 'u-febie', 'jurnal.save', { id: 'j1', mood: 'lelah', isi: 'Hari panjang' });
+  eq('jurnal: pemilik = penulis', j.jurnal.pemilik, 'u-febie');
+  eq('jurnal: tanggal default hari ini', j.jurnal.tanggal, '2026-11-02');
+  eq('jurnal: Riki tidak bisa lihat jurnal Febie', todoCall(st, 'u-riki', 'jurnal.list', {}).jurnal.length, 0);
+  eq('jurnal: Febie lihat miliknya', todoCall(st, 'u-febie', 'jurnal.list', {}).jurnal.length, 1);
+  lempar('jurnal: Riki tidak bisa ubah', function () { todoCall(st, 'u-riki', 'jurnal.save', { id: 'j1', isi: 'x' }); });
+  lempar('jurnal: Riki tidak bisa hapus', function () { todoCall(st, 'u-riki', 'jurnal.delete', { id: 'j1' }); });
+  lempar('jurnal: mood ngawur ditolak', function () { todoCall(st, 'u-febie', 'jurnal.save', { id: 'j2', mood: 'galau' }); });
+  lempar('jurnal: kosong ditolak', function () { todoCall(st, 'u-febie', 'jurnal.save', { id: 'j3' }); });
+  todoCall(st, 'u-febie', 'jurnal.delete', { id: 'j1' });
+  eq('jurnal: hapus', todoCall(st, 'u-febie', 'jurnal.list', {}).jurnal.length, 0);
 })();
 
 console.log('\n' + lulus + ' cek lulus, ' + gagal + ' gagal.');

@@ -31,7 +31,9 @@ supabase db push
 
 Ini membuat tabel `buku, users, kategori, kantong, budget, transaksi, todo, akses` beserta fungsi `kantong_muat`, `kantong_simpan`, `kantong_buat_kode`. Semua tabel memakai RLS tanpa policy: hanya Edge Function (service role) yang bisa membaca/menulis.
 
-Alternatif tanpa CLI: buka **SQL Editor**, tempel isi `supabase/migrations/20261116000000_kantong.sql`, **Run**.
+Alternatif tanpa CLI: buka **SQL Editor**, tempel isi tiap file di `supabase/migrations/` **berurutan** (`20261116…_kantong.sql`, lalu `20261117…_beranda.sql`), **Run**.
+
+Migrasi Beranda (`20261117…`) hanya menambah: kolom `tipe` & `isi` di `todo` (catatan, agenda evaluasi), tabel `komitmen` dan `jurnal` (Ruang Catat). Data lama aman.
 
 Lalu di **Table Editor → users** dan **buku**: ganti nama `Istri` sesuai nama pasangan. Kolom `id` jangan diubah.
 
@@ -88,7 +90,7 @@ To-do yang **punya waktu** otomatis masuk ke satu kalender khusus bernama **Ruma
 1. Google Calendar web → ⚙ **Settings → Add calendar → Create new calendar** → nama `Rumah Kita`.
 2. console.cloud.google.com → project baru (mis. `kantong`) → **APIs & Services → Enable APIs** → aktifkan **Google Calendar API**.
 3. **IAM & Admin → Service Accounts → Create** (nama `kantong`) → tab **Keys → Add key → JSON**. File JSON terunduh; salin alamat email service account-nya (`kantong@….iam.gserviceaccount.com`).
-4. Google Calendar → Settings → **Rumah Kita → Share with specific people** → tambahkan email service account, izin **Make changes to events**. Tambahkan juga email Google pasangan dengan izin yang sama.
+4. Google Calendar → Settings → **Rumah Kita → Share with specific people** → tambahkan email service account, izin **Make changes to events**. Tambahkan juga **semua** email Google yang perlu melihat kalender (boleh lebih dari satu per orang, mis. email pribadi & kantor Febie) dengan izin yang sama.
 5. Di halaman yang sama, bagian **Integrate calendar**, salin **Calendar ID**.
 6. Simpan secret ke Edge Function:
 
@@ -115,7 +117,18 @@ Aturan yang dijalankan server:
 
 ---
 
-## Aturan akses
+## Beranda, Komitmen, Ruang Catat
+
+| Halaman | URL | Isi |
+|---|---|---|
+| Beranda | `/` | Ringkasan Kantong, pengingat evaluasi, to-do & catatan, mood |
+| Kantong | `/kantong.html` (`#todo` = tab To-do) | App keuangan lengkap, sama seperti sebelumnya |
+| Ruang Catat | `/ruang-catat/?mood=…` | Jurnal harian + mood, **pribadi** (pasangan tidak bisa baca) |
+
+- **Catatan**: tidak punya centang, tidak pernah masuk kalender. Bisa pribadi atau Bersama.
+- **Evaluasi bulanan**: dijadwalkan dari Beranda → Komitmen → **Jadwalkan evaluasi**. Ini agenda (to-do bertipe evaluasi) yang masuk Google Calendar. Kartu pengingat muncul di Beranda mulai 6 jam sebelumnya; **Ingatkan nanti** = sembunyi 1 jam.
+- **Komitmen**: dua-duanya boleh tulis. Berlaku sampai diganti; yang diganti pindah ke Riwayat.
+
 
 | | Buku Riki | Buku Istri | Rumah Tangga |
 |---|---|---|---|

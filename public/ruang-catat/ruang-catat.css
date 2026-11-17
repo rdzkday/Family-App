@@ -1,0 +1,52 @@
+/* Ruang Catat: jurnal harian + mood. Token sama dengan Beranda. */
+@font-face { font-family: 'Plus Jakarta Sans'; src: url('../fonts/jakarta.woff2') format('woff2'); font-weight: 200 800; font-display: swap; }
+:root {
+  --bg: #0E1014; --surface: #161920; --border: #262B35; --inset: #0E1014; --divider: #20242D;
+  --text: #ECEEF2; --muted: #9AA3B2; --violet: #C4B5FD; --violet-bg: #252137; --bad: #F87171;
+  --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-weight: 500; -webkit-font-smoothing: antialiased; }
+button, textarea, input { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+.rc { max-width: 720px; margin: 0 auto; padding: calc(var(--safe-t) + 16px) 16px calc(var(--safe-b) + 40px); display: flex; flex-direction: column; gap: 16px; }
+.back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin-left: -8px; padding: 0 8px; color: var(--muted); font-weight: 700; font-size: 14px; text-decoration: none; }
+.back svg { width: 18px; height: 18px; }
+h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+.sub { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.q { margin: 0; font-weight: 700; font-size: 15px; }
+.moods { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.moods button { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 76px; padding: 10px 2px; border-radius: 14px;
+  background: var(--inset); border: 1px solid var(--border); color: var(--muted); font-size: 12px; font-weight: 700; }
+.moods svg { width: 28px; height: 28px; color: var(--c); }
+.moods button[aria-checked="true"] { border-color: var(--c); color: var(--text); background: color-mix(in srgb, var(--c) 14%, var(--inset)); }
+textarea { width: 100%; min-height: 180px; padding: 14px 16px; border-radius: 14px; background: var(--inset); border: 1px solid var(--border); font-size: 16px; line-height: 1.6; resize: vertical; cursor: text; }
+textarea::placeholder { color: #7A8394; }
+textarea:focus { outline: none; border-color: #4B4470; box-shadow: 0 0 0 3px rgba(196, 181, 253, .18); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.note { font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.note svg { width: 14px; height: 14px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 22px; border-radius: 14px; background: var(--violet); color: #17132A; font-weight: 800; font-size: 15px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); min-height: 44px; padding: 0 14px; font-size: 13.5px; }
+.err { color: #FCA5A5; font-size: 13px; min-height: 0; }
+.err:empty { display: none; }
+h2 { margin: 0; font-size: 17px; font-weight: 800; }
+.entry { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--divider); }
+.entry:last-child { border-bottom: 0; padding-bottom: 0; }
+.entry:first-child { padding-top: 0; }
+.entry .m { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 16%, var(--inset)); color: var(--c); }
+.entry .m svg { width: 22px; height: 22px; }
+.entry .b { flex: 1; min-width: 0; }
+.entry .d { font-size: 12.5px; color: var(--muted); font-weight: 700; }
+.entry p { margin: 4px 0 0; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.entry .x { min-height: 44px; min-width: 44px; color: var(--muted); font-size: 13px; font-weight: 700; align-self: flex-start; margin-top: -10px; }
+.empty { color: var(--muted); font-size: 14px; }
+.toast { position: fixed; left: 50%; bottom: calc(var(--safe-b) + 24px); transform: translate(-50%, 20px); opacity: 0; pointer-events: none; transition: .2s;
+  background: #ECEEF2; color: #0E1014; padding: 12px 18px; border-radius: 14px; font-weight: 700; font-size: 14px; max-width: calc(100% - 32px); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.bad { background: #FCA5A5; }
+.connect { text-align: center; padding-top: 20vh; }
+.connect a { color: var(--violet); font-weight: 700; }

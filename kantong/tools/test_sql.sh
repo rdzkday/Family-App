@@ -4,7 +4,6 @@
 # Tanpa PGURL: membuat cluster sementara dengan pg_ctlcluster (Ubuntu) di direktori temp.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SQL="$ROOT/supabase/migrations/20261116000000_kantong.sql"
 TMP=""
 if [ -z "${PGURL:-}" ]; then
   TMP="$(mktemp -d)"
@@ -23,8 +22,8 @@ if [ -z "${PGURL:-}" ]; then
   end \$\$;"
 fi
 
-psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$SQL"
-psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$SQL"   # idempoten: boleh dijalankan dua kali
+for SQL in "$ROOT"/supabase/migrations/*.sql; do psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$SQL"; done
+for SQL in "$ROOT"/supabase/migrations/*.sql; do psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$SQL"; done   # idempoten: boleh dijalankan dua kali
 echo "✓ migrasi jalan dua kali tanpa error"
 
 q() { psql -qtA -v ON_ERROR_STOP=1 "$PGURL" -c "$1"; }
@@ -58,6 +57,14 @@ if q "select kantong_simpan('[{\"tabel\":\"akses\",\"baris\":{\"user_id\":\"riki
 if q "select kantong_simpan('[{\"tabel\":\"todo\",\"baris\":{\"judul\":\"tanpa id\"}}]'::jsonb)" 2>/dev/null; then echo "baris tanpa id harus ditolak"; exit 1; fi
 echo "✓ kantong_simpan menolak tabel terlarang & baris tanpa id"
 
+# tabel Beranda: komitmen & jurnal lewat kantong_simpan; baris todo versi lama (tanpa tipe/isi) tetap bisa disimpan
+ROWS3='[{"tabel":"komitmen","baris":{"id":"k-1","judul":"Quality time","isi":"","berlaku_sejak":"2026-11-01","diganti_oleh":"","oleh":"riki","dibuat":"x","diubah":"x","dihapus":""}},
+        {"tabel":"jurnal","baris":{"id":"j-1","pemilik":"riki","tanggal":"2026-11-17","mood":"baik","isi":"ok","dibuat":"x","diubah":"x","dihapus":""}},
+        {"tabel":"todo","baris":{"id":"c-1","judul":"Catatan","pemilik":"bersama","tanggal":null,"jam":"","durasi":30,"selesai":false,"selesai_oleh":"","gcal_event_id":"","gcal_status":"","gcal_error":"","oleh":"riki","dibuat":"y","diubah":"y","dihapus":"","tipe":"catatan","isi":"isi"}}]'
+[ "$(q "select kantong_simpan('$ROWS3'::jsonb)")" = "3" ] || { echo "kantong_simpan tabel Beranda gagal"; exit 1; }
+[ "$(q "select coalesce(tipe,'') from todo where id='td-1'")" = "" ] || { echo "todo lama: tipe kosong (core membacanya sebagai todo)"; exit 1; }
+echo "✓ komitmen & jurnal tersimpan; to-do versi lama tetap bisa disimpan (tipe kosong = todo)"
+
 # kantong_muat: snapshot semua tabel, tanggal sebagai string, null tetap null
 MUAT="$(q "select kantong_muat()")"
 node -e '
@@ -67,6 +74,8 @@ a.strictEqual(s.buku.length, 3); a.strictEqual(s.users.length, 2);
 a.strictEqual(s.transaksi[0].tanggal, "2026-11-17"); a.strictEqual(s.transaksi[0].nominal, 30000);
 a.strictEqual(s.kantong[0].limit, 0); a.strictEqual(s.kantong[0].per_tanggal, "2026-10-31");
 a.strictEqual(s.todo[0].tanggal, null); a.strictEqual(s.todo[0].selesai, false);
+a.strictEqual(s.komitmen[0].berlaku_sejak, "2026-11-01"); a.strictEqual(s.jurnal[0].mood, "baik");
+a.strictEqual(s.todo.find((t) => t.id === "c-1").tipe, "catatan");
 a.strictEqual(s.akses.length, 1); a.ok(s.akses[0].token_hash.length === 64);
 ' "$MUAT"
 echo "✓ kantong_muat: snapshot lengkap, tipe kolom sesuai harapan core"

@@ -16,19 +16,28 @@ var KantongCore = (function () {
     Transaksi: ['id', 'tanggal', 'tipe', 'nominal', 'buku', 'kategori', 'kantong', 'kantong_tujuan',
       'keterangan', 'reimburse', 'oleh', 'sumber', 'dibuat', 'diubah', 'dihapus', 'terbayar', 'tx_balik'],
     Todo: ['id', 'judul', 'pemilik', 'tanggal', 'jam', 'durasi', 'selesai', 'selesai_oleh',
-      'gcal_event_id', 'gcal_status', 'gcal_error', 'oleh', 'dibuat', 'diubah', 'dihapus']
+      'gcal_event_id', 'gcal_status', 'gcal_error', 'oleh', 'dibuat', 'diubah', 'dihapus', 'tipe', 'isi'],
+    // Kesepakatan berdua hasil evaluasi bulanan. Berlaku sampai diganti (diganti_oleh = id kesepakatan baru).
+    Komitmen: ['id', 'judul', 'isi', 'berlaku_sejak', 'diganti_oleh', 'oleh', 'dibuat', 'diubah', 'dihapus'],
+    // Ruang Catat: jurnal harian + mood. Pribadi: hanya pemiliknya yang bisa baca & tulis.
+    Jurnal: ['id', 'pemilik', 'tanggal', 'mood', 'isi', 'dibuat', 'diubah', 'dihapus']
   };
   var KAT_REIMBURSE = 'reimburse-masuk';   // kategori pemasukan otomatis, tidak dihitung sebagai pendapatan
   var KAT_SETORAN = 'setoran-rt';          // pengeluaran otomatis: topup dari kantong pribadi ke dompet bersama
   var KAT_SETORAN_MASUK = 'setoran-rt-in'; // pemasukan otomatis di sisi dompet bersama
   var TIPE_TX = ['Pengeluaran', 'Pemasukan', 'Transfer'];
   var JENIS_KANTONG = ['Cash', 'Debit', 'E-wallet', 'Kredit'];
-  var VERSION = '1.3.0';
+  var VERSION = '1.4.0';
   // ---------- to-do ----------
   var TODO_BERSAMA = 'bersama';          // pemilik to-do bersama (selain itu: id user)
   var TODO_DURASI = 30;                  // menit, dipakai kalau jam diisi tapi durasi kosong
   var TODO_SELESAI_EVENT = 'centang';    // 'centang' = event dibiarkan, judul diberi tanda ✓ ; 'hapus' = event dihapus saat dicentang
   var TODO_SIMPAN_SELESAI_HARI = 30;     // to-do selesai lebih lama dari ini tidak dikirim ke app
+  // tipe baris di tabel Todo: to-do biasa, catatan (tanpa centang & tanpa kalender), agenda evaluasi bulanan
+  var TODO_TIPE = ['todo', 'catatan', 'evaluasi'];
+  var EVALUASI_JUDUL = 'Evaluasi bulanan';
+  var EVALUASI_PENGINGAT_JAM = 6;         // kartu pengingat evaluasi muncul mulai 6 jam sebelum jadwal
+  var MOOD = ['berat', 'lelah', 'biasa', 'baik', 'senang'];
 
   // ---------- util ----------
   function err(msg) { var e = new Error(msg); e.userFacing = true; return e; }
@@ -322,24 +331,55 @@ var KantongCore = (function () {
     var u = byId(db.Users || [])[pemilik];
     return u ? u.nama : pemilik;
   }
+  function todoTipe(t) { var x = String((t && t.tipe) || 'todo'); return TODO_TIPE.indexOf(x) >= 0 ? x : 'todo'; }
   function cleanTodo(input, db, user, existing) {
+    var tipe = String(input.tipe || (existing ? todoTipe(existing) : 'todo'));
+    if (TODO_TIPE.indexOf(tipe) < 0) throw err('Tipe tidak dikenal');
     var t = {
       id: String(input.id || ''),
+      tipe: tipe,
+      isi: String(input.isi || '').replace(/\r\n?/g, '\n').trim().slice(0, 2000),
       judul: String(input.judul || '').replace(/\s+/g, ' ').trim().slice(0, 120),
-      pemilik: String(input.pemilik || (existing ? existing.pemilik : user.id)),
+      pemilik: String(input.pemilik || (existing ? existing.pemilik : (tipe === 'evaluasi' ? TODO_BERSAMA : user.id))),
       tanggal: String(input.tanggal || ''),
       jam: String(input.jam || ''),
       durasi: (input.durasi === undefined || input.durasi === null || input.durasi === '')
         ? (existing && num(existing.durasi) ? num(existing.durasi) : TODO_DURASI) : Math.round(num(input.durasi))
     };
     if (!t.id || t.id.length > 64) throw err('ID to-do tidak valid');
-    if (!t.judul) throw err('Tulis dulu to-do-nya');
+    if (tipe === 'catatan') {
+      // catatan: cukup isi; judul = baris pertama. Tidak pernah punya waktu, jadi tidak pernah masuk kalender.
+      if (!t.judul) t.judul = t.isi.split('\n')[0].replace(/\s+/g, ' ').trim().slice(0, 120);
+      t.tanggal = ''; t.jam = '';
+    }
+    if (tipe === 'evaluasi' && !t.judul) t.judul = EVALUASI_JUDUL;
+    if (!t.judul) throw err(tipe === 'catatan' ? 'Tulis dulu catatannya' : 'Tulis dulu to-do-nya');
     if (t.pemilik !== TODO_BERSAMA && !byId(db.Users || [])[t.pemilik]) throw err('Pilih untuk siapa to-do ini');
+    if (tipe === 'evaluasi' && !t.tanggal) throw err('Evaluasi butuh tanggal');
     if (t.tanggal && !isDate(t.tanggal)) throw err('Tanggal tidak valid');
     if (!t.tanggal) t.jam = '';                       // tanpa tanggal = tanpa waktu sama sekali
     if (t.jam && !isTime(t.jam)) throw err('Jam tidak valid');
     if (!(t.durasi >= 5 && t.durasi <= 1440)) throw err('Durasi 5 menit sampai 24 jam');
     return t;
+  }
+  // Kartu pengingat evaluasi: agenda evaluasi terdekat yang belum selesai, kalau sekarang sudah masuk
+  // jendela EVALUASI_PENGINGAT_JAM sebelum mulai dan acaranya belum lewat. nowLocal: 'YYYY-MM-DDTHH:MM' (waktu lokal).
+  function evaluasiPengingat(todos, nowLocal) {
+    var best = null;
+    (todos || []).forEach(function (t) {
+      if (t.dihapus || bool(t.selesai) || todoTipe(t) !== 'evaluasi' || !t.tanggal) return;
+      var mulai = t.tanggal + 'T' + (t.jam || '00:00');
+      var akhir = t.jam ? addMinutes(t.tanggal, t.jam, num(t.durasi) || TODO_DURASI) : addDays(t.tanggal, 1) + 'T00:00';
+      var buka = addMinutes(t.tanggal, t.jam || '00:00', -EVALUASI_PENGINGAT_JAM * 60);
+      if (nowLocal < buka || nowLocal >= akhir) return;
+      if (!best || mulai < best.mulai) best = { todo: t, mulai: mulai, akhir: akhir, menit: menitAntara(nowLocal, mulai) };
+    });
+    return best;
+  }
+  function menitAntara(a, b) {   // b - a dalam menit, keduanya 'YYYY-MM-DDTHH:MM'
+    var pa = Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10), +a.slice(11, 13), +a.slice(14, 16));
+    var pb = Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10), +b.slice(11, 13), +b.slice(14, 16));
+    return Math.round((pb - pa) / 60000);
   }
   // jam akhir event: 'YYYY-MM-DDTHH:MM' + menit, aman lewat tengah malam
   function addMinutes(tanggal, jam, menit) {
@@ -357,13 +397,14 @@ var KantongCore = (function () {
       judul: '[' + huruf + '] ' + (selesai ? '\u2713 ' : '') + t.judul,
       tanggal: t.tanggal, jam: t.jam, durasi: num(t.durasi) || TODO_DURASI, seharian: !t.jam,
       pemilik: t.pemilik, pemilikNama: nama, warna: t.pemilik === TODO_BERSAMA ? 'bersama' : idx, selesai: selesai,
-      deskripsi: 'To-do ' + nama + ' dari Kantong.' + (selesai ? ' Sudah selesai.' : '') + '\nkantong-todo:' + t.id
+      deskripsi: (todoTipe(t) === 'evaluasi' ? 'Evaluasi bulanan berdua. Buka Beranda untuk lihat kesepakatan yang berlaku.' : 'To-do ' + nama + ' dari Kantong.') +
+        (selesai ? ' Sudah selesai.' : '') + '\nkantong-todo:' + t.id
     };
     if (!spec.seharian) { spec.mulai = t.tanggal + 'T' + t.jam; spec.akhir = addMinutes(t.tanggal, t.jam, spec.durasi); }
     return spec;
   }
   function todoPerluEvent(t) {
-    if (t.dihapus || !t.tanggal) return false;
+    if (t.dihapus || !t.tanggal || todoTipe(t) === 'catatan') return false;
     if (bool(t.selesai) && TODO_SELESAI_EVENT === 'hapus') return false;
     return true;
   }
@@ -392,7 +433,7 @@ var KantongCore = (function () {
     return t;
   }
   function todoEventSama(a, b) {
-    return !!a && !!b && a.judul === b.judul && a.pemilik === b.pemilik && a.tanggal === b.tanggal &&
+    return !!a && !!b && a.judul === b.judul && todoTipe(a) === todoTipe(b) && a.pemilik === b.pemilik && a.tanggal === b.tanggal &&
       a.jam === b.jam && num(a.durasi) === num(b.durasi) && bool(a.selesai) === bool(b.selesai) && !a.dihapus === !b.dihapus;
   }
   function liveTodo(db, today) {
@@ -411,8 +452,8 @@ var KantongCore = (function () {
       if (ex && ex.dihapus) throw err('To-do sudah dihapus');
       if (ex && !canWriteTodo(user, ex)) throw err('To-do ini milik ' + todoPemilikNama(db, ex.pemilik) + '. Kamu hanya bisa melihat.');
       var t = cleanTodo(payload, db, user, ex);
-      t.selesai = ex ? bool(ex.selesai) : false;
-      t.selesai_oleh = ex ? String(ex.selesai_oleh || '') : '';
+      t.selesai = ex && t.tipe !== 'catatan' ? bool(ex.selesai) : false;
+      t.selesai_oleh = t.selesai ? String(ex.selesai_oleh || '') : '';
       t.gcal_event_id = ex ? String(ex.gcal_event_id || '') : '';
       t.gcal_status = ex ? String(ex.gcal_status || '') : ''; t.gcal_error = ex ? String(ex.gcal_error || '') : '';
       t.oleh = ex ? ex.oleh : user.id; t.dibuat = ex ? ex.dibuat : nowIso; t.diubah = nowIso; t.dihapus = '';
@@ -423,6 +464,7 @@ var KantongCore = (function () {
     }
     if (action === 'todo.done') {
       if (!ex || ex.dihapus) throw err('To-do tidak ditemukan');
+      if (todoTipe(ex) === 'catatan') throw err('Catatan tidak bisa dicentang');
       if (!canWriteTodo(user, ex)) throw err('To-do ini milik ' + todoPemilikNama(db, ex.pemilik) + '. Kamu hanya bisa melihat.');
       var d = clone(ex), selesai = bool(payload.selesai);
       d.selesai = selesai; d.selesai_oleh = selesai ? user.id : ''; d.diubah = nowIso;
@@ -445,6 +487,93 @@ var KantongCore = (function () {
       syncTodoCalendar(store, db, s);
       store.upsert('Todo', s);
       return { todo: s };
+    }
+    throw err('Aksi tidak dikenal: ' + action);
+  }
+
+  // ---------- komitmen (kesepakatan berdua) ----------
+  // Dua-duanya boleh tulis. Berlaku tanpa batas waktu sampai diganti kesepakatan baru.
+  function cleanKomitmen(input) {
+    var k = {
+      id: String(input.id || ''),
+      judul: String(input.judul || '').replace(/\s+/g, ' ').trim().slice(0, 160),
+      isi: String(input.isi || '').replace(/\r\n?/g, '\n').trim().slice(0, 4000),
+      berlaku_sejak: String(input.berlaku_sejak || '')
+    };
+    if (!k.id || k.id.length > 64) throw err('ID kesepakatan tidak valid');
+    if (!k.judul) throw err('Tulis dulu kesepakatannya');
+    if (k.berlaku_sejak && !isDate(k.berlaku_sejak)) throw err('Tanggal berlaku tidak valid');
+    return k;
+  }
+  function komitmenAktif(db) {
+    return (db.Komitmen || []).filter(function (k) { return !k.dihapus && !k.diganti_oleh; });
+  }
+  function komitmenAksi(store, db, user, action, payload, nowIso) {
+    var today = nowIso.slice(0, 10);
+    var list = (db.Komitmen || []).filter(function (k) { return !k.dihapus; });
+    if (action === 'komitmen.list') {
+      return { komitmen: list.sort(function (a, b) { return String(b.berlaku_sejak || b.dibuat).localeCompare(String(a.berlaku_sejak || a.dibuat)); }) };
+    }
+    var ex = byId(db.Komitmen || [])[String(payload.id || '')];
+    if (action === 'komitmen.save') {
+      if (ex && ex.dihapus) throw err('Kesepakatan sudah dihapus');
+      var k = cleanKomitmen(payload);
+      k.berlaku_sejak = k.berlaku_sejak || (ex ? ex.berlaku_sejak : '') || today;
+      k.diganti_oleh = ex ? String(ex.diganti_oleh || '') : '';
+      k.oleh = ex ? ex.oleh : user.id; k.dibuat = ex ? ex.dibuat : nowIso; k.diubah = nowIso; k.dihapus = '';
+      // mengganti kesepakatan lama: yang lama ditandai diganti, tetap tersimpan sebagai riwayat
+      var lama = payload.mengganti ? byId(db.Komitmen || [])[String(payload.mengganti)] : null;
+      if (payload.mengganti && (!lama || lama.dihapus)) throw err('Kesepakatan lama tidak ditemukan');
+      if (lama && lama.id === k.id) throw err('Kesepakatan tidak bisa mengganti dirinya sendiri');
+      store.upsert('Komitmen', k);
+      if (lama) { var l = clone(lama); l.diganti_oleh = k.id; l.diubah = nowIso; store.upsert('Komitmen', l); }
+      return { komitmen: k };
+    }
+    if (action === 'komitmen.delete') {
+      if (!ex || ex.dihapus) return { id: String(payload.id || '') };
+      var h = clone(ex); h.dihapus = nowIso; h.diubah = nowIso;
+      store.upsert('Komitmen', h);
+      // kesepakatan yang dulu diganti olehnya berlaku lagi
+      (db.Komitmen || []).forEach(function (o) {
+        if (o.diganti_oleh === ex.id && !o.dihapus) { var b = clone(o); b.diganti_oleh = ''; b.diubah = nowIso; store.upsert('Komitmen', b); }
+      });
+      return { id: h.id };
+    }
+    throw err('Aksi tidak dikenal: ' + action);
+  }
+
+  // ---------- jurnal (Ruang Catat) ----------
+  // Pribadi: list hanya mengembalikan milik user sendiri, dan hanya pemilik yang boleh ubah/hapus.
+  function jurnalAksi(store, db, user, action, payload, nowIso) {
+    var mine = (db.Jurnal || []).filter(function (j) { return j.pemilik === user.id; });
+    if (action === 'jurnal.list') {
+      return { jurnal: mine.filter(function (j) { return !j.dihapus; })
+        .sort(function (a, b) { return String(b.tanggal + b.dibuat).localeCompare(String(a.tanggal + a.dibuat)); }).slice(0, 200) };
+    }
+    var id = String(payload.id || '');
+    var ex = byId(db.Jurnal || [])[id];
+    if (ex && ex.pemilik !== user.id) throw err('Catatan ini bukan milikmu');
+    if (action === 'jurnal.save') {
+      if (ex && ex.dihapus) throw err('Catatan sudah dihapus');
+      var j = {
+        id: id, pemilik: user.id,
+        tanggal: String(payload.tanggal || (ex ? ex.tanggal : '') || nowIso.slice(0, 10)),
+        mood: String(payload.mood || ''),
+        isi: String(payload.isi || '').replace(/\r\n?/g, '\n').trim().slice(0, 10000)
+      };
+      if (!j.id || j.id.length > 64) throw err('ID catatan tidak valid');
+      if (!isDate(j.tanggal)) throw err('Tanggal tidak valid');
+      if (j.mood && MOOD.indexOf(j.mood) < 0) throw err('Mood tidak dikenal');
+      if (!j.isi && !j.mood) throw err('Pilih mood atau tulis sesuatu dulu');
+      j.dibuat = ex ? ex.dibuat : nowIso; j.diubah = nowIso; j.dihapus = '';
+      store.upsert('Jurnal', j);
+      return { jurnal: j };
+    }
+    if (action === 'jurnal.delete') {
+      if (!ex || ex.dihapus) return { id: id };
+      var h = clone(ex); h.dihapus = nowIso; h.diubah = nowIso;
+      store.upsert('Jurnal', h);
+      return { id: id };
     }
     throw err('Aksi tidak dikenal: ' + action);
   }
@@ -686,6 +815,8 @@ var KantongCore = (function () {
       }
       default:
         if (String(action).indexOf('todo.') === 0) return todoAksi(store, db, user, action, payload, nowIso);
+        if (String(action).indexOf('komitmen.') === 0) return komitmenAksi(store, db, user, action, payload, nowIso);
+        if (String(action).indexOf('jurnal.') === 0) return jurnalAksi(store, db, user, action, payload, nowIso);
         throw err('Aksi tidak dikenal: ' + action);
     }
   }
@@ -724,7 +855,9 @@ var KantongCore = (function () {
     computeUtang: computeUtang, computeTalangan: computeTalangan, arahTransfer: arahTransfer,
     KAT_REIMBURSE: KAT_REIMBURSE, KAT_SETORAN: KAT_SETORAN, KAT_SETORAN_MASUK: KAT_SETORAN_MASUK,
     cleanTodo: cleanTodo, canWriteTodo: canWriteTodo, todoEventSpec: todoEventSpec, todoPerluEvent: todoPerluEvent,
-    isTime: isTime, TODO_BERSAMA: TODO_BERSAMA, TODO_DURASI: TODO_DURASI, TODO_SELESAI_EVENT: TODO_SELESAI_EVENT
+    isTime: isTime, TODO_BERSAMA: TODO_BERSAMA, TODO_DURASI: TODO_DURASI, TODO_SELESAI_EVENT: TODO_SELESAI_EVENT,
+    TODO_TIPE: TODO_TIPE, todoTipe: todoTipe, evaluasiPengingat: evaluasiPengingat, EVALUASI_JUDUL: EVALUASI_JUDUL,
+    EVALUASI_PENGINGAT_JAM: EVALUASI_PENGINGAT_JAM, komitmenAktif: komitmenAktif, cleanKomitmen: cleanKomitmen, MOOD: MOOD
   };
 })();
 export default KantongCore;

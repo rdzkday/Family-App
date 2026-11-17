@@ -20,7 +20,7 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | ✅ Live | Offline: catatan tersimpan di HP, dikirim saat online |
 | ⏳ Perlu setup sekali | Sync to-do ke Google Calendar "Rumah Kita" (secret belum diisi, PANDUAN §7) |
 | ⏳ Perlu dilakukan | Impor data lama dari Google Sheets (PANDUAN §5) |
-| 🧪 Dalam pengembangan | Beranda desktop (`beranda.html`): Agenda & Komitmen masih tersimpan di browser saja |
+| 🆕 Siap rilis | Beranda (`/`): Kantong, to-do & catatan, pengingat evaluasi, kesepakatan, mood → Ruang Catat. Butuh migrasi `20261117…_beranda.sql` + deploy ulang API |
 
 ---
 
@@ -82,7 +82,8 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | Path | Isi |
 |---|---|
 | `public/` | PWA yang di-deploy. `core.js` = logika bersama (aturan, hitungan, to-do) |
-| `public/beranda.html` | Beranda desktop (ringkasan + agenda/komitmen, sebagian masih di browser) |
+| `public/index.html` | Beranda (halaman awal). Kantong pindah ke `public/kantong.html` |
+| `public/ruang-catat/` | Ruang Catat: jurnal + mood (`?mood=`) |
 | `supabase/migrations/` | Skema database |
 | `supabase/functions/kantong/` | Edge Function: API + adapter Postgres + Google Calendar |
 | `kantong/PANDUAN.md` | Panduan pasang & update |
@@ -93,7 +94,7 @@ Data keuangan pribadi tidak disertakan di repo ini.
 ## Update & tes
 
 ```bash
-node kantong/tools/test_core.js        # 159 cek logika bersama
+node kantong/tools/test_core.js        # 203 cek logika bersama
 node kantong/tools/test_supabase.js    # 18 tes Edge Function (DB & Google tiruan)
 bash kantong/tools/test_sql.sh         # skema SQL di Postgres lokal
 ```

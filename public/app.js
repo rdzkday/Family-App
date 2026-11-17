@@ -59,20 +59,30 @@
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="6"/><path d="M8 12.5l3 3 5.5-6.5"/></svg>',
     cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="4"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
     calx: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="4"/><path d="M3 10h18M8 3v4M16 3v4M9.5 13.5l5 5M14.5 13.5l-5 5"/></svg>',
-    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h5"/></svg>',
+    heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
+    wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h15a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7z"/><path d="M3 7l12-4v4"/><circle cx="16.5" cy="13.5" r="1"/></svg>',
+    book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>',
+    house: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a2 2 0 0 1-2 2h-3v-6h-6v6H6a2 2 0 0 1-2-2z"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+    ext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>',
+    user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'
   };
 
   // ================= tema =================
   var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
   var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
-  function themePref() { return LS.get('k_theme', 'auto'); }
+  var PAGE = window.KANTONG_PAGE === 'beranda' ? 'beranda' : 'kantong';
+  function themePref() { return PAGE === 'beranda' ? 'dark' : LS.get('k_theme', 'auto'); }
   function isDark() { var t = themePref(); return t === 'dark' || (t === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches); }
   function applyTheme() {
     var t = themePref(), r = document.documentElement;
     if (t === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', t);
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', isDark() ? '#1B1925' : '#F7F5FC');
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', PAGE === 'beranda' ? '#0E1014' : isDark() ? '#1B1925' : '#F7F5FC');
   }
   function setTheme(t) { LS.set('k_theme', t); applyTheme(); }
+  function berandaBtn() { return '<button class="theme-btn" data-act="beranda" aria-label="Ke Beranda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v8a2 2 0 0 1-2 2h-3v-6h-6v6H6a2 2 0 0 1-2-2z"/></svg></button>'; }
   function themeBtn() { return '<button class="theme-btn" data-act="theme" aria-label="Ganti tema terang/gelap">' + (isDark() ? SUN : MOON) + '</button>'; }
   applyTheme();
   if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyTheme(); });
@@ -84,19 +94,20 @@
     months: LS.get('k_months', {}),
     outbox: LS.get('k_outbox', []),
     todos: LS.get('k_todos', null),        // null = belum pernah dimuat
+    komitmen: LS.get('k_komitmen', null),  // kesepakatan berdua (Beranda > Komitmen)
     prefs: LS.get('k_prefs', { lastKantong: {}, demoUser: 'riki' }),
-    tab: 'home', sub: null, bukuView: null, bulan: thisMonth(),
+    tab: PAGE === 'beranda' ? 'beranda' : (({ '#todo': 'todo', '#ringkasan': 'ringkasan', '#riwayat': 'riwayat', '#pengaturan': 'pengaturan' })[location.hash] || 'home'), sub: null, bukuView: null, bulan: thisMonth(),
     syncing: false, again: false, lastError: null, catTab: 'Pengeluaran'
   };
   function persist() {
-    LS.set('k_conn', S.conn); LS.set('k_boot', S.boot); LS.set('k_outbox', S.outbox); LS.set('k_prefs', S.prefs); LS.set('k_todos', S.todos);
+    LS.set('k_conn', S.conn); LS.set('k_boot', S.boot); LS.set('k_outbox', S.outbox); LS.set('k_prefs', S.prefs); LS.set('k_todos', S.todos); LS.set('k_komitmen', S.komitmen);
     var keys = Object.keys(S.months).sort().reverse();
     var keep = {}; keys.slice(0, 8).forEach(function (k) { keep[k] = S.months[k]; });
     S.months = keep; LS.set('k_months', keep);
   }
   function db() {
     var b = S.boot || {};
-    return { Buku: b.buku || [], Users: b.users || [], Kategori: b.kategori || [], Kantong: b.kantong || [], Budget: [], Transaksi: [], Todo: S.todos || [] };
+    return { Buku: b.buku || [], Users: b.users || [], Kategori: b.kategori || [], Kantong: b.kantong || [], Budget: [], Transaksi: [], Todo: S.todos || [], Komitmen: S.komitmen || [] };
   }
   function me() { return S.boot ? S.boot.user : null; }
   function bukuById(id) { return C.byId(db().Buku)[id]; }
@@ -114,7 +125,7 @@
     var saved = LS.get('k_demo', null);
     if (saved) return saved;
     var seed = window.KANTONG_DEMO_SEED || makeDemoSeed();
-    return { Buku: seed.buku, Users: seed.users, Kategori: seed.kategori, Kantong: seed.kantong, Budget: seed.budget, Transaksi: seed.transaksi, Todo: seed.todo || [] };
+    return { Buku: seed.buku, Users: seed.users, Kategori: seed.kategori, Kantong: seed.kantong, Budget: seed.budget, Transaksi: seed.transaksi, Todo: seed.todo || [], Komitmen: seed.komitmen || [], Jurnal: seed.jurnal || [] };
   }
   var demoStore = null;
   function demoRpc(action, payload) {
@@ -217,6 +228,18 @@
       if (tdn) { tdn.selesai = !!op.payload.selesai; tdn.selesai_oleh = tdn.selesai && me() ? me().id : ''; tdn.diubah = op.at; tdn._pending = true; }
     } else if (op.action === 'todo.delete') {
       S.todos = todos().filter(function (t) { return t.id !== op.payload.id; });
+    } else if (op.action === 'komitmen.save') {
+      var kp = op.payload, list = (S.komitmen || []).slice(), exK = list.filter(function (k) { return k.id === kp.id; })[0];
+      var baru = Object.assign({ diganti_oleh: '', oleh: me() ? me().id : '', dibuat: op.at, berlaku_sejak: todayISO() }, exK || {}, kp, { diubah: op.at, dihapus: '', _pending: true });
+      delete baru.mengganti;
+      list = list.filter(function (k) { return k.id !== kp.id; }).map(function (k) {
+        return kp.mengganti && k.id === kp.mengganti ? Object.assign({}, k, { diganti_oleh: kp.id }) : k;
+      });
+      list.unshift(baru); S.komitmen = list;
+    } else if (op.action === 'komitmen.delete') {
+      S.komitmen = (S.komitmen || []).filter(function (k) { return k.id !== op.payload.id; }).map(function (k) {
+        return k.diganti_oleh === op.payload.id ? Object.assign({}, k, { diganti_oleh: '' }) : k;
+      });
     } else if (op.action === 'todo.sync') {
       var tsy = findTodo(op.payload.id);
       if (tsy) tsy._pending = true;
@@ -231,13 +254,14 @@
     (extraMonths || []).concat(S.wantMonths || []).forEach(function (b) { want[b] = 1; });
     S.wantMonths = [];
     var batch = ops.map(function (o) { return { opId: o.opId, action: o.action, payload: o.payload }; })
-      .concat([{ opId: '_boot', action: 'bootstrap' }, { opId: '_todo', action: 'todo.list' }])
+      .concat([{ opId: '_boot', action: 'bootstrap' }, { opId: '_todo', action: 'todo.list' }, { opId: '_komit', action: 'komitmen.list' }])
       .concat(Object.keys(want).map(function (b) { return { opId: '_m_' + b, action: 'month', payload: { bulan: b } }; }));
     return rpc('batch', { ops: batch }).then(function (d) {
       var sent = {}; ops.forEach(function (o) { sent[o.opId] = 1; });
       d.results.forEach(function (r) {
         if (r.opId === '_boot') { if (r.ok) S.boot = r.data; }
         else if (r.opId === '_todo') { if (r.ok) S.todos = r.data.todos || []; }
+        else if (r.opId === '_komit') { if (r.ok) S.komitmen = r.data.komitmen || []; }   // server lama: belum kenal, abaikan
         else if (String(r.opId).indexOf('_m_') === 0) { if (r.ok) S.months[r.data.bulan] = r.data; }
         else if (!r.ok) toast('Tidak tersimpan: ' + r.error, true);
       });
@@ -925,7 +949,8 @@
   }
   function todoRow(t) {
     var bisa = canWriteTodo(t), selesai = C.bool(t.selesai), p = todoPemilikInfo(t.pemilik);
-    var tags = '';
+    if (C.todoTipe(t) === 'catatan') return catatanRow(t);
+    var tags = C.todoTipe(t) === 'evaluasi' ? '<span class="tag" style="--c:#FCD34D"><i></i>Evaluasi</span>' : '';
     if (t.pemilik !== me().id) tags += '<span class="tag" style="--c:' + p.warna + '"><i></i>' + esc(p.nama) + '</span>';
     if (selesai && t.pemilik === C.TODO_BERSAMA && t.selesai_oleh) tags += '<span class="tag">oleh ' + esc(userName(t.selesai_oleh)) + '</span>';
     var gagal = !t._pending && t.gcal_status === 'gagal' && C.todoPerluEvent(t);
@@ -935,6 +960,14 @@
       '<span class="t2">' + todoStatusHtml(t) + tags + '</span>' +
       (gagal ? '<button type="button" class="td-retry" data-tretry="' + esc(t.id) + '"' + (bisa ? '' : ' disabled') + '>' + ICON.calx + 'Gagal masuk kalender. Coba lagi</button>' : '') +
       '</div></div>';
+  }
+  function catatanRow(t) {
+    var p = todoPemilikInfo(t.pemilik), isi = String(t.isi || t.judul);
+    var sisa = isi.indexOf('\n') >= 0 ? isi.slice(isi.indexOf('\n') + 1).replace(/\s+/g, ' ').trim() : '';
+    return '<div class="todo-row note"><span class="note-ic" aria-hidden="true">' + ICON.note + '</span>' +
+      '<div class="todo-main" role="button" tabindex="0" data-todo="' + esc(t.id) + '"><span class="t1">' + esc(t.judul) + '</span>' +
+      '<span class="t2">' + (sisa ? '<span class="note-more">' + esc(sisa.slice(0, 90)) + '</span>' : '') +
+      '<span class="tag" style="--c:' + p.warna + '"><i></i>' + esc(t.pemilik === (me() || {}).id ? 'Pribadi' : p.nama) + '</span></span></div></div>';
   }
   function bindTodoRows(root) {
     if (!root) return;
@@ -964,13 +997,15 @@
   }
   // simpan dari form cepat maupun sheet; validasi memakai aturan yang sama dengan server
   function simpanTodo(f, existing, errEl) {
-    var payload = { id: f.id || uid(), judul: f.judul, pemilik: f.pemilik,
-      tanggal: f.aturWaktu ? f.tanggal : '', jam: f.aturWaktu && !f.seharian ? f.jam : '', durasi: f.durasi };
+    var tipe = f.tipe || 'todo', waktu = tipe === 'evaluasi' || (tipe === 'todo' && f.aturWaktu);
+    var payload = { id: f.id || uid(), tipe: tipe, judul: tipe === 'catatan' ? '' : f.judul, isi: tipe === 'catatan' ? f.isi : (f.isi || ''), pemilik: f.pemilik,
+      tanggal: waktu ? f.tanggal : '', jam: waktu && !f.seharian ? f.jam : '', durasi: f.durasi };
     try { payload = C.cleanTodo(payload, db(), me(), existing); }
     catch (e) { if (errEl) errEl.textContent = e.message; else toast(e.message, true); return null; }
     if (errEl) errEl.textContent = '';
     enqueue('todo.save', payload);
-    if (existing && existing.tanggal && !payload.tanggal) toast('Waktu dihapus. Event kalender ikut dihapus, to-do tetap ada.');
+    if (tipe === 'catatan') toast(existing ? 'Catatan diperbarui' : 'Catatan tersimpan');
+    else if (existing && existing.tanggal && !payload.tanggal) toast('Waktu dihapus. Event kalender ikut dihapus, to-do tetap ada.');
     else if (payload.tanggal) toast(existing ? 'Perubahan disimpan. Masuk ke Google Calendar.' : 'Tersimpan. Masuk ke Google Calendar.');
     else toast(existing ? 'Perubahan disimpan' : 'Tersimpan');
     return payload;
@@ -980,11 +1015,15 @@
     var editable = !t || canWriteTodo(t);
     var now = new Date(), jamDefault = pad((now.getHours() + 1) % 24) + ':00';
     var f = t
-      ? { id: t.id, judul: t.judul, pemilik: t.pemilik, aturWaktu: !!t.tanggal, tanggal: t.tanggal || todayISO(),
+      ? { id: t.id, tipe: C.todoTipe(t), judul: t.judul, isi: t.isi || '', pemilik: t.pemilik, aturWaktu: !!t.tanggal, tanggal: t.tanggal || todayISO(),
         seharian: !!t.tanggal && !t.jam, jam: t.jam || jamDefault, durasi: C.num(t.durasi) || C.TODO_DURASI }
-      : Object.assign({ id: '', judul: '', pemilik: todoDefaultPemilik(), aturWaktu: false, tanggal: todayISO(), seharian: false, jam: jamDefault, durasi: C.TODO_DURASI }, init || {});
-    openSheet(t ? (editable ? 'Ubah to-do' : 'Detail to-do') : 'To-do baru', function (sh) {
+      : Object.assign({ id: '', tipe: 'todo', judul: '', isi: '', pemilik: todoDefaultPemilik(), aturWaktu: false, tanggal: todayISO(), seharian: false, jam: jamDefault, durasi: C.TODO_DURASI }, init || {});
+    if (f.tipe === 'evaluasi') { f.aturWaktu = true; if (!f.judul) f.judul = C.EVALUASI_JUDUL; }
+    var NAMA = { todo: 'to-do', catatan: 'catatan', evaluasi: 'jadwal evaluasi' }[f.tipe];
+    var judulSheet = t ? (editable ? 'Ubah ' + NAMA : 'Detail ' + NAMA) : ({ todo: 'To-do baru', catatan: 'Catatan baru', evaluasi: 'Jadwalkan evaluasi' })[f.tipe];
+    openSheet(judulSheet, function (sh) {
       function hintText() {
+        if (f.tipe === 'catatan') return 'Catatan hanya di app, tidak pernah masuk kalender.';
         if (!f.aturWaktu) return 'Tanpa waktu: hanya di app, tidak masuk kalender.';
         var spec = C.todoEventSpec({ id: f.id || 'x', judul: f.judul || 'to-do', pemilik: f.pemilik, tanggal: f.tanggal, jam: f.seharian ? '' : f.jam, durasi: f.durasi, selesai: t ? t.selesai : false }, db());
         var kapan = todoWaktuLabel({ tanggal: f.tanggal, jam: f.seharian ? '' : f.jam });
@@ -995,13 +1034,17 @@
         var dis = editable ? '' : ' disabled';
         var pil = TODO_DURASI_PILIHAN.slice();
         if (!pil.some(function (x) { return x[0] === f.durasi; })) pil.push([f.durasi, f.durasi + ' mnt']);
-        sh.el.innerHTML = (editable ? '' : '<div class="readonly-note">' + ICON.lock + '<span>To-do ini milik ' + esc(todoPemilikInfo(f.pemilik).nama) + '. Hanya bisa kamu lihat.</span></div>') +
-          '<div class="field" style="margin-top:4px"><label for="td-judul">Apa yang mau dikerjain?</label><input id="td-judul" class="input" maxlength="120" placeholder="mis. bayar listrik" autocomplete="off" value="' + esc(f.judul) + '"' + dis + '></div>' +
+        var catatan = f.tipe === 'catatan', evaluasi = f.tipe === 'evaluasi';
+        sh.el.innerHTML = (editable ? '' : '<div class="readonly-note">' + ICON.lock + '<span>' + (catatan ? 'Catatan' : 'To-do') + ' ini milik ' + esc(todoPemilikInfo(f.pemilik).nama) + '. Hanya bisa kamu lihat.</span></div>') +
+          (catatan
+            ? '<div class="field" style="margin-top:4px"><label for="td-isi">Catatan</label><textarea id="td-isi" class="input" rows="6" maxlength="2000" placeholder="Tulis catatan…"' + dis + '>' + esc(f.isi) + '</textarea></div>'
+            : '<div class="field" style="margin-top:4px"><label for="td-judul">' + (evaluasi ? 'Judul agenda' : 'Apa yang mau dikerjain?') + '</label><input id="td-judul" class="input" maxlength="120" placeholder="mis. bayar listrik" autocomplete="off" value="' + esc(f.judul) + '"' + dis + '></div>') +
+          (evaluasi ? '<div class="hint" style="margin-top:-4px">Agenda evaluasi bulanan berdua. Kartu pengingat muncul di Beranda ' + C.EVALUASI_PENGINGAT_JAM + ' jam sebelumnya.</div>' : '') +
           '<div class="field"><span class="lbl">Untuk</span><div class="chips wrap" role="group" aria-label="Pemilik to-do">' + todoPemilikList().map(function (p) {
             return '<button type="button" class="chip" data-tp="' + esc(p.id) + '" aria-pressed="' + (f.pemilik === p.id) + '" style="--c:' + p.warna + '"' + dis + '><span class="dot" style="background:' + p.warna + '"></span>' + esc(p.nama) + '</button>';
           }).join('') + '</div></div>' +
-          toggleHtml('td-waktu', 'Atur waktu', f.aturWaktu ? 'Masuk ke Google Calendar "Rumah Kita"' : 'Tanpa waktu: hanya di app', f.aturWaktu).replace('<button ', '<button' + dis + ' ') +
-          (f.aturWaktu ?
+          (catatan || evaluasi ? '' : toggleHtml('td-waktu', 'Atur waktu', f.aturWaktu ? 'Masuk ke Google Calendar "Rumah Kita"' : 'Tanpa waktu: hanya di app', f.aturWaktu).replace('<button ', '<button' + dis + ' ')) +
+          (f.aturWaktu && !catatan ?
             '<div class="field row2"><div><label for="td-tgl">Tanggal</label><input id="td-tgl" class="input" type="date" value="' + esc(f.tanggal) + '"' + dis + '></div>' +
             '<div><label for="td-jam">Jam</label><input id="td-jam" class="input" type="time" step="300" value="' + esc(f.jam) + '"' + (f.seharian || !editable ? ' disabled' : '') + '></div></div>' +
             toggleHtml('td-seharian', 'Seharian', 'Tanpa jam, muncul sebagai event sehari penuh', f.seharian).replace('<button ', '<button' + dis + ' ') +
@@ -1012,17 +1055,20 @@
           (t && t.gcal_status === 'gagal' && C.todoPerluEvent(t) && !t._pending ? '<div class="hint" style="color:var(--todo-bad)">Terakhir gagal masuk kalender: ' + esc(t.gcal_error || 'tidak diketahui') + '</div>' : '') +
           '<div class="err" id="td-err" role="alert"></div>' +
           (editable ? '<button type="button" class="btn" id="td-save">' + (t ? 'Simpan perubahan' : 'Simpan') + '</button>' +
-            (t ? '<button type="button" class="btn danger" id="td-del">Hapus to-do</button>' : '') : '');
+            (t ? '<button type="button" class="btn danger" id="td-del">Hapus ' + NAMA + '</button>' : '') : '');
         if (!editable) return;
-        var judul = $('#td-judul', sh.el);
-        judul.addEventListener('input', function () { f.judul = judul.value; $('#td-hint', sh.el).textContent = hintText(); });
-        judul.addEventListener('keydown', function (e) { if (e.key === 'Enter') simpan(); });
+        var judul = $('#td-judul', sh.el), isi = $('#td-isi', sh.el);
+        if (judul) {
+          judul.addEventListener('input', function () { f.judul = judul.value; $('#td-hint', sh.el).textContent = hintText(); });
+          judul.addEventListener('keydown', function (e) { if (e.key === 'Enter') simpan(); });
+        }
+        if (isi) isi.addEventListener('input', function () { f.isi = isi.value; });
         $$('[data-tp]', sh.el).forEach(function (b) { b.addEventListener('click', function () {
           f.pemilik = b.getAttribute('data-tp');
           $$('[data-tp]', sh.el).forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
           $('#td-hint', sh.el).textContent = hintText();
         }); });
-        $('#td-waktu', sh.el).addEventListener('click', function () { f.aturWaktu = !f.aturWaktu; draw(); });
+        var tw = $('#td-waktu', sh.el); if (tw) tw.addEventListener('click', function () { f.aturWaktu = !f.aturWaktu; draw(); });
         var tgl = $('#td-tgl', sh.el), jam = $('#td-jam', sh.el), sehari = $('#td-seharian', sh.el);
         if (tgl) tgl.addEventListener('change', function () { f.tanggal = tgl.value || todayISO(); $('#td-hint', sh.el).textContent = hintText(); });
         if (jam) jam.addEventListener('change', function () { if (jam.value) f.jam = jam.value.slice(0, 5); $('#td-hint', sh.el).textContent = hintText(); });
@@ -1035,15 +1081,15 @@
         $('#td-save', sh.el).addEventListener('click', simpan);
         var del = $('#td-del', sh.el);
         if (del) del.addEventListener('click', function () {
-          if (!confirm('Hapus to-do ini?' + (t.gcal_event_id ? ' Event di Google Calendar ikut dihapus.' : ''))) return;
-          enqueue('todo.delete', { id: t.id }); toast('To-do dihapus'); sh.close();
+          if (!confirm('Hapus ' + NAMA + ' ini?' + (t.gcal_event_id ? ' Event di Google Calendar ikut dihapus.' : ''))) return;
+          enqueue('todo.delete', { id: t.id }); toast(NAMA.charAt(0).toUpperCase() + NAMA.slice(1) + ' dihapus'); sh.close();
         });
       }
       function simpan() {
         if (simpanTodo(f, t, $('#td-err', sh.el))) sh.close();
       }
       draw();
-      if (!t) { var j = $('#td-judul', sh.el); if (j && !f.judul) setTimeout(function () { j.focus(); }, 300); }
+      if (!t) { var j = $('#td-judul', sh.el) || $('#td-isi', sh.el); if (j && !f.judul && !f.isi) setTimeout(function () { j.focus(); }, 300); }
     });
   }
   // kartu kecil di Beranda: to-do hari ini & yang terlewat (milikku + bersama)
@@ -1061,7 +1107,7 @@
   var TodoView = {
     render: function (el) {
       var self = this;
-      el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>To-do</h1></div><div class="top-actions">' + syncPill() + '</div></div>' +
+      el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>To-do & catatan</h1></div><div class="top-actions">' + berandaBtn() + syncPill() + '</div></div>' +
         '<div class="seg" role="group" aria-label="Filter to-do">' + [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) {
           return '<button type="button" data-tf="' + x[0] + '" aria-pressed="' + (todoFilter() === x[0]) + '">' + x[1] + '</button>';
         }).join('') + '</div>' +
@@ -1089,7 +1135,10 @@
     update: function (el) {
       var box = $('#td-list', el); if (!box) return this.render(el);
       if (S.todos === null) { box.innerHTML = skeleton(3); return; }
-      var f = todoFilter(), list = todos().filter(function (t) { return todoMatch(t, f); });
+      var f = todoFilter(), semua = todos().filter(function (t) { return todoMatch(t, f); });
+      var list = semua.filter(function (t) { return C.todoTipe(t) !== 'catatan'; });
+      var notes = semua.filter(function (t) { return C.todoTipe(t) === 'catatan'; })
+        .sort(function (a, b) { return String(b.diubah || b.dibuat || '').localeCompare(String(a.diubah || a.dibuat || '')); });
       var buka = todoSorted(list.filter(function (t) { return !C.bool(t.selesai); }));
       var beres = list.filter(function (t) { return C.bool(t.selesai); })
         .sort(function (a, b) { return String(b.diubah || '').localeCompare(String(a.diubah || '')); }).slice(0, 20);
@@ -1100,7 +1149,10 @@
           : '<div class="list"><div class="empty">Semua beres. Tulis to-do berikutnya di atas.</div></div>';
         if (beres.length) html += '<section class="section"><div class="section-h"><h2>Selesai</h2><span class="aside">' + beres.length + ' terakhir</span></div><div class="list todo-list">' + beres.map(todoRow).join('') + '</div></section>';
       }
+      html += '<section class="section"><div class="section-h"><h2>Catatan</h2><button type="button" class="aside lnk" id="td-note-new">+ Catatan</button></div>' +
+        (notes.length ? '<div class="list todo-list">' + notes.map(catatanRow).join('') + '</div>' : '<div class="list"><div class="empty">Belum ada catatan.</div></div>') + '</section>';
       box.innerHTML = html;
+      $('#td-note-new', box).addEventListener('click', function () { openTodoSheet(null, { tipe: 'catatan' }); });
       bindTodoRows(box);
     }
   };
@@ -1110,7 +1162,8 @@
   function renderShell() {
     var app = $('#app');
     if (!S.conn) { renderConnect(); return; }
-    app.innerHTML = (S.conn.mode === 'demo' ? '<div class="demo-bar">Ini versi demo dengan data contoh. <button data-act="leave-demo">Hubungkan Google Sheets</button></div>' : '') +
+    if (PAGE === 'beranda') { renderBerandaShell(app); return; }
+    app.innerHTML = (S.conn.mode === 'demo' ? '<div class="demo-bar">Ini versi demo dengan data contoh. <button data-act="leave-demo">Keluar dari demo</button></div>' : '') +
       '<main id="view" class="view"></main>' +
       '<footer class="tabbar"><nav>' + [['home', 'Catat', ICON.home], ['todo', 'To-do', ICON.check], ['ringkasan', 'Ringkasan', ICON.chart], ['riwayat', 'Riwayat', ICON.list], ['pengaturan', 'Pengaturan', ICON.gear]].map(function (x) {
         return '<button data-tab="' + x[0] + '" aria-current="' + (S.tab === x[0] ? 'page' : 'false') + '">' + x[2] + x[1] + '</button>';
@@ -1124,9 +1177,10 @@
     renderView(); window.scrollTo(0, 0);
   }
   function renderView() {
+    if (PAGE === 'beranda' && !S.boot) { $('#view').innerHTML = '<div class="br-wrap"><div class="br-card br-skel"></div><div class="br-card br-skel"></div></div>'; return; }
     if (!S.boot) { $('#view').innerHTML = '<div class="topbar"><div><h1>Memuat data…</h1></div>' + syncPill() + '</div>' + skeleton(5); return; }
     if (!S.bukuView) S.bukuView = me().buku;
-    var v = { home: HomeView, todo: TodoView, ringkasan: RingkasanView, riwayat: RiwayatView, pengaturan: SettingsView }[S.tab];
+    var v = { home: HomeView, todo: TodoView, ringkasan: RingkasanView, riwayat: RiwayatView, pengaturan: SettingsView, beranda: BerandaView, komitmen: KomitmenView }[S.tab];
     view = v; v.render($('#view'));
   }
   function refresh() {
@@ -1141,12 +1195,13 @@
     if (a === 'theme') { setTheme(isDark() ? 'light' : 'dark'); t.outerHTML = themeBtn(); }
     if (a === 'leave-demo') { if (confirm('Keluar dari mode demo?')) disconnect(); }
     if (a === 'goto-todo') goTab('todo');
+    if (a === 'beranda') location.href = './';
   });
 
   // ---------- Catat (home) ----------
   var HomeView = {
     render: function (el) {
-      el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Halo, ' + esc(me().nama) + '!</h1></div><div class="top-actions">' + themeBtn() + syncPill() + '</div></div>' +
+      el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Halo, ' + esc(me().nama) + '!</h1></div><div class="top-actions">' + berandaBtn() + themeBtn() + syncPill() + '</div></div>' +
         '<div id="home-budget"></div>' +
         '<section class="section"><div class="entry" id="entry"></div></section>' +
         '<div id="home-todo"></div><div id="home-utang"></div><div id="home-reim"></div>' +
@@ -1386,14 +1441,14 @@
         '<button data-s="kategori"><span class="main">Kategori<div class="t2">' + db().Kategori.filter(function (k) { return C.bool(k.aktif) && k.id !== C.KAT_REIMBURSE; }).length + ' kategori aktif</div></span>' + ICON.right + '</button>' +
         '<button data-s="kantong"><span class="main">Kantong<div class="t2">Cash, debit, e-wallet, kartu kredit</div></span>' + ICON.right + '</button>' +
         '</div></section>' +
-        '<section class="section"><div class="menu"><button data-s="beranda"><span class="main">Beranda desktop<div class="t2">Ringkasan, to-do, dan mood dalam satu layar lebar</div></span>' + ICON.right + '</button></div></section>' +
+        '<section class="section"><div class="menu"><button data-s="beranda"><span class="main">Beranda<div class="t2">Ringkasan keuangan, to-do, kesepakatan, dan mood</div></span>' + ICON.right + '</button></div></section>' +
         '<section class="section"><div class="menu"><button data-s="out"><span class="main" style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Putuskan koneksi di HP ini') + '</span></button></div>' +
         '<p class="faint" style="font-size:12px;text-align:center;margin-top:20px">Kantong v' + (S.boot.version || C.VERSION) + '</p></section>';
       $$('[data-theme-set]', el).forEach(function (b) { b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme-set')); SettingsView.render(el); }); });
       $$('[data-s]', el).forEach(function (b) { b.addEventListener('click', function () {
         var a = b.getAttribute('data-s');
         if (a === 'sync') sync();
-        else if (a === 'beranda') location.href = 'beranda.html';
+        else if (a === 'beranda') location.href = './';
         else if (a === 'switch') { S.prefs.demoUser = S.prefs.demoUser === 'riki' ? 'istri' : 'riki'; S.bukuView = null; persist(); S.boot = null; renderView(); sync(); }
         else if (a === 'out') { if (confirm(demo ? 'Keluar dari mode demo? Data demo dihapus.' : 'Putuskan koneksi? Transaksi yang belum terkirim akan hilang dari HP ini.')) disconnect(); }
         else goSub({ type: a });
@@ -1567,6 +1622,328 @@
     return _sr.call(SettingsView, el);
   };
 
+  // ================= Beranda (index.html) =================
+  // Satu pintu: ringkasan Kantong, pengingat evaluasi, to-do & catatan, mood → Ruang Catat.
+  // Memakai state, antrean offline, dan sheet yang sama dengan Kantong.
+  var RUANG_CATAT_URL = 'ruang-catat/';
+  var MOODS = [['berat', 'Berat', '#F87171', 'M8 16.5c1.2-1.6 2.5-2.3 4-2.3s2.8.7 4 2.3'], ['lelah', 'Lelah', '#FB923C', 'M8.5 15.5c1-.7 2.2-1 3.5-1s2.5.3 3.5 1'],
+    ['biasa', 'Biasa', '#FCD34D', 'M8.5 15h7'], ['baik', 'Baik', '#86EFAC', 'M8.5 14.5c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2'], ['senang', 'Senang', '#7DD3A8', 'M8 13.5c1 2 2.4 3 4 3s3-1 4-3']];
+  function moodSvg(m) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9.8v.4M15 9.8v.4"/><path d="' + m[3] + '"/></svg>';
+  }
+  function sapaan() { var h = new Date().getHours(); return h < 11 ? 'Pagi' : h < 15 ? 'Siang' : h < 18 ? 'Sore' : 'Malam'; }
+  function nowLocal() { return todayISO() + 'T' + nowHM(); }
+  function bukuRT() { return db().Buku.filter(function (b) { return b.tipe === 'Bersama'; })[0] || null; }
+  function saldoBuku(bukuId) {
+    var saldo = (S.boot && S.boot.saldo) || {};
+    return db().Kantong.filter(function (k) { return C.bool(k.aktif) && k.buku === bukuId; })
+      .reduce(function (s, k) { return s + (saldo[k.id] || 0); }, 0);
+  }
+  function brSisa(menit) {
+    if (menit <= 0) return 'Sedang berlangsung';
+    if (menit < 60) return menit + ' menit lagi';
+    var j = Math.floor(menit / 60), m = menit % 60;
+    return j + ' jam' + (m >= 10 ? ' ' + m + ' mnt' : '') + ' lagi';
+  }
+  function brTanggal(t) {
+    var d = dateObj(t.tanggal);
+    return HARI_P[d.getDay()] + ', ' + d.getDate() + ' ' + BULAN[d.getMonth()].slice(0, 3) + (t.jam ? ' · ' + t.jam.replace(':', '.') : ' · seharian');
+  }
+  function brSyncLine() {
+    var timed = todos().filter(function (t) { return C.todoPerluEvent(t); });
+    var gagal = timed.filter(function (t) { return !t._pending && t.gcal_status === 'gagal'; });
+    var ic = '<span class="br-sync-ic">' + ICON.cal + '</span>', cls = '', txt;
+    if (S.conn && S.conn.mode === 'demo') txt = 'Mode demo · data contoh di HP ini';
+    else if (S.outbox.length) { txt = S.syncing || !S.lastError ? 'Menyinkronkan ' + S.outbox.length + ' perubahan…' : 'Offline · ' + S.outbox.length + ' perubahan menunggu koneksi'; cls = ' wait'; }
+    else if (gagal.length && /belum disiapkan/i.test(gagal[0].gcal_error || '')) { txt = 'Google Calendar belum disiapkan'; cls = ' bad'; }
+    else if (gagal.length) { txt = gagal.length + ' to-do gagal masuk Google Calendar'; cls = ' bad'; }
+    else txt = 'Tersinkron ke Google Calendar' + (S.lastSync ? ' · ' + agoLabel(S.lastSync) : '');
+    return '<button type="button" class="br-sync' + cls + '" data-act="sync" aria-label="' + esc(txt) + '. Ketuk untuk sinkron sekarang">' + ic + '<span>' + esc(txt) + '</span></button>';
+  }
+  function renderBerandaShell(app) {
+    document.body.classList.add('br-page');
+    var nav = [['beranda', 'Beranda', ICON.house], ['kantong', 'Kantong', ICON.wallet], ['tambah', 'Tambah', ICON.plus], ['agenda', 'Agenda', ICON.cal], ['komitmen', 'Komitmen', ICON.heart]];
+    app.innerHTML = (S.conn.mode === 'demo' ? '<div class="br-demo">Mode demo, data contoh. <button data-act="leave-demo">Keluar</button></div>' : '') +
+      '<main id="view" class="br-view"></main>' +
+      '<nav class="br-nav" aria-label="Menu utama">' + nav.map(function (x) {
+        return '<button type="button" data-brnav="' + x[0] + '"' + (x[0] === 'tambah' ? ' class="br-fab" aria-label="Tambah to-do atau catatan"' : ' aria-current="' + (S.tab === x[0] ? 'page' : 'false') + '"') + '>' +
+          '<span class="ic">' + x[2] + '</span>' + (x[0] === 'tambah' ? '' : '<span>' + x[1] + '</span>') + '</button>';
+      }).join('') + '</nav>';
+    $$('[data-brnav]', app).forEach(function (b) { b.addEventListener('click', function () { brNav(b.getAttribute('data-brnav')); }); });
+    renderView();
+  }
+  function brNav(id) {
+    if (id === 'kantong') { location.href = 'kantong.html'; return; }
+    if (id === 'agenda') { location.href = 'kantong.html#todo'; return; }
+    if (id === 'tambah') {
+      if (S.tab !== 'beranda') brGo('beranda');
+      var box = $('#br-add'); if (!box) return;
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var inp = $('#br-add-in'); if (inp) setTimeout(function () { inp.focus(); }, 250);
+      return;
+    }
+    brGo(id);
+  }
+  function brGo(id) {
+    S.tab = id; S.sub = null;
+    $$('[data-brnav]').forEach(function (x) { if (x.hasAttribute('aria-current')) x.setAttribute('aria-current', x.getAttribute('data-brnav') === id ? 'page' : 'false'); });
+    renderView(); window.scrollTo(0, 0);
+  }
+  function openTxBaru() {
+    openSheet('Catat transaksi', function (sh) { txForm(sh.el, null, { onDone: function () { sh.close(); } }); });
+  }
+
+  var BerandaView = {
+    add: { tipe: 'todo', pemilik: '' },
+    mood: '',
+    render: function (el) {
+      var self = this, user = me();
+      var cari = function (id) { return $('#' + id, el); };
+      el.innerHTML = '<div class="br-wrap">' +
+        '<header class="br-head"><div><div class="br-date">' + esc(longToday()) + ' ' + new Date().getFullYear() + '</div><h1>' + sapaan() + ', ' + esc(user.nama) + '</h1></div>' +
+        (S.conn.mode === 'demo' ? '<div class="br-who" role="group" aria-label="Lihat sebagai (mode demo)">' + db().Users.map(function (u) {
+          return '<button type="button" data-who="' + esc(u.id) + '" aria-pressed="' + (u.id === user.id) + '" aria-label="Lihat sebagai ' + esc(u.nama) + '">' + esc(u.nama.charAt(0)) + '</button>';
+        }).join('') + '</div>' : '') + '</header>' +
+        '<div id="br-sync"></div>' +
+        '<nav class="br-short" aria-label="Pintasan">' +
+          '<a href="kantong.html" style="--c:#7DD3A8;--cb:#1B2A23"><span class="ic">' + ICON.wallet + '</span>Kantong</a>' +
+          '<a href="kantong.html#todo" style="--c:#93C5FD;--cb:#1A2433"><span class="ic">' + ICON.cal + '</span>Agenda</a>' +
+          '<button type="button" data-brgo="komitmen" style="--c:#FCD34D;--cb:#2A2614"><span class="ic">' + ICON.heart + '</span>Komitmen</button>' +
+          '<a href="' + RUANG_CATAT_URL + '" style="--c:#C4B5FD;--cb:#252137"><span class="ic">' + ICON.book + '</span><span>Ruang Catat <i class="ext">' + ICON.ext + '</i></span></a>' +
+        '</nav>' +
+        '<div class="br-grid"><div class="br-col main">' +
+          '<section class="br-card br-kantong" id="br-kantong" aria-labelledby="br-kantong-h"></section>' +
+          '<div id="br-eval-m" class="br-eval-slot m"></div>' +
+          '<section class="br-card" id="br-todo" aria-labelledby="br-todo-h"></section>' +
+          '<section class="br-card br-add" id="br-add" aria-label="Tambah cepat"></section>' +
+        '</div><div class="br-col side">' +
+          '<div id="br-eval-d" class="br-eval-slot d"></div>' +
+          '<section class="br-card br-mood" id="br-mood" aria-labelledby="br-mood-h"></section>' +
+        '</div></div></div>';
+      $$('[data-who]', el).forEach(function (b) { b.addEventListener('click', function () {
+        if (b.getAttribute('data-who') === user.id) return;
+        S.prefs.demoUser = b.getAttribute('data-who'); self.add.pemilik = ''; persist(); S.boot = null; S.todos = null; renderView(); sync();
+      }); });
+      $$('[data-brgo]', el).forEach(function (b) { b.addEventListener('click', function () { brGo(b.getAttribute('data-brgo')); }); });
+      this.renderAdd(cari('br-add'));
+      this.renderMood(cari('br-mood'));
+      this.update(el);
+    },
+    update: function (el) {
+      if (!$('#br-kantong', el)) return this.render(el);
+      $('#br-sync', el).innerHTML = brSyncLine();
+      this.renderKantong($('#br-kantong', el));
+      var ev = this.evalHtml(), slot = window.matchMedia && matchMedia('(min-width: 900px)').matches ? 'd' : 'm';
+      $('#br-eval-m', el).innerHTML = slot === 'm' ? ev : '';
+      $('#br-eval-d', el).innerHTML = slot === 'd' ? ev : '';
+      this.bindEval(el);
+      this.renderTodo($('#br-todo', el));
+    },
+    renderKantong: function (box) {
+      var user = me(), rt = bukuRT(), m = ensureMonth(thisMonth());
+      var head = '<div class="br-card-h"><h2 id="br-kantong-h"><span class="br-ic" style="--c:#7DD3A8;--cb:#1B2A23">' + ICON.wallet + '</span>Kantong</h2><a class="br-lnk" href="kantong.html">Buka</a></div>';
+      if (!m) { box.innerHTML = head + '<div class="br-skel-line"></div><div class="br-skel-line"></div>'; return; }
+      var d = db(), s = rt ? C.summarize(d, m.transaksi, m.budget, rt.id) : null;
+      var used = s && s.budgetTotal ? s.pengeluaran / s.budgetTotal : 0;
+      var pct = Math.round(used * 100);
+      var rtHtml = rt ? '<div class="br-rt"><div class="br-lbl">Sisa dompet ' + esc(rt.nama) + '</div>' +
+        '<div class="br-big num">' + rp(saldoBuku(rt.id)) + '</div>' +
+        (s.budgetTotal ? '<div class="br-bar' + (used > 1 ? ' over' : '') + '" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.min(pct, 100) + '" aria-label="Budget rumah tangga terpakai ' + pct + ' persen"><i style="width:' + Math.min(100, pct) + '%"></i></div>' +
+          '<div class="br-foot"><span>Terpakai ' + pct + '%</span><span>dari budget ' + rp(s.budgetTotal) + '</span></div>'
+          : '<div class="br-foot"><span>Budget bulan ini belum diatur</span></div>') + '</div>' : '';
+      var pribadi = '<div class="br-inset br-pribadi"><span class="br-lbl">Saldo pribadi ' + esc(user.nama) + '</span><span class="num">' + rp(saldoBuku(user.buku)) + '</span></div>';
+      // transaksi terakhir: buku RT + buku pribadi user, urut terbaru
+      var bukuSaya = [user.buku].concat(rt ? [rt.id] : []);
+      var semua = [];
+      Object.keys(S.months).sort().reverse().slice(0, 2).forEach(function (b) { semua = semua.concat(S.months[b].transaksi || []); });
+      var last = semua.filter(function (t) { return bukuSaya.some(function (bk) { return C.txInBuku(d, t, bk); }); })
+        .sort(function (a, b) { return (String(b.tanggal) + String(b.dibuat || '9')).localeCompare(String(a.tanggal) + String(a.dibuat || '9')); }).slice(0, 3);
+      var rows = last.length ? last.map(function (t) {
+        var k = kategoriOf(t.kategori), keluar = t.tipe === 'Pengeluaran', masuk = t.tipe === 'Pemasukan';
+        var bk = bukuById(t.buku), label = bk && bk.tipe === 'Bersama' ? 'RT' : 'Pribadi';
+        return '<button type="button" class="br-tx" data-tx="' + esc(t.id) + '"><span class="dot" style="background:' + esc(k ? k.warna : '#9AA3B2') + '"></span>' +
+          '<span class="main"><span class="t1">' + esc(t.keterangan || (k ? k.nama : t.tipe)) + '</span><span class="t2">' + esc(dayLabel(t.tanggal)) + ' · ' + label + (k ? ' · ' + esc(k.nama) : '') + '</span></span>' +
+          '<span class="amt num' + (masuk ? ' in' : '') + '">' + (keluar ? '−' : masuk ? '+' : '') + rp(t.nominal).replace('−', '') + '</span></button>';
+      }).join('') : '<div class="br-empty">Belum ada transaksi bulan ini.</div>';
+      box.innerHTML = head + '<div class="br-kantong-cols"><div>' + rtHtml + pribadi + '</div>' +
+        '<div><div class="br-sub">Transaksi terakhir</div><div class="br-txs">' + rows + '</div></div></div>' +
+        '<button type="button" class="br-btn primary" id="br-catat">' + ICON.plus + 'Catat transaksi</button>';
+      $('#br-catat', box).addEventListener('click', openTxBaru);
+      $$('[data-tx]', box).forEach(function (b) { b.addEventListener('click', function () { openTxSheet(findTx(b.getAttribute('data-tx'))); }); });
+    },
+    evalHtml: function () {
+      var p = C.evaluasiPengingat(todos(), nowLocal());
+      if (!p) return '';
+      var tunda = LS.get('k_eval_tunda', null);
+      if (tunda && tunda.id === p.todo.id && tunda.sampai > Date.now()) return '';
+      var n = (S.komitmen || []).filter(function (k) { return !k.dihapus && !k.diganti_oleh; }).length;
+      return '<section class="br-card br-eval" aria-labelledby="br-eval-h"><div class="br-eval-top"><span class="br-ic" style="--c:#FCD34D;--cb:#2A2614">' + ICON.heart + '</span>' +
+        '<div><h2 id="br-eval-h">' + esc(p.todo.judul) + ' · ' + esc(brSisa(p.menit)) + '</h2><div class="br-eval-d">' + esc(brTanggal(p.todo)) + ' · ' + n + ' kesepakatan aktif</div></div></div>' +
+        '<p>Siapkan catatan: mana kesepakatan yang jalan, mana yang perlu dibahas ulang.</p>' +
+        '<div class="br-eval-act"><button type="button" class="br-btn amber" data-brgo="komitmen">Lihat kesepakatan</button>' +
+        '<button type="button" class="br-btn ghost" data-eval-tunda="' + esc(p.todo.id) + '">Ingatkan nanti</button></div></section>';
+    },
+    bindEval: function (el) {
+      $$('.br-eval [data-brgo]', el).forEach(function (b) { b.addEventListener('click', function () { brGo('komitmen'); }); });
+      $$('[data-eval-tunda]', el).forEach(function (b) { b.addEventListener('click', function () {
+        LS.set('k_eval_tunda', { id: b.getAttribute('data-eval-tunda'), sampai: Date.now() + 60 * 60000 });
+        toast('Diingatkan lagi 1 jam lagi'); BerandaView.update($('#view'));
+      }); });
+    },
+    renderTodo: function (box) {
+      var f = todoFilter(), today = todayISO();
+      var head = '<div class="br-card-h"><h2 id="br-todo-h"><span class="br-ic" style="--c:#93C5FD;--cb:#1A2433">' + ICON.check + '</span>To-do</h2>';
+      if (S.todos === null) { box.innerHTML = head + '</div><div class="br-skel-line"></div><div class="br-skel-line"></div>'; return; }
+      var semua = todos().filter(function (t) { return todoMatch(t, f); });
+      var tugas = semua.filter(function (t) { return C.todoTipe(t) !== 'catatan'; });
+      var buka = todoSorted(tugas.filter(function (t) { return !C.bool(t.selesai); }));
+      var beres = tugas.filter(function (t) { return C.bool(t.selesai) && String(t.diubah || '').slice(0, 10) === today; });
+      var notes = semua.filter(function (t) { return C.todoTipe(t) === 'catatan'; })
+        .sort(function (a, b) { return String(b.diubah || b.dibuat || '').localeCompare(String(a.diubah || a.dibuat || '')); });
+      var tampil = buka.slice(0, 6).concat(beres.slice(0, 2));
+      box.innerHTML = head + '<span class="br-count">' + beres.length + ' dari ' + (buka.length + beres.length) + ' selesai</span></div>' +
+        '<div class="br-chips" role="group" aria-label="Filter to-do">' + [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) {
+          return '<button type="button" data-brtf="' + x[0] + '" aria-pressed="' + (f === x[0]) + '">' + x[1] + '</button>';
+        }).join('') + '</div>' +
+        (tampil.length ? '<div class="br-todos">' + tampil.map(brTodoRow).join('') + '</div>' : '<div class="br-empty">' + (buka.length + beres.length ? '' : 'Belum ada to-do. Tulis satu di bawah.') + '</div>') +
+        (buka.length > 6 ? '<a class="br-more" href="kantong.html#todo">+' + (buka.length - 6) + ' to-do lainnya</a>' : '') +
+        (notes.length ? '<div class="br-sub" style="margin-top:6px">Catatan</div><div class="br-todos">' + notes.slice(0, 3).map(brNoteRow).join('') + '</div>' +
+          (notes.length > 3 ? '<a class="br-more" href="kantong.html#todo">Semua catatan (' + notes.length + ')</a>' : '') : '');
+      $$('[data-brtf]', box).forEach(function (b) { b.addEventListener('click', function () {
+        S.prefs.todoFilter = b.getAttribute('data-brtf'); persist(); BerandaView.renderTodo(box);
+      }); });
+      $$('[data-tdone]', box).forEach(function (b) { b.addEventListener('click', function () { toggleTodoDone(findTodo(b.getAttribute('data-tdone'))); }); });
+      $$('[data-todo]', box).forEach(function (b) { b.addEventListener('click', function () { var t = findTodo(b.getAttribute('data-todo')); if (t) openTodoSheet(t); }); });
+    },
+    renderAdd: function (box) {
+      var self = this, a = this.add, user = me();
+      if (!a.pemilik) a.pemilik = user.id;
+      var p = todoPemilikInfo(a.pemilik), isTodo = a.tipe === 'todo';
+      box.innerHTML = '<div class="br-seg" role="group" aria-label="Jenis">' + [['todo', 'To-do'], ['catatan', 'Catatan']].map(function (x) {
+          return '<button type="button" data-addt="' + x[0] + '" aria-pressed="' + (a.tipe === x[0]) + '">' + x[1] + '</button>';
+        }).join('') + '</div>' +
+        '<div class="br-add-row">' + (isTodo
+          ? '<input id="br-add-in" class="br-input" type="text" maxlength="120" autocomplete="off" enterkeyhint="done" placeholder="Tambah to-do…" aria-label="To-do baru">'
+          : '<textarea id="br-add-in" class="br-input" rows="3" maxlength="2000" placeholder="Tulis catatan…" aria-label="Catatan baru"></textarea>') +
+        '</div><div class="br-add-opts">' +
+          (isTodo ? '<button type="button" class="br-pill blue" id="br-add-time">' + ICON.cal + 'Atur waktu</button>' : '') +
+          '<button type="button" class="br-pill" id="br-add-who" aria-label="Untuk ' + esc(p.nama) + '. Ketuk untuk ganti">' + ICON.user + 'Untuk: ' + esc(p.id === user.id ? user.nama : p.nama) + '</button>' +
+          '<button type="button" class="br-btn primary small" id="br-add-save">Simpan</button>' +
+        '</div><p class="br-help">' + (isTodo ? 'Tanpa waktu: disimpan di app saja. Atur waktu → masuk Google Calendar.' : 'Catatan tidak masuk kalender. Pilih "Bersama" supaya bisa dibaca berdua.') + '</p>';
+      var inp = $('#br-add-in', box);
+      function simpan() {
+        var v = inp.value.trim(); if (!v) { inp.focus(); return; }
+        var ok = simpanTodo(isTodo ? { tipe: 'todo', judul: v, pemilik: a.pemilik, aturWaktu: false, durasi: C.TODO_DURASI }
+          : { tipe: 'catatan', isi: v, pemilik: a.pemilik, aturWaktu: false, durasi: C.TODO_DURASI }, null);
+        if (ok) { inp.value = ''; inp.focus(); }
+      }
+      $$('[data-addt]', box).forEach(function (b) { b.addEventListener('click', function () { a.tipe = b.getAttribute('data-addt'); var v = inp.value; self.renderAdd(box); $('#br-add-in', box).value = v; }); });
+      inp.addEventListener('keydown', function (e) { if (isTodo && e.key === 'Enter') { e.preventDefault(); simpan(); } });
+      $('#br-add-save', box).addEventListener('click', simpan);
+      $('#br-add-who', box).addEventListener('click', function () {
+        var list = todoPemilikList().map(function (x) { return x.id; });
+        a.pemilik = list[(list.indexOf(a.pemilik) + 1) % list.length];
+        var v = inp.value; self.renderAdd(box); var ni = $('#br-add-in', box); ni.value = v;
+      });
+      var tm = $('#br-add-time', box);
+      if (tm) tm.addEventListener('click', function () { openTodoSheet(null, { tipe: 'todo', judul: inp.value.trim(), pemilik: a.pemilik, aturWaktu: true }); inp.value = ''; });
+    },
+    renderMood: function (box) {
+      var self = this, cur = this.mood;
+      box.innerHTML = '<div class="br-card-h"><h2 id="br-mood-h"><span class="br-ic" style="--c:#C4B5FD;--cb:#252137">' + ICON.book + '</span>Ruang Catat</h2></div>' +
+        '<p class="br-q">Gimana rasanya hari ini?</p>' +
+        '<div class="br-moods" role="radiogroup" aria-label="Mood hari ini">' + MOODS.map(function (m) {
+          return '<button type="button" role="radio" aria-checked="' + (cur === m[0]) + '" data-mood="' + m[0] + '" style="--c:' + m[2] + '"><span class="face">' + moodSvg(m) + '</span><span>' + m[1] + '</span></button>';
+        }).join('') + '</div>' +
+        (cur ? '<a class="br-btn violet" href="' + RUANG_CATAT_URL + '?mood=' + cur + '">Lanjut tulis di Ruang Catat <i class="ext">' + ICON.ext + '</i></a>'
+          : '<p class="br-help">Pilih satu, lalu lanjut menulis di Ruang Catat. Mood tidak disimpan di Beranda.</p>');
+      $$('[data-mood]', box).forEach(function (b) { b.addEventListener('click', function () {
+        var m = b.getAttribute('data-mood'); self.mood = self.mood === m ? '' : m; self.renderMood(box);
+        var nb = $('[data-mood="' + m + '"]', box); if (nb) nb.focus();
+      }); });
+    }
+  };
+  function brTodoRow(t) {
+    var bisa = canWriteTodo(t), selesai = C.bool(t.selesai), p = todoPemilikInfo(t.pemilik), ev = C.todoTipe(t) === 'evaluasi';
+    var meta;
+    if (t.tanggal) {
+      var gagal = !t._pending && t.gcal_status === 'gagal';
+      meta = '<span class="br-when' + (gagal || todoTerlewat(t) ? ' bad' : '') + '">' + (gagal ? ICON.calx : ICON.cal) + esc(todoWaktuLabel(t)) + '</span>' +
+        (t.pemilik !== me().id ? '<span class="br-owner">' + esc(p.nama) + '</span>' : '');
+    } else meta = '<span class="br-owner">' + esc(p.id === me().id ? me().nama : p.nama) + '</span>';
+    if (ev) meta = '<span class="br-owner amber">' + ICON.heart + 'Evaluasi</span>' + meta;
+    return '<div class="br-todo' + (selesai ? ' done' : '') + '">' +
+      '<button type="button" class="br-chk" role="checkbox" aria-checked="' + selesai + '" data-tdone="' + esc(t.id) + '" aria-label="' + (selesai ? 'Batalkan selesai' : 'Tandai selesai') + ': ' + esc(t.judul) + '"' + (bisa ? '' : ' disabled') + '><i>' + ICON_CHECK + '</i></button>' +
+      '<button type="button" class="br-todo-main" data-todo="' + esc(t.id) + '"><span class="t1">' + esc(t.judul) + '</span><span class="t2">' + meta + '</span></button></div>';
+  }
+  function brNoteRow(t) {
+    var p = todoPemilikInfo(t.pemilik);
+    return '<div class="br-todo note"><span class="br-note-ic">' + ICON.note + '</span>' +
+      '<button type="button" class="br-todo-main" data-todo="' + esc(t.id) + '"><span class="t1">' + esc(t.judul) + '</span><span class="t2"><span class="br-owner">' + esc(p.id === me().id ? 'Pribadi' : p.nama) + '</span></span></button></div>';
+  }
+  var ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
+
+  // ---------- Komitmen (sementara, sampai desain halaman lengkap dari Riki) ----------
+  var KomitmenView = {
+    render: function (el) {
+      var aktif = (S.komitmen || []).filter(function (k) { return !k.dihapus && !k.diganti_oleh; })
+        .sort(function (a, b) { return String(b.berlaku_sejak).localeCompare(String(a.berlaku_sejak)); });
+      var lama = (S.komitmen || []).filter(function (k) { return !k.dihapus && k.diganti_oleh; });
+      var today = todayISO();
+      var evNext = todoSorted(todos().filter(function (t) { return C.todoTipe(t) === 'evaluasi' && !C.bool(t.selesai) && t.tanggal >= today; }))[0];
+      el.innerHTML = '<div class="br-wrap narrow">' +
+        '<header class="br-head"><div><button type="button" class="br-back" data-brgo="beranda">' + ICON.left + 'Beranda</button><h1>Komitmen</h1>' +
+        '<p class="br-intro">Kesepakatan berdua dari evaluasi bulanan. Berlaku sampai diganti kesepakatan baru.</p></div></header>' +
+        '<section class="br-card br-eval"><div class="br-eval-top"><span class="br-ic" style="--c:#FCD34D;--cb:#2A2614">' + ICON.cal + '</span><div><h2>Evaluasi berikutnya</h2>' +
+        '<div class="br-eval-d">' + (evNext ? esc(brTanggal(evNext)) + ' · masuk Google Calendar' : 'Belum dijadwalkan') + '</div></div></div>' +
+        '<div class="br-eval-act">' + (evNext ? '<button type="button" class="br-btn ghost" data-ev-edit="' + esc(evNext.id) + '">Ubah jadwal</button>'
+          : '<button type="button" class="br-btn amber" id="km-jadwal">Jadwalkan evaluasi</button>') + '</div></section>' +
+        '<section class="br-card"><div class="br-card-h"><h2>Kesepakatan berlaku</h2><span class="br-count">' + aktif.length + '</span></div>' +
+        (S.komitmen === null ? '<div class="br-skel-line"></div>' : aktif.length ? '<div class="km-list">' + aktif.map(function (k) { return kmItem(k, true); }).join('') + '</div>'
+          : '<div class="br-empty">Belum ada kesepakatan. Tulis hasil evaluasi pertama kalian.</div>') +
+        '<button type="button" class="br-btn primary amber-solid" id="km-baru">' + ICON.plus + 'Kesepakatan baru</button></section>' +
+        (lama.length ? '<details class="br-card km-old"><summary>Riwayat (' + lama.length + ' sudah diganti)</summary><div class="km-list">' + lama.map(function (k) { return kmItem(k, false); }).join('') + '</div></details>' : '') +
+        '</div>';
+      $$('[data-brgo]', el).forEach(function (b) { b.addEventListener('click', function () { brGo(b.getAttribute('data-brgo')); }); });
+      var j = $('#km-jadwal', el);
+      if (j) j.addEventListener('click', function () { openTodoSheet(null, { tipe: 'evaluasi', pemilik: C.TODO_BERSAMA, aturWaktu: true, jam: '19:00', durasi: 60 }); });
+      $$('[data-ev-edit]', el).forEach(function (b) { b.addEventListener('click', function () { var t = findTodo(b.getAttribute('data-ev-edit')); if (t) openTodoSheet(t); }); });
+      $('#km-baru', el).addEventListener('click', function () { openKomitmenSheet(null, null); });
+      $$('[data-km-ganti]', el).forEach(function (b) { b.addEventListener('click', function () { openKomitmenSheet(null, kmFind(b.getAttribute('data-km-ganti'))); }); });
+      $$('[data-km-edit]', el).forEach(function (b) { b.addEventListener('click', function () { openKomitmenSheet(kmFind(b.getAttribute('data-km-edit')), null); }); });
+    }
+  };
+  function kmFind(id) { return (S.komitmen || []).filter(function (k) { return k.id === id; })[0] || null; }
+  function kmItem(k, aktif) {
+    var sejak = k.berlaku_sejak ? 'Berlaku sejak ' + dayLabel(k.berlaku_sejak) : '';
+    return '<article class="km-item' + (aktif ? '' : ' old') + '"><h3>' + esc(k.judul) + (k._pending ? ' <span class="br-owner">belum terkirim</span>' : '') + '</h3>' +
+      (k.isi ? '<p>' + esc(k.isi).replace(/\n/g, '<br>') + '</p>' : '') + '<div class="km-meta">' + esc(sejak) + (k.oleh ? ' · ditulis ' + esc(userName(k.oleh)) : '') + '</div>' +
+      (aktif ? '<div class="km-act"><button type="button" class="br-pill" data-km-edit="' + esc(k.id) + '">Ubah</button><button type="button" class="br-pill" data-km-ganti="' + esc(k.id) + '">Ganti dengan yang baru</button></div>' : '') + '</article>';
+  }
+  function openKomitmenSheet(k, mengganti) {
+    var f = { judul: k ? k.judul : '', isi: k ? k.isi : '', berlaku_sejak: k ? k.berlaku_sejak : todayISO() };
+    openSheet(k ? 'Ubah kesepakatan' : mengganti ? 'Ganti kesepakatan' : 'Kesepakatan baru', function (sh) {
+      sh.el.innerHTML = (mengganti ? '<div class="readonly-note"><span>Menggantikan: <b>' + esc(mengganti.judul) + '</b>. Yang lama tetap tersimpan di riwayat.</span></div>' : '') +
+        '<div class="field" style="margin-top:4px"><label for="km-j">Kesepakatan</label><input id="km-j" class="input" maxlength="160" autocomplete="off" placeholder="mis. Quality time tiap Jumat malam" value="' + esc(f.judul) + '"></div>' +
+        '<div class="field"><label for="km-i">Detail (opsional)</label><textarea id="km-i" class="input" rows="4" maxlength="4000" placeholder="Apa yang disepakati, alasannya, cara cek bulan depan">' + esc(f.isi) + '</textarea></div>' +
+        '<div class="field"><label for="km-t">Berlaku sejak</label><input id="km-t" class="input" type="date" value="' + esc(f.berlaku_sejak) + '"></div>' +
+        '<div class="err" id="km-err" role="alert"></div><button type="button" class="btn" id="km-save">Simpan</button>' +
+        (k ? '<button type="button" class="btn danger" id="km-del">Hapus kesepakatan</button>' : '');
+      $('#km-save', sh.el).addEventListener('click', function () {
+        var payload = { id: k ? k.id : uid(), judul: $('#km-j', sh.el).value, isi: $('#km-i', sh.el).value, berlaku_sejak: $('#km-t', sh.el).value };
+        try { payload = C.cleanKomitmen(payload); } catch (e) { $('#km-err', sh.el).textContent = e.message; return; }
+        if (mengganti) payload.mengganti = mengganti.id;
+        enqueue('komitmen.save', payload); toast(mengganti ? 'Kesepakatan diganti' : 'Kesepakatan disimpan'); sh.close();
+      });
+      var del = $('#km-del', sh.el);
+      if (del) del.addEventListener('click', function () {
+        if (!confirm('Hapus kesepakatan ini? Kalau dia menggantikan kesepakatan lama, yang lama berlaku lagi.')) return;
+        enqueue('komitmen.delete', { id: k.id }); toast('Kesepakatan dihapus'); sh.close();
+      });
+      setTimeout(function () { var j = $('#km-j', sh.el); if (j && !f.judul) j.focus(); }, 300);
+    });
+  }
+
   // ================= connect =================
   function renderConnect() {
     var app = $('#app');
@@ -1587,20 +1964,20 @@
       } catch (e) { $('#c-err').textContent = 'Kode tidak dikenali. Salin ulang kode koneksi (Supabase: hasil kantong_buat_kode).'; return; }
       btn.disabled = true; btn.textContent = 'Menghubungkan…';
       rpc('bootstrap', {}, conn).then(function (boot) {
-        S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
+        S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.komitmen = null; S.bukuView = null; persist(); renderShell(); sync();
       }, function (e) {
         btn.disabled = false; btn.textContent = 'Hubungkan';
         $('#c-err').textContent = e.code === 'AUTH' ? 'Kode akses ditolak server.' : e.message;
       });
     });
     $('#demo').addEventListener('click', function () {
-      S.conn = { mode: 'demo' }; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
+      S.conn = { mode: 'demo' }; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.komitmen = null; S.bukuView = null; persist(); renderShell(); sync();
     });
   }
   function disconnect() {
-    ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos'].forEach(LS.del);
+    ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_komitmen'].forEach(LS.del);
     demoStore = null;
-    S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.sub = null; S.tab = 'home'; S.bukuView = null;
+    S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.komitmen = null; S.sub = null; S.tab = PAGE === 'beranda' ? 'beranda' : 'home'; S.bukuView = null;
     renderConnect();
   }
 
@@ -1655,9 +2032,9 @@
       keterangan: 'Reimburse: kereta dinas', reimburse: false, oleh: 'riki', sumber: 'auto', dibuat: pd.terbayar + 'T09:00:00+07:00', diubah: '', dihapus: '', terbayar: '', tx_balik: '' });
     // to-do contoh: campuran dengan waktu, tanpa waktu, bersama, dan yang sudah selesai
     var t0 = todayISO(), td = [];
-    var tdAdd = function (n, judul, pemilik, tanggal, jam, selesai) {
+    var tdAdd = function (n, judul, pemilik, tanggal, jam, selesai, tipe, isi) {
       var kapan = (tanggal || t0) + 'T08:0' + n + ':00+07:00';
-      td.push({ id: 'demo-td-' + n, judul: judul, pemilik: pemilik, tanggal: tanggal, jam: jam, durasi: 30,
+      td.push({ id: 'demo-td-' + n, tipe: tipe || 'todo', isi: isi || '', judul: judul, pemilik: pemilik, tanggal: tanggal, jam: jam, durasi: tipe === 'evaluasi' ? 60 : 30,
         selesai: !!selesai, selesai_oleh: selesai ? 'istri' : '', gcal_event_id: tanggal ? 'demo-ev-' + n : '',
         gcal_status: tanggal ? 'ok' : '', gcal_error: '', oleh: pemilik === 'bersama' ? 'riki' : pemilik,
         dibuat: kapan, diubah: kapan, dihapus: '' });
@@ -1667,25 +2044,37 @@
     tdAdd(3, 'Jemput paket di agen', 'istri', C.addDays(t0, 1), '10:00');
     tdAdd(4, 'Servis AC kamar', 'bersama', C.addDays(t0, 3), '');
     tdAdd(5, 'Transfer arisan', 'istri', C.addDays(t0, -1), '16:00', true);
+    // agenda evaluasi ~3 jam lagi supaya kartu pengingat terlihat di demo
+    var ev = new Date(Date.now() + 3 * 3600000);
+    tdAdd(6, 'Evaluasi bulanan', 'bersama', ev.getFullYear() + '-' + pad(ev.getMonth() + 1) + '-' + pad(ev.getDate()), pad(ev.getHours()) + ':00', false, 'evaluasi');
+    tdAdd(7, 'Ide kado ulang tahun Ibu', 'bersama', '', '', false, 'catatan', 'Ide kado ulang tahun Ibu\nSyal rajut atau voucher pijat');
+    tdAdd(8, 'Ukuran gorden kamar', 'riki', '', '', false, 'catatan', 'Ukuran gorden kamar\n2 x 140 cm, tinggi 240 cm');
+    var kAt = C.addDays(t0, -16) + 'T21:00:00+07:00';
+    var komitmen = [
+      { id: 'demo-k1', judul: 'Quality time tiap Jumat malam, HP disimpan', isi: 'Mulai jam 19.00. Kalau batal, ganti di hari lain minggu itu.', berlaku_sejak: C.addDays(t0, -16), diganti_oleh: '', oleh: 'istri', dibuat: kAt, diubah: kAt, dihapus: '' },
+      { id: 'demo-k2', judul: 'Belanja di atas Rp 500 rb dibahas dulu berdua', isi: '', berlaku_sejak: C.addDays(t0, -16), diganti_oleh: '', oleh: 'riki', dibuat: kAt, diubah: kAt, dihapus: '' },
+      { id: 'demo-k3', judul: 'Gantian masak tiap akhir pekan', isi: 'Sabtu Riki, Minggu Febie.', berlaku_sejak: C.addDays(t0, -16), diganti_oleh: '', oleh: 'riki', dibuat: kAt, diubah: kAt, dihapus: '' }
+    ];
     return {
       buku: [{ id: 'riki', nama: 'Riki', tipe: 'Pribadi', pemilik: 'riki', urutan: 1 }, { id: 'istri', nama: 'Febie', tipe: 'Pribadi', pemilik: 'istri', urutan: 2 }, { id: 'rt', nama: 'Rumah Tangga', tipe: 'Bersama', pemilik: '', urutan: 3 }],
       users: [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'istri', nama: 'Febie', buku: 'istri' }],
-      kategori: kat, kantong: kan, budget: bud, transaksi: tx, todo: td
+      kategori: kat, kantong: kan, budget: bud, transaksi: tx, todo: td, komitmen: komitmen
     };
   }
 
   // ================= start =================
   window.addEventListener('online', function () { sync(); });
+  if (PAGE === 'beranda' && window.matchMedia) matchMedia('(min-width: 900px)').addEventListener('change', function () { if (S.tab === 'beranda' && view && view.update && $('#view')) view.update($('#view')); });
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') sync(); });
   setInterval(function () { if (document.visibilityState === 'visible' && (S.outbox.length || !S.lastSync || Date.now() - S.lastSync > 120000)) sync(); }, 30000);
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
   // data demo versi lama (sebelum to-do) dibuang sekali supaya contoh to-do ikut muncul
-  if (LS.get('k_ver', null) !== 'v5') {
+  if (LS.get('k_ver', null) !== 'v6') {
     if (S.conn && S.conn.mode === 'demo') {
-      ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos'].forEach(LS.del);
-      S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null;
+      ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_komitmen'].forEach(LS.del);
+      S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.komitmen = null;
     }
-    LS.set('k_ver', 'v5');
+    LS.set('k_ver', 'v6');
   }
   if (!S.conn && window.KANTONG_PREVIEW) S.conn = { mode: 'demo' };   // file preview
   renderShell();

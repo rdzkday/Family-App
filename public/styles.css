@@ -410,3 +410,9 @@ input.input:disabled { opacity: .5; }
 .td-retry svg { width: 16px; height: 16px; }
 .td-retry:disabled { opacity: .5; cursor: default; }
 .section-h button.aside.lnk { color: var(--todo-ok); font-weight: 800; min-height: 44px; margin: -12px 0; }
+
+/* catatan di daftar to-do: tanpa centang */
+.todo-row.note .note-ic { flex: none; width: 44px; height: 44px; margin-top: 2px; display: grid; place-items: center; color: var(--text-3); }
+.todo-row.note .note-ic svg { width: 20px; height: 20px; }
+.note-more { display: block; width: 100%; color: var(--text-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+textarea.input { resize: vertical; min-height: 96px; line-height: 1.5; font-family: inherit; }
