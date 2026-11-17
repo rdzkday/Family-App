@@ -121,6 +121,15 @@ Aturan yang dijalankan server:
 - Butuh migrasi `20261117000000_komitmen.sql` + deploy ulang Edge Function (core baru).
 - Fase 4a sudah ada: baca, cari (nomor + isi), filter, A–Z. Usul/ubah/TTD menyusul (4b).
 - Isi asli kesepakatan & perjanjian pranikah **hanya** di database. Jangan taruh di repo.
+- **Data contoh** (17 Nov) sudah dimasukkan ke database: 12 pasal, id berawalan `contoh-`. Hapus **sebelum import perjanjian pranikah** supaya nomor Pasal 1–12 bebas lagi. Jalankan di SQL Editor:
+
+  ```sql
+  delete from komitmen_keterangan where id like 'contoh-%';
+  delete from komitmen_versi where id like 'contoh-%';
+  delete from komitmen_pasal where id like 'contoh-%';
+  delete from komitmen_bab where id like 'contoh-%';
+  delete from pengesahan where id like 'contoh-%';
+  ```
 
 ## Aturan akses
 
