@@ -1,11 +1,11 @@
 /* Kantong — Layar hubungkan & putuskan.
-   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
+   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 
 // ================= connect =================
 function renderConnect() {
   var app = $('#app');
-  app.innerHTML = '<div class="connect"><img class="logo" src="icons/icon-animated.svg" alt=""><h1>Kantong</h1>' +
+  app.innerHTML = '<div class="connect"><img class="logo" src="' + ROOT + 'icons/icon-animated.svg" alt=""><h1>Kantong</h1>' +
     '<p>Catatan keuangan dan to-do rumah tangga. Tempel kode koneksi untuk mulai.</p>' +
     '<div class="field"><label for="code">Kode koneksi</label><textarea id="code" class="input" placeholder="Tempel kode koneksi (lihat kantong/PANDUAN.md)" autocomplete="off" spellcheck="false"></textarea></div>' +
     '<div class="err" id="c-err"></div><button class="btn" id="connect">Hubungkan</button>' +
@@ -35,6 +35,6 @@ function renderConnect() {
 function disconnect() {
   ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_komitmen'].forEach(LS.del);
   demoStore = null;
-  S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.sub = null; S.tab = PAGE === 'beranda' ? 'beranda' : 'home'; S.bukuView = null;
+  S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.sub = null; S.tab = PAGE === 'beranda' ? 'beranda' : PAGE === 'agenda' ? 'todo' : 'home'; S.bukuView = null;
   renderConnect();
 }

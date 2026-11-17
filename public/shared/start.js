@@ -1,5 +1,5 @@
 /* Kantong — Mulai app.
-   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
+   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 
 // ================= start =================
@@ -7,7 +7,7 @@ window.addEventListener('online', function () { sync(); });
 if (PAGE === 'beranda' && window.matchMedia) matchMedia('(min-width: 900px)').addEventListener('change', function () { if (S.tab === 'beranda' && view && view.update && $('#view')) view.update($('#view')); });
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') sync(); });
 setInterval(function () { if (document.visibilityState === 'visible' && (S.outbox.length || !S.lastSync || Date.now() - S.lastSync > 120000)) sync(); }, 30000);
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register(ROOT + 'sw.js').catch(function () {});
 // data demo versi lama (sebelum to-do) dibuang sekali supaya contoh to-do ikut muncul
 if (LS.get('k_ver', null) !== 'v6') {
   if (S.conn && S.conn.mode === 'demo') {

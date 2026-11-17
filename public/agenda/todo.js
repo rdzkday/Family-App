@@ -1,5 +1,5 @@
-/* Kantong — To-do & catatan rumah tangga.
-   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
+/* Agenda — To-do & catatan rumah tangga: data, baris, sheet, dan tab To-do.
+   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 
 // ================= to-do rumah tangga =================
@@ -224,14 +224,14 @@ function renderHomeTodo(root) {
   root.innerHTML = list.length
     ? '<section class="section"><div class="section-h"><h2>To-do hari ini</h2><button type="button" class="aside lnk" data-act="goto-todo">Lihat semua</button></div>' +
       '<div class="list todo-list">' + list.slice(0, 3).map(todoRow).join('') + '</div>' +
-      (list.length > 3 ? '<p class="faint" style="font-size:12px;text-align:center;margin:8px 0 0">+' + (list.length - 3) + ' lainnya di tab To-do</p>' : '') + '</section>'
+      (list.length > 3 ? '<p class="faint" style="font-size:12px;text-align:center;margin:8px 0 0">+' + (list.length - 3) + ' lainnya di Agenda</p>' : '') + '</section>'
     : '';
   bindTodoRows(root);
 }
 var TodoView = {
   render: function (el) {
     var self = this;
-    el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>To-do & catatan</h1></div><div class="top-actions">' + berandaBtn() + syncPill() + '</div></div>' +
+    el.innerHTML = agendaHead('todo') +
       '<div class="seg" role="group" aria-label="Filter to-do">' + [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) {
         return '<button type="button" data-tf="' + x[0] + '" aria-pressed="' + (todoFilter() === x[0]) + '">' + x[1] + '</button>';
       }).join('') + '</div>' +
@@ -261,8 +261,6 @@ var TodoView = {
     if (S.todos === null) { box.innerHTML = skeleton(3); return; }
     var f = todoFilter(), semua = todos().filter(function (t) { return todoMatch(t, f); });
     var list = semua.filter(function (t) { return C.todoTipe(t) !== 'catatan'; });
-    var notes = semua.filter(function (t) { return C.todoTipe(t) === 'catatan'; })
-      .sort(function (a, b) { return String(b.diubah || b.dibuat || '').localeCompare(String(a.diubah || a.dibuat || '')); });
     var buka = todoSorted(list.filter(function (t) { return !C.bool(t.selesai); }));
     var beres = list.filter(function (t) { return C.bool(t.selesai); })
       .sort(function (a, b) { return String(b.diubah || '').localeCompare(String(a.diubah || '')); }).slice(0, 20);
@@ -273,10 +271,7 @@ var TodoView = {
         : '<div class="list"><div class="empty">Semua beres. Tulis to-do berikutnya di atas.</div></div>';
       if (beres.length) html += '<section class="section"><div class="section-h"><h2>Selesai</h2><span class="aside">' + beres.length + ' terakhir</span></div><div class="list todo-list">' + beres.map(todoRow).join('') + '</div></section>';
     }
-    html += '<section class="section"><div class="section-h"><h2>Catatan</h2><button type="button" class="aside lnk" id="td-note-new">+ Catatan</button></div>' +
-      (notes.length ? '<div class="list todo-list">' + notes.map(catatanRow).join('') + '</div>' : '<div class="list"><div class="empty">Belum ada catatan.</div></div>') + '</section>';
     box.innerHTML = html;
-    $('#td-note-new', box).addEventListener('click', function () { openTodoSheet(null, { tipe: 'catatan' }); });
     bindTodoRows(box);
   }
 };

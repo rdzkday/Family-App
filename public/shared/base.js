@@ -1,5 +1,5 @@
 /* Kantong — Dasar: util, tema, state, API, antrean offline & sinkron.
-   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di index.html & kantong.html. */
+   Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 var C = KantongCore;
 
@@ -73,12 +73,20 @@ var ICON = {
 // ================= tema =================
 var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
-var PAGE = window.KANTONG_PAGE === 'beranda' ? 'beranda' : 'kantong';
-// To-do sekarang fitur sendiri di Beranda: link lama kantong.html#todo diarahkan ke sana
-if (PAGE === 'kantong' && location.hash === '#todo') location.replace('./#todo');
-if (PAGE === 'kantong') window.addEventListener('hashchange', function () { if (location.hash === '#todo') location.replace('./#todo'); });
-var BERANDA_RUTE = ['beranda', 'todo', 'agenda', 'setelan'];
-function berandaRute() { var h = location.hash.slice(1); return BERANDA_RUTE.indexOf(h) >= 0 ? h : 'beranda'; }
+// Halaman per fitur: beranda (/), kantong (/kantong/), agenda (/agenda/). ROOT = jalur ke folder public dari halaman ini.
+var PAGE = ['beranda', 'kantong', 'agenda'].indexOf(window.KANTONG_PAGE) >= 0 ? window.KANTONG_PAGE : 'kantong';
+var ROOT = window.KANTONG_ROOT || '';
+var AGENDA_RUTE = ['todo', 'catatan', 'jadwal'];
+function agendaRute() { var h = location.hash.slice(1); return AGENDA_RUTE.indexOf(h) >= 0 ? h : 'todo'; }
+// link lama: kantong#todo, kantong#pengaturan, beranda#todo/#agenda/#setelan
+(function () {
+  var h = location.hash;
+  if (PAGE === 'kantong' && h === '#todo') location.replace(ROOT + 'agenda/');
+  if (PAGE === 'kantong' && h === '#pengaturan') location.replace(ROOT + '#pengaturan/kantong');
+  if (PAGE === 'beranda' && h === '#todo') location.replace(ROOT + 'agenda/');
+  if (PAGE === 'beranda' && h === '#agenda') location.replace(ROOT + 'agenda/#jadwal');
+  if (PAGE === 'beranda' && h === '#setelan') history.replaceState(null, '', '#pengaturan');
+})();
 function themePref() { return LS.get('k_theme', 'dark') === 'light' ? 'light' : 'dark'; }
 function isDark() { return themePref() === 'dark'; }
 function applyTheme() {
@@ -99,7 +107,7 @@ var S = {
   outbox: LS.get('k_outbox', []),
   todos: LS.get('k_todos', null),        // null = belum pernah dimuat
   prefs: LS.get('k_prefs', { lastKantong: {}, demoUser: 'riki' }),
-  tab: PAGE === 'beranda' ? berandaRute() : (({ '#ringkasan': 'ringkasan', '#riwayat': 'riwayat', '#pengaturan': 'pengaturan' })[location.hash] || 'home'), sub: null, bukuView: null, bulan: thisMonth(),
+  tab: PAGE === 'beranda' ? 'beranda' : PAGE === 'agenda' ? agendaRute() : (({ '#ringkasan': 'ringkasan', '#riwayat': 'riwayat' })[location.hash] || 'home'), sub: null, bukuView: null, bulan: thisMonth(),
   syncing: false, again: false, lastError: null, catTab: 'Pengeluaran'
 };
 function persist() {
@@ -252,7 +260,7 @@ function sync(extraMonths) {
     d.results.forEach(function (r) {
       if (r.opId === '_boot') { if (r.ok) S.boot = r.data; }
       else if (r.opId === '_todo') { if (r.ok) S.todos = r.data.todos || []; }
-      else if (r.opId === '_komit') { if (r.ok) LS.set('k_komitmen', { data: r.data, at: Date.now() }); }   // cache yang sama dengan komitmen.html
+      else if (r.opId === '_komit') { if (r.ok) LS.set('k_komitmen', { data: r.data, at: Date.now() }); }   // cache yang sama dengan komitmen/
       else if (String(r.opId).indexOf('_m_') === 0) { if (r.ok) S.months[r.data.bulan] = r.data; }
       else if (!r.ok) toast('Tidak tersimpan: ' + r.error, true);
     });

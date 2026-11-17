@@ -1,5 +1,5 @@
-/* Ruang Catat: kolom selebar ponsel, tab bar bawah; wajah mood 5 warna sebagai karakter utama.
-   Token sama dengan Beranda (tokens.css): gelap, aksen violet Ruang Catat, mood dari brief. */
+/* Daily Mood: kolom selebar ponsel, tab bar bawah; wajah mood 5 warna sebagai karakter utama.
+   Token sama dengan Beranda (tokens.css): gelap, aksen violet Daily Mood, mood dari brief. */
 @font-face{font-family:"Plus Jakarta Sans";src:url("fonts/jakarta.woff2") format("woff2");font-weight:200 800;font-display:swap}
 :root{
   --bg:#0A0C10; --app:#0E1014; --surface:#161920; --ink:#ECEEF2; --muted:#9AA3B2; --line:#262B35;
@@ -20,12 +20,12 @@ html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;display:flex;justify-content:center;overscroll-behavior:none}
 .app{width:100%;max-width:440px;height:100vh;height:100dvh;background:var(--app);display:flex;flex-direction:column;position:relative}
 header.top{display:flex;align-items:center;justify-content:space-between;padding:calc(16px + env(safe-area-inset-top)) 18px 10px;gap:12px}
-.brand{font-family:var(--font-display);font-size:1.4rem;font-weight:600;color:var(--accent)}
+.brand{font-family:var(--font-display);font-size:1.4rem;font-weight:600;color:var(--accent);text-decoration:none}
 .lock{font-size:.74rem;color:var(--muted);display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);padding:4px 10px;border-radius:999px}
 .view{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 16px 20px;display:flex;flex-direction:column;gap:14px}
 nav.tabs{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 10px calc(10px + env(safe-area-inset-bottom));gap:6px}
-nav.tabs button{background:none;border:0;padding:8px 4px;border-radius:14px;font:700 .78rem var(--font-body);color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
-nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button,nav.tabs a{text-decoration:none;background:none;border:0;padding:8px 4px;border-radius:14px;font:700 .78rem var(--font-body);color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav.tabs button svg,nav.tabs a svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 nav.tabs button[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}
 nav.tabs.hidden{display:none}
 button,input,textarea{font:inherit}

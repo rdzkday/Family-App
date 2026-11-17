@@ -1,7 +1,7 @@
-// Ruang Catat service worker: network-first untuk app shell, fallback ke cache saat offline.
-// Data catatan tidak lewat sini (tersimpan di localStorage perangkat).
-const CACHE = 'ruang-catat-v4';
-const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest',
+// Daily Mood service worker: network-first untuk app shell, fallback ke cache saat offline.
+// Data catatan tidak lewat sini (localStorage + POST ke Supabase).
+const CACHE = 'ruang-catat-v5';
+const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'data.js', 'manifest.webmanifest',
   'vendor/jspdf.umd.min.js', 'fonts/jakarta.woff2',
   'icons/icon.svg', 'icons/icon-32.png', 'icons/icon-192.png', 'icons/apple-touch-icon.png'];
 

@@ -66,7 +66,7 @@ echo "✓ catatan tersimpan; to-do versi lama tetap bisa disimpan (tipe kosong =
 JR='[{"tabel":"jurnal","baris":{"id":"riki|_pengaturan","pemilik":"riki","jenis":"pengaturan","tanggal":null,"isi":"{}","diubah":"x","dihapus":""}},{"tabel":"jurnal","baris":{"id":"riki|2026-11-18","pemilik":"riki","jenis":"entri","tanggal":"2026-11-18","isi":"{}","diubah":"x","dihapus":""}}]'
 [ "$(q "select kantong_simpan('$JR'::jsonb)")" = "2" ] || { echo "simpan jurnal gagal"; exit 1; }
 [ "$(q "select jsonb_array_length(kantong_muat()->'jurnal')")" = "2" ] || { echo "jurnal harus ada di snapshot"; exit 1; }
-echo "✓ jurnal Ruang Catat: tersimpan & ikut snapshot"
+echo "✓ jurnal Daily Mood: tersimpan & ikut snapshot"
 
 # kantong_muat: snapshot semua tabel, tanggal sebagai string, null tetap null
 MUAT="$(q "select kantong_muat()")"

@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Ruang Catat">
-  <title>Ruang Catat</title>
+  <meta name="apple-mobile-web-app-title" content="Daily Mood">
+  <title>Daily Mood</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="icon" href="icons/icon-32.png" sizes="32x32" type="image/png">
@@ -20,18 +20,19 @@
 <body>
 <div class="app">
   <header class="top">
-    <div class="brand">Ruang Catat</div>
-    <div class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Hanya di perangkat ini</div>
+    <a class="brand" href="../" aria-label="Kembali ke Beranda">‹ Daily Mood</a>
+    <div class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Memuat…</div>
   </header>
   <section class="view" id="view" aria-live="polite"></section>
   <nav class="tabs" id="tabs" aria-label="Menu utama">
     <button type="button" data-tab="today"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5q3.5 3 7 0"/><path d="M9 10h.01M15 10h.01"/></svg>Hari ini</button>
     <button type="button" data-tab="calendar"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Kalender</button>
-    <button type="button" data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Setting</button>
+    <a href="../#pengaturan/mood"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Pengaturan</a>
   </nav>
 </div>
 <div class="toast" id="toast" role="status"></div>
 <script src="vendor/jspdf.umd.min.js" defer></script>
+<script src="data.js" defer></script>
 <script src="app.js" defer></script>
 </body>
 </html>

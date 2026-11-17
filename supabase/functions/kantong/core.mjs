@@ -1,4 +1,4 @@
-// DIBUAT OTOMATIS dari public/core.js. Jangan diedit di sini. Jalankan: node kantong/tools/build_core.js
+// DIBUAT OTOMATIS dari public/shared/core.js. Jangan diedit di sini. Jalankan: node kantong/tools/build_core.js
 /*
  * Kantong — core logic (dipakai bersama oleh PWA, mode demo, dan Edge Function Supabase).
  * Salinan untuk Edge Function dibuat oleh: node kantong/tools/build_core.js

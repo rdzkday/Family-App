@@ -286,7 +286,7 @@
   }
   function listHtml() {
     var d = S.data, FIL = [['semua', 'Semua'], ['pranikah', 'Pranikah'], ['usulan', 'Usulan'], ['dicabut', 'Dicabut']];
-    return '<header class="km-head"><a class="back" href="./" aria-label="Kembali ke Beranda">' + ICON.back + '</a>' +
+    return '<header class="km-head"><a class="back" href="../" aria-label="Kembali ke Beranda">' + ICON.back + '</a>' +
       '<div><h1>Komitmen</h1><p class="sub">' + (d ? jumlahLabel(d) : '&nbsp;') + '</p></div>' +
       (S.status ? '<span class="km-status" role="status">' + esc(S.status) + '</span>' : '') + '</header>' +
       (demo ? '<div class="km-demo">Data contoh, bukan isi kesepakatan asli.' + (conn ? '' : ' Hubungkan dulu di Kantong untuk melihat data kalian.') + '</div>' : '') +
@@ -410,5 +410,5 @@
   load();
   if (currentNomor()) scrollFokus();
   // offline: halaman ikut cache service worker yang sama dengan app
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(function () {});
 })();

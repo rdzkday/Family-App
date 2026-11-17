@@ -16,13 +16,13 @@ Data keuangan pribadi tidak disertakan di repo ini.
 |---|---|
 | ✅ Live | Database Supabase (8 tabel, RLS, 3 fungsi RPC) |
 | ✅ Live | Edge Function `kantong` (API, kode akses per user) |
-| ✅ Live | PWA di Vercel: Catat, To-do, Ringkasan, Riwayat, Pengaturan |
+| ✅ Live | PWA di Vercel: Beranda, Kantong, Agenda, Komitmen, Daily Mood |
 | ✅ Live | Offline: catatan tersimpan di HP, dikirim saat online |
 | ⏳ Perlu setup sekali | Sync to-do ke Google Calendar "Rumah Kita" (secret belum diisi, PANDUAN §7) |
-| 🆕 Baru | Beranda (`/`): ringkasan Kantong, to-do & catatan, pengingat evaluasi (6 jam sebelum), shortcut Komitmen, mood → Ruang Catat |
-| 🧪 Fase 4a | Komitmen (`komitmen.html`): baca & cari pasal, modul Kesepakatan + Definisi A–Z. Usul/ubah/TTD menyusul. Brief: `claude/komitmen-brief.md` |
-| 🆕 Baru | Ruang Catat (`/ruang-catat/`): jurnal mood, tersimpan di Supabase (pribadi, pasangan tidak bisa baca). Terima `?mood=` dari Beranda |
-| 🆕 Baru | To-do jadi fitur sendiri di Beranda (`/#todo`), Agenda (`/#agenda`), Setelan tema (`/#setelan`) |
+| 🆕 Baru | Beranda (`/`): ringkasan Kantong, to-do & catatan, pengingat evaluasi, mood → Daily Mood, **Pengaturan** semua fitur (expand-collapse) |
+| 🧪 Fase 4a | Komitmen (`/komitmen/`): baca & cari pasal, modul Kesepakatan + Definisi A–Z. Usul/ubah/TTD menyusul. Brief: `claude/komitmen-brief.md` |
+| 🆕 Baru | Agenda (`/agenda/`): To-do, Catatan, Jadwal |
+| 🆕 Baru | Daily Mood (`/daily-mood/`, dulu Ruang Catat): jurnal mood di Supabase (tabel `jurnal`, pribadi). Terima `?mood=` dari Beranda |
 
 ---
 
@@ -37,15 +37,15 @@ Data keuangan pribadi tidak disertakan di repo ini.
    select kantong_buat_kode('istri', 'https://serskylzlevhjidqrvjm.supabase.co/functions/v1/kantong');
    ```
    Menjalankan ulang = kode lama langsung mati (dipakai kalau HP hilang).
-4. **Pengaturan → Kantong**: isi saldo tiap kantong sesuai aplikasi bank. **Pengaturan → Budget bulanan**: atur budget.
+4. **Beranda › Pengaturan › Kantong**: isi saldo tiap kantong sesuai aplikasi bank, atur kategori & budget bulanan.
 5. Belum punya kode? Tombol **Coba mode demo** memakai data contoh di HP saja.
 
 ### Sehari-hari
-- **Catat** (tab pertama): ketik nominal → keterangan → kategori (ditebak otomatis dari catatan sebelumnya) → kantong → Simpan. Enter di nominal = simpan.
-- **To-do**: ketik → Enter untuk simpan cepat. **Atur waktu** untuk tanggal/jam → masuk Google Calendar.
+- **Kantong › Catat** (tab pertama): ketik nominal → keterangan → kategori (ditebak otomatis dari catatan sebelumnya) → kantong → Simpan. Enter di nominal = simpan.
+- **Agenda › To-do**: ketik → Enter untuk simpan cepat. **Atur waktu** untuk tanggal/jam → masuk Google Calendar.
 - **Ringkasan**: geser bulan, ketuk kategori untuk rincian.
 - **Riwayat**: cari keterangan/kategori, ketuk transaksi untuk ubah/hapus.
-- Pill **Tersinkron / belum terkirim** di kanan atas: ketuk untuk sinkron sekarang.
+- Sinkron otomatis (Supabase). Status sinkron manual ada di **Beranda › Pengaturan › Umum**.
 
 ---
 
@@ -73,22 +73,22 @@ Data keuangan pribadi tidak disertakan di repo ini.
 
 ### Umum
 - **Offline-first**: semua input masuk antrean, dikirim saat online. Request ulang tidak menggandakan data/event.
-- **Tema** terang/gelap/ikut HP.
+- **Tema** terang/gelap (Beranda › Pengaturan › Umum).
 - **Keamanan**: kode akses disimpan sebagai hash; tabel Supabase RLS tanpa policy (hanya Edge Function yang bisa akses).
 - **Mode demo** dengan data contoh, tanpa server.
 
 ---
 
-## Struktur repo
+## Struktur repo (per fitur)
 
 | Path | Isi |
 |---|---|
-| `public/` | PWA yang di-deploy. `core.js` = logika bersama (aturan, hitungan, to-do) |
-| `public/index.html` | Beranda (halaman awal). Kantong pindah ke `public/kantong.html` (`#todo` = tab To-do) |
-| `public/js/` | Kode app, dipecah per bagian (base, ui, transaksi, todo, shell, laporan, pengaturan, beranda, connect, demo, start). Skrip biasa, urutan muat di HTML |
-| `public/tokens.css` | Design token bersama (warna, font). Gelap default, terang opsional |
-| `public/komitmen.html` | Komitmen: kamus kesepakatan berbentuk pasal (baca & cari) |
-| `public/ruang-catat/` | Ruang Catat: jurnal mood, sinkron ke tabel `jurnal` (service worker sendiri) |
+| `public/index.html` + `public/beranda/` | Beranda: kartu ringkasan + Pengaturan semua fitur (`pengaturan.js`) |
+| `public/kantong/` | Kantong: `index.html`, `catat.js`, `transaksi.js`, `laporan.js` (Ringkasan/Riwayat), `atur.js` (kantong, kategori, budget; tampil di Beranda) |
+| `public/agenda/` | Agenda: `index.html`, `todo.js` (data, sheet, tab To-do), `agenda.js` (tab Catatan & Jadwal) |
+| `public/komitmen/` | Komitmen: kamus kesepakatan berbentuk pasal |
+| `public/daily-mood/` | Daily Mood (dulu Ruang Catat): jurnal mood, sinkron ke tabel `jurnal`, SW sendiri. `data.js` dipakai juga oleh Beranda |
+| `public/shared/` | Dipakai semua halaman: `core.js` (logika bersama, disalin ke Edge Function), `base.js` (state, API, antrean offline), `ui.js`, `shell.js`, `connect.js`, `demo.js`, `start.js`, `tokens.css`, `styles.css` |
 | `supabase/migrations/` | Skema database |
 | `supabase/functions/kantong/` | Edge Function: API + adapter Postgres + Google Calendar |
 | `kantong/PANDUAN.md` | Panduan pasang & update |
@@ -102,6 +102,6 @@ node kantong/tools/test_supabase.js    # 18 tes Edge Function (DB & Google tirua
 bash kantong/tools/test_sql.sh         # skema SQL di Postgres lokal
 ```
 
-- Ubah `public/core.js` → `node kantong/tools/build_core.js` (salinan untuk Edge Function).
+- Ubah `public/shared/core.js` → `node kantong/tools/build_core.js` (salinan untuk Edge Function).
 - Deploy API: `supabase functions deploy kantong --no-verify-jwt` atau `SUPABASE_ACCESS_TOKEN=sbp_xxx node kantong/tools/deploy_supabase.js serskylzlevhjidqrvjm`.
 - PWA: push ke `main`.

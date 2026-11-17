@@ -1,7 +1,7 @@
 (function(){
-  // tema dari Beranda > Setelan (sama untuk semua halaman)
+  // tema dari Beranda › Pengaturan (sama untuk semua halaman)
   try { if (JSON.parse(localStorage.getItem('k_theme')) === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
-  const KEY = 'ruang-catat-v2';
+  const KEY = window.DM_DATA.KEY;
   const MOODS = [
     {v:1,label:'Berat',c:'var(--m1)',hex:'#F0646B'},
     {v:2,label:'Kurang',c:'var(--m2)',hex:'#FF9F43'},
@@ -11,31 +11,7 @@
   ];
   const EMO_POS = ['Senang','Tenang','Bersyukur','Bangga','Lega','Semangat'];
   const EMO_NEG = ['Cemas','Sedih','Lelah','Kesal','Marah','Kecewa','Kesepian','Bingung','Takut'];
-  const AGES = ['18–24','25–34','35–44','45+'];
-  const BASE_TAGS = ['Tidur','Kesehatan','Uang','Teman','Diri sendiri'];
-  const CONDITIONS = [
-    {group:'Pekerjaan', items:[
-      {id:'kantor',label:'Kerja kantoran',tags:['Kerjaan','Atasan','Rekan kerja','Perjalanan']},
-      {id:'remote',label:'Kerja remote',tags:['Kerjaan','Rapat online']},
-      {id:'freelance',label:'Freelance',tags:['Klien','Pemasukan']},
-      {id:'usaha',label:'Punya usaha',tags:['Bisnis','Pelanggan','Tim']},
-      {id:'carikerja',label:'Sedang cari kerja',tags:['Lamaran kerja','Wawancara']},
-      {id:'kuliah',label:'Kuliah / sekolah',tags:['Kuliah','Tugas'],ages:['18–24']}
-    ]},
-    {group:'Hubungan & rumah', items:[
-      {id:'pacaran',label:'Pacaran',tags:['Pasangan']},
-      {id:'menikah',label:'Menikah',tags:['Pasangan','Keluarga besar']},
-      {id:'anak',label:'Punya anak',tags:['Anak']},
-      {id:'ortu',label:'Merawat orang tua',tags:['Orang tua']},
-      {id:'sendiri',label:'Tinggal sendiri',tags:['Sendirian']},
-      {id:'ldr',label:'Hubungan jarak jauh',tags:['Pasangan','Jarak']},
-      {id:'rumah',label:'Bangun / pindah rumah',tags:['Rumah']}
-    ]},
-    {group:'Diri sendiri', items:[
-      {id:'konseling',label:'Sedang konseling',tags:['Sesi konseling']},
-      {id:'sakit',label:'Ada masalah kesehatan',tags:['Kesehatan']}
-    ]}
-  ];
+  const { AGES, BASE_TAGS, CONDITIONS } = window.DM_DATA;
   const BANK = {
     any:['Satu hal kecil yang kamu syukuri hari ini?','Apa yang paling menyita pikiranmu hari ini?','Kalau hari ini punya judul, apa judulnya?','Apa yang tubuhmu rasakan sekarang?','Siapa yang kamu temui hari ini, dan bagaimana rasanya?','Hal apa yang ingin kamu lepaskan sebelum tidur?','Apa satu hal yang kamu lakukan dengan baik hari ini?','Apa yang kamu butuhkan tapi belum kamu dapatkan?'],
     low:['Apa yang terjadi sebelum perasaan ini muncul?','Apa yang biasanya sedikit membantu saat kamu merasa seperti ini?','Kalau temanmu merasakan hal yang sama, apa yang akan kamu katakan padanya?','Pikiran apa yang paling sering muncul hari ini?'],
@@ -84,14 +60,14 @@
   const RC_CONN = (() => { try { return JSON.parse(localStorage.getItem('k_conn')); } catch (e) { return null; } })();
   const RC_USER = (() => { try { const b = JSON.parse(localStorage.getItem('k_boot')); return b && b.user ? b.user.id : ''; } catch (e) { return ''; } })();
   const REMOTE = !!(RC_CONN && RC_CONN.mode === 'remote' && RC_USER);
-  const SYNC_KEY = 'ruang-catat-sync';
+  const SYNC_KEY = window.DM_DATA.SYNC_KEY;
   let sy = { snap: {}, outbox: [], at: 0 };
   try { sy = Object.assign(sy, JSON.parse(localStorage.getItem(SYNC_KEY)) || {}); } catch (e) {}
   function sySave(){ try { localStorage.setItem(SYNC_KEY, JSON.stringify(sy)); } catch (e) {} }
   // keadaan lokal sebagai peta kunci -> JSON (yang dibandingkan dengan snapshot terakhir dari server)
   function petaLokal(){
     const m = {};
-    if (state.profile) m._pengaturan = JSON.stringify({ profile: state.profile, custom: state.custom || [], randomToo: state.randomToo !== false, lastBackup: state.lastBackup || '' });
+    if (state.profile) m._pengaturan = window.DM_DATA.pengaturanIsi(state);
     if (!state.demo) Object.keys(state.entries || {}).forEach(k => { m[k] = JSON.stringify(state.entries[k]); });
     return m;
   }
@@ -241,12 +217,12 @@
     tabsEl.classList.add('hidden');
     const p = draftProfile;
     if (onboardStep === 0){
-      view.innerHTML = '<div class="hero"><div class="faces">'+[1,2,3,4,5].map(face).join('')+'</div><h1>Hai, kenalan dulu yuk</h1><p class="muted">Dua pertanyaan singkat supaya pilihan di aplikasi pas dengan hidupmu sekarang. Semua tersimpan hanya di perangkat ini.</p></div>' +
+      view.innerHTML = '<div class="hero"><div class="faces">'+[1,2,3,4,5].map(face).join('')+'</div><h1>Hai, kenalan dulu yuk</h1><p class="muted">Dua pertanyaan singkat supaya pilihan di aplikasi pas dengan hidupmu sekarang. '+(REMOTE ? 'Tersimpan di akunmu, hanya kamu yang bisa membaca.' : 'Semua tersimpan di perangkat ini.')+'</p></div>' +
         '<div class="card"><label for="nm"><h3>Mau dipanggil siapa?</h3></label><input type="text" id="nm" value="'+esc(p.name)+'" placeholder="Opsional"></div>' +
         '<div class="card"><h3>Usia kamu</h3><div class="age">'+AGES.map(a => '<button type="button" class="chip" data-age="'+a+'" aria-pressed="'+(p.age===a)+'">'+a+'</button>').join('')+'</div></div>' +
         '<button type="button" class="btn wide" data-act="ob-next" '+(p.age?'':'disabled')+'>Lanjut</button>';
     } else {
-      view.innerHTML = '<div><span class="tag">Langkah 2 dari 2</span><h1>Apa yang sedang kamu jalani?</h1><p class="muted small">Pilih semua yang sesuai. Ini menentukan pilihan "apa yang memengaruhi" di catatan harianmu, dan bisa diubah kapan saja di Setting.</p></div>' +
+      view.innerHTML = '<div><span class="tag">Langkah 2 dari 2</span><h1>Apa yang sedang kamu jalani?</h1><p class="muted small">Pilih semua yang sesuai. Ini menentukan pilihan "apa yang memengaruhi" di catatan harianmu, dan bisa diubah kapan saja di Beranda › Pengaturan › Daily Mood.</p></div>' +
         conditionPicker(p) + extraTagEditor(p) +
         '<div class="row"><button type="button" class="btn ghost" data-act="ob-back">Kembali</button><button type="button" class="btn" style="flex:1" data-act="ob-done">Mulai mencatat</button></div>';
     }
@@ -390,7 +366,7 @@
     const head = t => { need(14); y += 4; doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(91,75,219); doc.text(t.toUpperCase(), M, y); y += 2; doc.setDrawColor(225,221,242); doc.line(M, y, M+PW, y); y += 6; doc.setTextColor(43,37,64); };
     const para = (t, size, style) => { doc.setFont('helvetica', style||'normal'); doc.setFontSize(size||10.5); const lines = doc.splitTextToSize(t, PW); lines.forEach(l => { need(6); doc.text(l, M, y); y += (size||10.5)*0.45; }); y += 1.5; };
     doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(43,37,64); doc.text('Rangkuman Catatan', M, y); y += 7;
-    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(110,104,137); doc.text(fmtLong(sum.from)+' - '+fmtLong(sum.to)+'   ·   dibuat dari Ruang Catat', M, y); y += 6; doc.setTextColor(43,37,64);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(110,104,137); doc.text(fmtLong(sum.from)+' - '+fmtLong(sum.to)+'   ·   dibuat dari Daily Mood', M, y); y += 6; doc.setTextColor(43,37,64);
     head('Mood');
     para('Rata-rata '+a.avg.toFixed(1).replace('.',',')+' dari 5 ('+MOODS[Math.max(0,Math.round(a.avg)-1)].label+'). Dicatat '+a.es.length+' dari '+a.totalDays+' hari. '+a.trend);
     para('Hari terberat: '+a.hardest.map(fmtShort).join(', ')+'.   Hari terbaik: '+a.best.map(fmtShort).join(', ')+'.');
@@ -432,27 +408,11 @@
     return 'downloaded';
   }
 
-  function renderSettings(){
-    const p = state.profile;
-    const list = state.custom.map((x,i) => '<div class="li"><span>'+(i+1)+'. '+esc(x)+'</span><span class="row" style="flex:none;gap:4px">'+(i>0?'<button type="button" class="iconbtn" style="width:30px;height:30px" data-up="'+i+'" aria-label="Naikkan">↑</button>':'')+'<button type="button" class="x" data-del="'+i+'">Hapus</button></span></div>').join('') || '<p class="muted small">Belum ada prompt custom. Hari ini akan memakai prompt acak.</p>';
-    view.innerHTML = '<div><h1>Setting</h1><p class="muted small">'+(REMOTE ? 'Tersimpan di akunmu (Supabase). Hanya kamu yang bisa membaca, pasangan tidak.' : 'Semua tersimpan hanya di perangkat ini, tanpa akun.')+'</p></div>' +
-      '<div class="card"><h3>Profil</h3><label for="nm" class="small muted">Nama panggilan</label><input type="text" id="nm" value="'+esc(p.name||'')+'" placeholder="Opsional"><span class="small muted">Usia</span><div class="age">'+AGES.map(a => '<button type="button" class="chip" data-age="'+a+'" aria-pressed="'+(p.age===a)+'">'+a+'</button>').join('')+'</div></div>' +
-      '<div><h2>Kondisi yang sedang dijalani</h2><p class="small muted">Menentukan pilihan "apa yang memengaruhi" di catatan harian.</p></div>' + conditionPicker(p) + extraTagEditor(p) +
-      '<div><h2>Prompt</h2><p class="small muted">Kalau ada lebih dari satu, semuanya muncul berurutan di halaman Hari ini.</p></div>' +
-      '<div class="card"><h3>Prompt custom</h3><div class="list">'+list+'</div><label for="newPrompt" class="small muted">Tambah prompt, misalnya titipan dari psikolog</label><input type="text" id="newPrompt" placeholder="Contoh: Apa yang membuatku cemas minggu ini?"><button type="button" class="btn" data-act="add-prompt">Tambah prompt</button>' +
-      '<label class="switch"><input type="checkbox" id="randomToo" '+(state.randomToo?'checked':'')+'> Tambahkan 1 prompt acak di akhir</label></div>' +
-      '<div class="card"><h3>Cadangan</h3><p class="small muted">Data hanya ada di perangkat ini. Simpan file cadangan (mis. ke Files/iCloud Drive atau kirim ke diri sendiri) supaya catatan aman kalau ganti HP atau browser di-reset.'+(state.lastBackup ? ' Terakhir dicadangkan: '+fmtLong(state.lastBackup)+'.' : ' Belum pernah dicadangkan.')+'</p>' +
-      '<button type="button" class="btn" data-act="backup">Cadangkan data</button>' +
-      '<div id="restoreZone"><button type="button" class="btn ghost wide" data-act="restore">Pulihkan dari file</button></div>' +
-      '<input type="file" id="restoreFile" accept=".json,application/json" hidden></div>' +
-      '<div class="card"><h3>Data</h3><div id="wipeZone"><button type="button" class="btn danger" data-act="wipe">Hapus semua data</button></div></div>';
-  }
-
   function render(){
     if (!state.profile){ renderOnboard(); return; }
     tabsEl.classList.remove('hidden');
     document.querySelectorAll('nav.tabs button').forEach(b => { if (b.dataset.tab===tab) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
-    ({today:renderToday, calendar:renderCalendar, settings:renderSettings})[tab]();
+    ({today:renderToday, calendar:renderCalendar})[tab]();
   }
 
   function editableProfile(){ return state.profile || draftProfile; }
@@ -467,6 +427,7 @@
 
   tabsEl.addEventListener('click', ev => {
     const b = ev.target.closest('button[data-tab]'); if (!b) return;
+    if (!b.dataset.tab) return;
     if (tab==='today') saveAnswer();
     tab = b.dataset.tab; if (tab==='calendar') calMode = 'view'; render(); view.scrollTop = 0;
   });
@@ -491,8 +452,6 @@
       save(); t.setAttribute('aria-pressed', e[key].includes(val)); return;
     }
     if (d.day){ selDay = d.day; render(); return; }
-    if (d.del !== undefined){ state.custom.splice(Number(d.del),1); save(); render(); return; }
-    if (d.up !== undefined){ const i = Number(d.up); const x = state.custom[i]; state.custom[i] = state.custom[i-1]; state.custom[i-1] = x; save(); render(); return; }
     switch (d.act){
       case 'ob-next': persistName(); onboardStep = 1; render(); view.scrollTop = 0; break;
       case 'ob-back': onboardStep = 0; render(); break;
@@ -510,66 +469,19 @@
       case 'toggle-all': { const es = rangeEntries(); const all = es.every(e => sum.sel[e.date]); es.forEach(e => sum.sel[e.date] = !all); render(); break; }
       case 'make-sum': calMode = 'summary'; render(); view.scrollTop = 0; break;
       case 'copy': try { await navigator.clipboard.writeText(summaryText()); toast('Teks rangkuman disalin'); } catch(e){ toast('Browser menolak menyalin, coba lagi'); } break;
-      case 'share-text': try { await navigator.share({title:'Rangkuman Ruang Catat', text:summaryText()}); } catch(e){ if (!e || e.name !== 'AbortError') toast('Gagal membagikan, pakai Salin'); } break;
+      case 'share-text': try { await navigator.share({title:'Rangkuman Daily Mood', text:summaryText()}); } catch(e){ if (!e || e.name !== 'AbortError') toast('Gagal membagikan, pakai Salin'); } break;
       case 'pdf': {
         let blob; try { blob = buildPdf(); } catch(e){ toast('PDF belum bisa dibuat, coba Salin sebagai teks'); return; }
-        const r = await saveFile(blob, 'Rangkuman '+sum.from+' sd '+sum.to+'.pdf', 'Rangkuman Ruang Catat');
+        const r = await saveFile(blob, 'Rangkuman '+sum.from+' sd '+sum.to+'.pdf', 'Rangkuman Daily Mood');
         toast(r === 'cancelled' ? 'Dibatalkan' : r === 'shared' ? 'PDF siap dikirim' : 'PDF diunduh');
         break;
       }
-      case 'add-prompt': { const inp = document.getElementById('newPrompt'); const v = inp.value.trim(); if (!v){ toast('Tulis prompt dulu'); inp.focus(); return; } state.custom.push(v); save(); render(); toast('Prompt ditambahkan'); break; }
-      case 'wipe': document.getElementById('wipeZone').innerHTML = '<p class="small">Semua catatan, prompt, dan profil akan hilang dari perangkat ini dan tidak bisa dikembalikan.</p><div class="row"><button type="button" class="btn danger" data-act="wipe-yes">Ya, hapus semua</button><button type="button" class="btn ghost" data-act="wipe-no">Batal</button></div>'; break;
-      case 'wipe-no': render(); break;
-      case 'backup': {
-        const payload = {app:'ruang-catat', version:2, exportedAt:new Date().toISOString(), data:state};
-        const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
-        const r = await saveFile(blob, 'Cadangan Ruang Catat '+todayIso+'.json', 'Cadangan Ruang Catat');
-        if (r === 'cancelled'){ toast('Dibatalkan'); break; }
-        state.lastBackup = todayIso; save(); render(); toast(r === 'shared' ? 'Cadangan siap disimpan' : 'Cadangan diunduh');
-        break;
-      }
-      case 'restore': document.getElementById('restoreFile').click(); break;
-      case 'restore-yes': {
-        if (!pendingRestore) return;
-        state = pendingRestore; pendingRestore = null; save();
-        draftProfile = {name:'',age:'',conditions:[],extraTags:[]}; onboardStep = 0; randomPrompt = null; stepIdx = 0; tab = 'today';
-        render(); view.scrollTop = 0; toast('Data berhasil dipulihkan'); break;
-      }
-      case 'restore-no': pendingRestore = null; render(); break;
-      case 'wipe-yes': state = {profile:null, entries:{}, custom:[], randomToo:true, demo:false}; draftProfile = {name:'',age:'',conditions:[],extraTags:[]}; onboardStep = 0; randomPrompt = null; stepIdx = 0; save(); render(); toast('Semua data dihapus'); break;
       case 'clear-demo': state.entries = {}; state.demo = false; randomPrompt = null; stepIdx = 0; save(); render(); toast('Data contoh dihapus'); break;
     }
   });
 
-  // Cek isi file cadangan sebelum menimpa data
-  function readBackup(text){
-    const j = JSON.parse(text);
-    const d = j && j.app === 'ruang-catat' ? j.data : j;
-    if (!d || typeof d !== 'object' || typeof d.entries !== 'object' || !Array.isArray(d.custom)) throw new Error('format');
-    const entries = {};
-    Object.values(d.entries).forEach(e => {
-      if (!e || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !(e.mood >= 1 && e.mood <= 5)) return;
-      entries[e.date] = {date:e.date, mood:Math.round(e.mood), emotions:Array.isArray(e.emotions)?e.emotions.map(String):[], tags:Array.isArray(e.tags)?e.tags.map(String):[],
-        answers:Array.isArray(e.answers)?e.answers.filter(a=>a&&a.prompt).map(a=>({prompt:String(a.prompt), text:String(a.text||'')})):[]};
-    });
-    const pr = d.profile;
-    const profile = pr && typeof pr === 'object' ? {name:String(pr.name||''), age:String(pr.age||''), conditions:Array.isArray(pr.conditions)?pr.conditions.map(String):[], extraTags:Array.isArray(pr.extraTags)?pr.extraTags.map(String):[]} : null;
-    return {profile, entries, custom:d.custom.map(String), randomToo:d.randomToo !== false, demo:!!d.demo, lastBackup:d.lastBackup||null};
-  }
-  let pendingRestore = null;
-
   view.addEventListener('change', ev => {
     const t = ev.target;
-    if (t.id === 'restoreFile' && t.files && t.files[0]){
-      const f = t.files[0]; t.value = '';
-      f.text().then(txt => {
-        try { pendingRestore = readBackup(txt); } catch(e){ toast('File bukan cadangan Ruang Catat'); return; }
-        const n = Object.keys(pendingRestore.entries).length;
-        document.getElementById('restoreZone').innerHTML = '<p class="small">File berisi <b>'+n+' catatan</b>. Data di perangkat ini sekarang ('+Object.keys(state.entries).length+' catatan) akan <b>diganti</b> dengan isi file.</p><div class="row"><button type="button" class="btn" data-act="restore-yes">Ya, pulihkan</button><button type="button" class="btn ghost" data-act="restore-no">Batal</button></div>';
-      }).catch(() => toast('File tidak bisa dibaca'));
-      return;
-    }
-    if (t.id === 'randomToo'){ state.randomToo = t.checked; randomPrompt = null; stepIdx = 0; save(); }
     if (t.id === 'nm' && state.profile){ state.profile.name = t.value.trim(); save(); }
     if (t.dataset && t.dataset.sel){ sum.sel[t.dataset.sel] = t.checked; render(); }
     if (t.id === 'from' || t.id === 'to'){ sum[t.id] = t.value || sum[t.id]; if (sum.from > sum.to){ const x = sum.from; sum.from = sum.to; sum.to = x; } render(); }
@@ -577,7 +489,6 @@
   view.addEventListener('input', ev => { if (ev.target.id === 'ans') saveAnswer(); });
   view.addEventListener('keydown', ev => {
     if (ev.key !== 'Enter') return;
-    if (ev.target.id === 'newPrompt'){ ev.preventDefault(); view.querySelector('[data-act="add-prompt"]').click(); }
     if (ev.target.id === 'newTag'){ ev.preventDefault(); view.querySelector('[data-act="add-tag"]').click(); }
   });
 
