@@ -20,7 +20,9 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | ✅ Live | Offline: catatan tersimpan di HP, dikirim saat online |
 | ⏳ Perlu setup sekali | Sync to-do ke Google Calendar "Rumah Kita" (secret belum diisi, PANDUAN §7) |
 | ⏳ Perlu dilakukan | Impor data lama dari Google Sheets (PANDUAN §5) |
-| 🆕 Siap rilis | Beranda (`/`): Kantong, to-do & catatan, pengingat evaluasi, kesepakatan, mood → Ruang Catat. Butuh migrasi `20261117…_beranda.sql` + deploy ulang API |
+| 🆕 Baru | Beranda (`/`): ringkasan Kantong, to-do & catatan, pengingat evaluasi (6 jam sebelum), shortcut Komitmen, mood → Ruang Catat |
+| 🧪 Fase 4a | Komitmen (`komitmen.html`): baca & cari pasal, modul Kesepakatan + Definisi A–Z. Usul/ubah/TTD menyusul. Brief: `claude/komitmen-brief.md` |
+| ✅ Live | Ruang Catat (`/ruang-catat/`): jurnal mood, data di HP saja. Terima `?mood=` dari Beranda |
 
 ---
 
@@ -82,8 +84,9 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | Path | Isi |
 |---|---|
 | `public/` | PWA yang di-deploy. `core.js` = logika bersama (aturan, hitungan, to-do) |
-| `public/index.html` | Beranda (halaman awal). Kantong pindah ke `public/kantong.html` |
-| `public/ruang-catat/` | Ruang Catat: jurnal + mood (`?mood=`) |
+| `public/index.html` | Beranda (halaman awal). Kantong pindah ke `public/kantong.html` (`#todo` = tab To-do) |
+| `public/komitmen.html` | Komitmen: kamus kesepakatan berbentuk pasal (baca & cari) |
+| `public/ruang-catat/` | Ruang Catat: jurnal mood (localStorage, service worker sendiri) |
 | `supabase/migrations/` | Skema database |
 | `supabase/functions/kantong/` | Edge Function: API + adapter Postgres + Google Calendar |
 | `kantong/PANDUAN.md` | Panduan pasang & update |
@@ -94,7 +97,7 @@ Data keuangan pribadi tidak disertakan di repo ini.
 ## Update & tes
 
 ```bash
-node kantong/tools/test_core.js        # 203 cek logika bersama
+node kantong/tools/test_core.js        # 250 cek logika bersama
 node kantong/tools/test_supabase.js    # 18 tes Edge Function (DB & Google tiruan)
 bash kantong/tools/test_sql.sh         # skema SQL di Postgres lokal
 ```

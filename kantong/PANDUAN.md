@@ -31,9 +31,9 @@ supabase db push
 
 Ini membuat tabel `buku, users, kategori, kantong, budget, transaksi, todo, akses` beserta fungsi `kantong_muat`, `kantong_simpan`, `kantong_buat_kode`. Semua tabel memakai RLS tanpa policy: hanya Edge Function (service role) yang bisa membaca/menulis.
 
-Alternatif tanpa CLI: buka **SQL Editor**, tempel isi tiap file di `supabase/migrations/` **berurutan** (`20261116…_kantong.sql`, lalu `20261117…_beranda.sql`), **Run**.
+Alternatif tanpa CLI: buka **SQL Editor**, tempel isi tiap file di `supabase/migrations/` **berurutan** (`20261116000000_kantong.sql`, `20261117000000_komitmen.sql`, `20261117120000_beranda.sql`), **Run**.
 
-Migrasi Beranda (`20261117…`) hanya menambah: kolom `tipe` & `isi` di `todo` (catatan, agenda evaluasi), tabel `komitmen` dan `jurnal` (Ruang Catat). Data lama aman.
+Migrasi Beranda (`20261117120000`) hanya menambah kolom `tipe` & `isi` di `todo` (catatan, agenda evaluasi). Data lama aman.
 
 Lalu di **Table Editor → users** dan **buku**: ganti nama `Istri` sesuai nama pasangan. Kolom `id` jangan diubah.
 
@@ -117,18 +117,35 @@ Aturan yang dijalankan server:
 
 ---
 
-## Beranda, Komitmen, Ruang Catat
+## Beranda
 
 | Halaman | URL | Isi |
 |---|---|---|
 | Beranda | `/` | Ringkasan Kantong, pengingat evaluasi, to-do & catatan, mood |
 | Kantong | `/kantong.html` (`#todo` = tab To-do) | App keuangan lengkap, sama seperti sebelumnya |
-| Ruang Catat | `/ruang-catat/?mood=…` | Jurnal harian + mood, **pribadi** (pasangan tidak bisa baca) |
+| Komitmen | `/komitmen.html` | Lihat §8 |
+| Ruang Catat | `/ruang-catat/?mood=…` | Jurnal mood, data hanya di HP |
 
 - **Catatan**: tidak punya centang, tidak pernah masuk kalender. Bisa pribadi atau Bersama.
-- **Evaluasi bulanan**: dijadwalkan dari Beranda → Komitmen → **Jadwalkan evaluasi**. Ini agenda (to-do bertipe evaluasi) yang masuk Google Calendar. Kartu pengingat muncul di Beranda mulai 6 jam sebelumnya; **Ingatkan nanti** = sembunyi 1 jam.
-- **Komitmen**: dua-duanya boleh tulis. Berlaku sampai diganti; yang diganti pindah ke Riwayat.
+- **Evaluasi bulanan**: buat to-do → nyalakan **Agenda evaluasi bulanan** → atur tanggal & jam. Masuk Google Calendar sebagai `[B] Evaluasi bulanan`. Kartu pengingat muncul di Beranda mulai 6 jam sebelumnya; **Ingatkan nanti** = sembunyi 1 jam.
 
+## 8. Komitmen (kamus kesepakatan)
+
+- Halaman: `komitmen.html` (dari Beranda → Komitmen). Brief: `claude/komitmen-brief.md`.
+- Butuh migrasi `20261117000000_komitmen.sql` + deploy ulang Edge Function (core baru).
+- Fase 4a sudah ada: baca, cari (nomor + isi), filter, A–Z. Usul/ubah/TTD menyusul (4b).
+- Isi asli kesepakatan & perjanjian pranikah **hanya** di database. Jangan taruh di repo.
+- **Data contoh** (17 Nov) sudah dimasukkan ke database: 12 pasal, id berawalan `contoh-`. Hapus **sebelum import perjanjian pranikah** supaya nomor Pasal 1–12 bebas lagi. Jalankan di SQL Editor:
+
+  ```sql
+  delete from komitmen_keterangan where id like 'contoh-%';
+  delete from komitmen_versi where id like 'contoh-%';
+  delete from komitmen_pasal where id like 'contoh-%';
+  delete from komitmen_bab where id like 'contoh-%';
+  delete from pengesahan where id like 'contoh-%';
+  ```
+
+## Aturan akses
 
 | | Buku Riki | Buku Istri | Rumah Tangga |
 |---|---|---|---|

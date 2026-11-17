@@ -94,20 +94,19 @@
     months: LS.get('k_months', {}),
     outbox: LS.get('k_outbox', []),
     todos: LS.get('k_todos', null),        // null = belum pernah dimuat
-    komitmen: LS.get('k_komitmen', null),  // kesepakatan berdua (Beranda > Komitmen)
     prefs: LS.get('k_prefs', { lastKantong: {}, demoUser: 'riki' }),
     tab: PAGE === 'beranda' ? 'beranda' : (({ '#todo': 'todo', '#ringkasan': 'ringkasan', '#riwayat': 'riwayat', '#pengaturan': 'pengaturan' })[location.hash] || 'home'), sub: null, bukuView: null, bulan: thisMonth(),
     syncing: false, again: false, lastError: null, catTab: 'Pengeluaran'
   };
   function persist() {
-    LS.set('k_conn', S.conn); LS.set('k_boot', S.boot); LS.set('k_outbox', S.outbox); LS.set('k_prefs', S.prefs); LS.set('k_todos', S.todos); LS.set('k_komitmen', S.komitmen);
+    LS.set('k_conn', S.conn); LS.set('k_boot', S.boot); LS.set('k_outbox', S.outbox); LS.set('k_prefs', S.prefs); LS.set('k_todos', S.todos);
     var keys = Object.keys(S.months).sort().reverse();
     var keep = {}; keys.slice(0, 8).forEach(function (k) { keep[k] = S.months[k]; });
     S.months = keep; LS.set('k_months', keep);
   }
   function db() {
     var b = S.boot || {};
-    return { Buku: b.buku || [], Users: b.users || [], Kategori: b.kategori || [], Kantong: b.kantong || [], Budget: [], Transaksi: [], Todo: S.todos || [], Komitmen: S.komitmen || [] };
+    return { Buku: b.buku || [], Users: b.users || [], Kategori: b.kategori || [], Kantong: b.kantong || [], Budget: [], Transaksi: [], Todo: S.todos || [] };
   }
   function me() { return S.boot ? S.boot.user : null; }
   function bukuById(id) { return C.byId(db().Buku)[id]; }
@@ -125,7 +124,7 @@
     var saved = LS.get('k_demo', null);
     if (saved) return saved;
     var seed = window.KANTONG_DEMO_SEED || makeDemoSeed();
-    return { Buku: seed.buku, Users: seed.users, Kategori: seed.kategori, Kantong: seed.kantong, Budget: seed.budget, Transaksi: seed.transaksi, Todo: seed.todo || [], Komitmen: seed.komitmen || [], Jurnal: seed.jurnal || [] };
+    return { Buku: seed.buku, Users: seed.users, Kategori: seed.kategori, Kantong: seed.kantong, Budget: seed.budget, Transaksi: seed.transaksi, Todo: seed.todo || [] };
   }
   var demoStore = null;
   function demoRpc(action, payload) {
@@ -228,18 +227,6 @@
       if (tdn) { tdn.selesai = !!op.payload.selesai; tdn.selesai_oleh = tdn.selesai && me() ? me().id : ''; tdn.diubah = op.at; tdn._pending = true; }
     } else if (op.action === 'todo.delete') {
       S.todos = todos().filter(function (t) { return t.id !== op.payload.id; });
-    } else if (op.action === 'komitmen.save') {
-      var kp = op.payload, list = (S.komitmen || []).slice(), exK = list.filter(function (k) { return k.id === kp.id; })[0];
-      var baru = Object.assign({ diganti_oleh: '', oleh: me() ? me().id : '', dibuat: op.at, berlaku_sejak: todayISO() }, exK || {}, kp, { diubah: op.at, dihapus: '', _pending: true });
-      delete baru.mengganti;
-      list = list.filter(function (k) { return k.id !== kp.id; }).map(function (k) {
-        return kp.mengganti && k.id === kp.mengganti ? Object.assign({}, k, { diganti_oleh: kp.id }) : k;
-      });
-      list.unshift(baru); S.komitmen = list;
-    } else if (op.action === 'komitmen.delete') {
-      S.komitmen = (S.komitmen || []).filter(function (k) { return k.id !== op.payload.id; }).map(function (k) {
-        return k.diganti_oleh === op.payload.id ? Object.assign({}, k, { diganti_oleh: '' }) : k;
-      });
     } else if (op.action === 'todo.sync') {
       var tsy = findTodo(op.payload.id);
       if (tsy) tsy._pending = true;
@@ -261,7 +248,7 @@
       d.results.forEach(function (r) {
         if (r.opId === '_boot') { if (r.ok) S.boot = r.data; }
         else if (r.opId === '_todo') { if (r.ok) S.todos = r.data.todos || []; }
-        else if (r.opId === '_komit') { if (r.ok) S.komitmen = r.data.komitmen || []; }   // server lama: belum kenal, abaikan
+        else if (r.opId === '_komit') { if (r.ok) LS.set('k_komitmen', { data: r.data, at: Date.now() }); }   // cache yang sama dengan komitmen.html
         else if (String(r.opId).indexOf('_m_') === 0) { if (r.ok) S.months[r.data.bulan] = r.data; }
         else if (!r.ok) toast('Tidak tersimpan: ' + r.error, true);
       });
@@ -1039,10 +1026,10 @@
           (catatan
             ? '<div class="field" style="margin-top:4px"><label for="td-isi">Catatan</label><textarea id="td-isi" class="input" rows="6" maxlength="2000" placeholder="Tulis catatan…"' + dis + '>' + esc(f.isi) + '</textarea></div>'
             : '<div class="field" style="margin-top:4px"><label for="td-judul">' + (evaluasi ? 'Judul agenda' : 'Apa yang mau dikerjain?') + '</label><input id="td-judul" class="input" maxlength="120" placeholder="mis. bayar listrik" autocomplete="off" value="' + esc(f.judul) + '"' + dis + '></div>') +
-          (evaluasi ? '<div class="hint" style="margin-top:-4px">Agenda evaluasi bulanan berdua. Kartu pengingat muncul di Beranda ' + C.EVALUASI_PENGINGAT_JAM + ' jam sebelumnya.</div>' : '') +
           '<div class="field"><span class="lbl">Untuk</span><div class="chips wrap" role="group" aria-label="Pemilik to-do">' + todoPemilikList().map(function (p) {
             return '<button type="button" class="chip" data-tp="' + esc(p.id) + '" aria-pressed="' + (f.pemilik === p.id) + '" style="--c:' + p.warna + '"' + dis + '><span class="dot" style="background:' + p.warna + '"></span>' + esc(p.nama) + '</button>';
           }).join('') + '</div></div>' +
+          (catatan ? '' : toggleHtml('td-eval', 'Agenda evaluasi bulanan', evaluasi ? 'Pengingat muncul di Beranda ' + C.EVALUASI_PENGINGAT_JAM + ' jam sebelumnya' : 'Jadikan jadwal evaluasi berdua', evaluasi).replace('<button ', '<button' + dis + ' ')) +
           (catatan || evaluasi ? '' : toggleHtml('td-waktu', 'Atur waktu', f.aturWaktu ? 'Masuk ke Google Calendar "Rumah Kita"' : 'Tanpa waktu: hanya di app', f.aturWaktu).replace('<button ', '<button' + dis + ' ')) +
           (f.aturWaktu && !catatan ?
             '<div class="field row2"><div><label for="td-tgl">Tanggal</label><input id="td-tgl" class="input" type="date" value="' + esc(f.tanggal) + '"' + dis + '></div>' +
@@ -1069,6 +1056,11 @@
           $('#td-hint', sh.el).textContent = hintText();
         }); });
         var tw = $('#td-waktu', sh.el); if (tw) tw.addEventListener('click', function () { f.aturWaktu = !f.aturWaktu; draw(); });
+        var te = $('#td-eval', sh.el); if (te) te.addEventListener('click', function () {
+          if (f.tipe === 'evaluasi') { f.tipe = 'todo'; if (f.judul === C.EVALUASI_JUDUL) f.judul = ''; }
+          else { f.tipe = 'evaluasi'; f.aturWaktu = true; f.pemilik = C.TODO_BERSAMA; if (!f.judul) f.judul = C.EVALUASI_JUDUL; }
+          draw();
+        });
         var tgl = $('#td-tgl', sh.el), jam = $('#td-jam', sh.el), sehari = $('#td-seharian', sh.el);
         if (tgl) tgl.addEventListener('change', function () { f.tanggal = tgl.value || todayISO(); $('#td-hint', sh.el).textContent = hintText(); });
         if (jam) jam.addEventListener('change', function () { if (jam.value) f.jam = jam.value.slice(0, 5); $('#td-hint', sh.el).textContent = hintText(); });
@@ -1180,7 +1172,7 @@
     if (PAGE === 'beranda' && !S.boot) { $('#view').innerHTML = '<div class="br-wrap"><div class="br-card br-skel"></div><div class="br-card br-skel"></div></div>'; return; }
     if (!S.boot) { $('#view').innerHTML = '<div class="topbar"><div><h1>Memuat data…</h1></div>' + syncPill() + '</div>' + skeleton(5); return; }
     if (!S.bukuView) S.bukuView = me().buku;
-    var v = { home: HomeView, todo: TodoView, ringkasan: RingkasanView, riwayat: RiwayatView, pengaturan: SettingsView, beranda: BerandaView, komitmen: KomitmenView }[S.tab];
+    var v = { home: HomeView, todo: TodoView, ringkasan: RingkasanView, riwayat: RiwayatView, pengaturan: SettingsView, beranda: BerandaView }[S.tab];
     view = v; v.render($('#view'));
   }
   function refresh() {
@@ -1675,6 +1667,7 @@
   function brNav(id) {
     if (id === 'kantong') { location.href = 'kantong.html'; return; }
     if (id === 'agenda') { location.href = 'kantong.html#todo'; return; }
+    if (id === 'komitmen') { location.href = 'komitmen.html'; return; }
     if (id === 'tambah') {
       if (S.tab !== 'beranda') brGo('beranda');
       var box = $('#br-add'); if (!box) return;
@@ -1708,7 +1701,7 @@
         '<nav class="br-short" aria-label="Pintasan">' +
           '<a href="kantong.html" style="--c:#7DD3A8;--cb:#1B2A23"><span class="ic">' + ICON.wallet + '</span>Kantong</a>' +
           '<a href="kantong.html#todo" style="--c:#93C5FD;--cb:#1A2433"><span class="ic">' + ICON.cal + '</span>Agenda</a>' +
-          '<button type="button" data-brgo="komitmen" style="--c:#FCD34D;--cb:#2A2614"><span class="ic">' + ICON.heart + '</span>Komitmen</button>' +
+          '<a href="komitmen.html" style="--c:#FCD34D;--cb:#2A2614"><span class="ic">' + ICON.heart + '</span>Komitmen</a>' +
           '<a href="' + RUANG_CATAT_URL + '" style="--c:#C4B5FD;--cb:#252137"><span class="ic">' + ICON.book + '</span><span>Ruang Catat <i class="ext">' + ICON.ext + '</i></span></a>' +
         '</nav>' +
         '<div class="br-grid"><div class="br-col main">' +
@@ -1776,15 +1769,15 @@
       if (!p) return '';
       var tunda = LS.get('k_eval_tunda', null);
       if (tunda && tunda.id === p.todo.id && tunda.sampai > Date.now()) return '';
-      var n = (S.komitmen || []).filter(function (k) { return !k.dihapus && !k.diganti_oleh; }).length;
+      var kc = LS.get('k_komitmen', null), kd = kc && kc.data;
+      var info = kd ? ' · ' + kd.berlaku + ' kesepakatan aktif' + (kd.menunggu_ttd ? ' · ' + kd.menunggu_ttd + ' menunggu tanda tanganmu' : '') : '';
       return '<section class="br-card br-eval" aria-labelledby="br-eval-h"><div class="br-eval-top"><span class="br-ic" style="--c:#FCD34D;--cb:#2A2614">' + ICON.heart + '</span>' +
-        '<div><h2 id="br-eval-h">' + esc(p.todo.judul) + ' · ' + esc(brSisa(p.menit)) + '</h2><div class="br-eval-d">' + esc(brTanggal(p.todo)) + ' · ' + n + ' kesepakatan aktif</div></div></div>' +
+        '<div><h2 id="br-eval-h">' + esc(p.todo.judul) + ' · ' + esc(brSisa(p.menit)) + '</h2><div class="br-eval-d">' + esc(brTanggal(p.todo)) + info + '</div></div></div>' +
         '<p>Siapkan catatan: mana kesepakatan yang jalan, mana yang perlu dibahas ulang.</p>' +
-        '<div class="br-eval-act"><button type="button" class="br-btn amber" data-brgo="komitmen">Lihat kesepakatan</button>' +
+        '<div class="br-eval-act"><a class="br-btn amber" href="komitmen.html">Lihat kesepakatan</a>' +
         '<button type="button" class="br-btn ghost" data-eval-tunda="' + esc(p.todo.id) + '">Ingatkan nanti</button></div></section>';
     },
     bindEval: function (el) {
-      $$('.br-eval [data-brgo]', el).forEach(function (b) { b.addEventListener('click', function () { brGo('komitmen'); }); });
       $$('[data-eval-tunda]', el).forEach(function (b) { b.addEventListener('click', function () {
         LS.set('k_eval_tunda', { id: b.getAttribute('data-eval-tunda'), sampai: Date.now() + 60 * 60000 });
         toast('Diingatkan lagi 1 jam lagi'); BerandaView.update($('#view'));
@@ -1883,67 +1876,6 @@
   }
   var ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
 
-  // ---------- Komitmen (sementara, sampai desain halaman lengkap dari Riki) ----------
-  var KomitmenView = {
-    render: function (el) {
-      var aktif = (S.komitmen || []).filter(function (k) { return !k.dihapus && !k.diganti_oleh; })
-        .sort(function (a, b) { return String(b.berlaku_sejak).localeCompare(String(a.berlaku_sejak)); });
-      var lama = (S.komitmen || []).filter(function (k) { return !k.dihapus && k.diganti_oleh; });
-      var today = todayISO();
-      var evNext = todoSorted(todos().filter(function (t) { return C.todoTipe(t) === 'evaluasi' && !C.bool(t.selesai) && t.tanggal >= today; }))[0];
-      el.innerHTML = '<div class="br-wrap narrow">' +
-        '<header class="br-head"><div><button type="button" class="br-back" data-brgo="beranda">' + ICON.left + 'Beranda</button><h1>Komitmen</h1>' +
-        '<p class="br-intro">Kesepakatan berdua dari evaluasi bulanan. Berlaku sampai diganti kesepakatan baru.</p></div></header>' +
-        '<section class="br-card br-eval"><div class="br-eval-top"><span class="br-ic" style="--c:#FCD34D;--cb:#2A2614">' + ICON.cal + '</span><div><h2>Evaluasi berikutnya</h2>' +
-        '<div class="br-eval-d">' + (evNext ? esc(brTanggal(evNext)) + ' · masuk Google Calendar' : 'Belum dijadwalkan') + '</div></div></div>' +
-        '<div class="br-eval-act">' + (evNext ? '<button type="button" class="br-btn ghost" data-ev-edit="' + esc(evNext.id) + '">Ubah jadwal</button>'
-          : '<button type="button" class="br-btn amber" id="km-jadwal">Jadwalkan evaluasi</button>') + '</div></section>' +
-        '<section class="br-card"><div class="br-card-h"><h2>Kesepakatan berlaku</h2><span class="br-count">' + aktif.length + '</span></div>' +
-        (S.komitmen === null ? '<div class="br-skel-line"></div>' : aktif.length ? '<div class="km-list">' + aktif.map(function (k) { return kmItem(k, true); }).join('') + '</div>'
-          : '<div class="br-empty">Belum ada kesepakatan. Tulis hasil evaluasi pertama kalian.</div>') +
-        '<button type="button" class="br-btn primary amber-solid" id="km-baru">' + ICON.plus + 'Kesepakatan baru</button></section>' +
-        (lama.length ? '<details class="br-card km-old"><summary>Riwayat (' + lama.length + ' sudah diganti)</summary><div class="km-list">' + lama.map(function (k) { return kmItem(k, false); }).join('') + '</div></details>' : '') +
-        '</div>';
-      $$('[data-brgo]', el).forEach(function (b) { b.addEventListener('click', function () { brGo(b.getAttribute('data-brgo')); }); });
-      var j = $('#km-jadwal', el);
-      if (j) j.addEventListener('click', function () { openTodoSheet(null, { tipe: 'evaluasi', pemilik: C.TODO_BERSAMA, aturWaktu: true, jam: '19:00', durasi: 60 }); });
-      $$('[data-ev-edit]', el).forEach(function (b) { b.addEventListener('click', function () { var t = findTodo(b.getAttribute('data-ev-edit')); if (t) openTodoSheet(t); }); });
-      $('#km-baru', el).addEventListener('click', function () { openKomitmenSheet(null, null); });
-      $$('[data-km-ganti]', el).forEach(function (b) { b.addEventListener('click', function () { openKomitmenSheet(null, kmFind(b.getAttribute('data-km-ganti'))); }); });
-      $$('[data-km-edit]', el).forEach(function (b) { b.addEventListener('click', function () { openKomitmenSheet(kmFind(b.getAttribute('data-km-edit')), null); }); });
-    }
-  };
-  function kmFind(id) { return (S.komitmen || []).filter(function (k) { return k.id === id; })[0] || null; }
-  function kmItem(k, aktif) {
-    var sejak = k.berlaku_sejak ? 'Berlaku sejak ' + dayLabel(k.berlaku_sejak) : '';
-    return '<article class="km-item' + (aktif ? '' : ' old') + '"><h3>' + esc(k.judul) + (k._pending ? ' <span class="br-owner">belum terkirim</span>' : '') + '</h3>' +
-      (k.isi ? '<p>' + esc(k.isi).replace(/\n/g, '<br>') + '</p>' : '') + '<div class="km-meta">' + esc(sejak) + (k.oleh ? ' · ditulis ' + esc(userName(k.oleh)) : '') + '</div>' +
-      (aktif ? '<div class="km-act"><button type="button" class="br-pill" data-km-edit="' + esc(k.id) + '">Ubah</button><button type="button" class="br-pill" data-km-ganti="' + esc(k.id) + '">Ganti dengan yang baru</button></div>' : '') + '</article>';
-  }
-  function openKomitmenSheet(k, mengganti) {
-    var f = { judul: k ? k.judul : '', isi: k ? k.isi : '', berlaku_sejak: k ? k.berlaku_sejak : todayISO() };
-    openSheet(k ? 'Ubah kesepakatan' : mengganti ? 'Ganti kesepakatan' : 'Kesepakatan baru', function (sh) {
-      sh.el.innerHTML = (mengganti ? '<div class="readonly-note"><span>Menggantikan: <b>' + esc(mengganti.judul) + '</b>. Yang lama tetap tersimpan di riwayat.</span></div>' : '') +
-        '<div class="field" style="margin-top:4px"><label for="km-j">Kesepakatan</label><input id="km-j" class="input" maxlength="160" autocomplete="off" placeholder="mis. Quality time tiap Jumat malam" value="' + esc(f.judul) + '"></div>' +
-        '<div class="field"><label for="km-i">Detail (opsional)</label><textarea id="km-i" class="input" rows="4" maxlength="4000" placeholder="Apa yang disepakati, alasannya, cara cek bulan depan">' + esc(f.isi) + '</textarea></div>' +
-        '<div class="field"><label for="km-t">Berlaku sejak</label><input id="km-t" class="input" type="date" value="' + esc(f.berlaku_sejak) + '"></div>' +
-        '<div class="err" id="km-err" role="alert"></div><button type="button" class="btn" id="km-save">Simpan</button>' +
-        (k ? '<button type="button" class="btn danger" id="km-del">Hapus kesepakatan</button>' : '');
-      $('#km-save', sh.el).addEventListener('click', function () {
-        var payload = { id: k ? k.id : uid(), judul: $('#km-j', sh.el).value, isi: $('#km-i', sh.el).value, berlaku_sejak: $('#km-t', sh.el).value };
-        try { payload = C.cleanKomitmen(payload); } catch (e) { $('#km-err', sh.el).textContent = e.message; return; }
-        if (mengganti) payload.mengganti = mengganti.id;
-        enqueue('komitmen.save', payload); toast(mengganti ? 'Kesepakatan diganti' : 'Kesepakatan disimpan'); sh.close();
-      });
-      var del = $('#km-del', sh.el);
-      if (del) del.addEventListener('click', function () {
-        if (!confirm('Hapus kesepakatan ini? Kalau dia menggantikan kesepakatan lama, yang lama berlaku lagi.')) return;
-        enqueue('komitmen.delete', { id: k.id }); toast('Kesepakatan dihapus'); sh.close();
-      });
-      setTimeout(function () { var j = $('#km-j', sh.el); if (j && !f.judul) j.focus(); }, 300);
-    });
-  }
-
   // ================= connect =================
   function renderConnect() {
     var app = $('#app');
@@ -1964,20 +1896,20 @@
       } catch (e) { $('#c-err').textContent = 'Kode tidak dikenali. Salin ulang kode koneksi (Supabase: hasil kantong_buat_kode).'; return; }
       btn.disabled = true; btn.textContent = 'Menghubungkan…';
       rpc('bootstrap', {}, conn).then(function (boot) {
-        S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.komitmen = null; S.bukuView = null; persist(); renderShell(); sync();
+        S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
       }, function (e) {
         btn.disabled = false; btn.textContent = 'Hubungkan';
         $('#c-err').textContent = e.code === 'AUTH' ? 'Kode akses ditolak server.' : e.message;
       });
     });
     $('#demo').addEventListener('click', function () {
-      S.conn = { mode: 'demo' }; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.komitmen = null; S.bukuView = null; persist(); renderShell(); sync();
+      S.conn = { mode: 'demo' }; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
     });
   }
   function disconnect() {
     ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_komitmen'].forEach(LS.del);
     demoStore = null;
-    S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.komitmen = null; S.sub = null; S.tab = PAGE === 'beranda' ? 'beranda' : 'home'; S.bukuView = null;
+    S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.sub = null; S.tab = PAGE === 'beranda' ? 'beranda' : 'home'; S.bukuView = null;
     renderConnect();
   }
 
@@ -2049,16 +1981,10 @@
     tdAdd(6, 'Evaluasi bulanan', 'bersama', ev.getFullYear() + '-' + pad(ev.getMonth() + 1) + '-' + pad(ev.getDate()), pad(ev.getHours()) + ':00', false, 'evaluasi');
     tdAdd(7, 'Ide kado ulang tahun Ibu', 'bersama', '', '', false, 'catatan', 'Ide kado ulang tahun Ibu\nSyal rajut atau voucher pijat');
     tdAdd(8, 'Ukuran gorden kamar', 'riki', '', '', false, 'catatan', 'Ukuran gorden kamar\n2 x 140 cm, tinggi 240 cm');
-    var kAt = C.addDays(t0, -16) + 'T21:00:00+07:00';
-    var komitmen = [
-      { id: 'demo-k1', judul: 'Quality time tiap Jumat malam, HP disimpan', isi: 'Mulai jam 19.00. Kalau batal, ganti di hari lain minggu itu.', berlaku_sejak: C.addDays(t0, -16), diganti_oleh: '', oleh: 'istri', dibuat: kAt, diubah: kAt, dihapus: '' },
-      { id: 'demo-k2', judul: 'Belanja di atas Rp 500 rb dibahas dulu berdua', isi: '', berlaku_sejak: C.addDays(t0, -16), diganti_oleh: '', oleh: 'riki', dibuat: kAt, diubah: kAt, dihapus: '' },
-      { id: 'demo-k3', judul: 'Gantian masak tiap akhir pekan', isi: 'Sabtu Riki, Minggu Febie.', berlaku_sejak: C.addDays(t0, -16), diganti_oleh: '', oleh: 'riki', dibuat: kAt, diubah: kAt, dihapus: '' }
-    ];
     return {
       buku: [{ id: 'riki', nama: 'Riki', tipe: 'Pribadi', pemilik: 'riki', urutan: 1 }, { id: 'istri', nama: 'Febie', tipe: 'Pribadi', pemilik: 'istri', urutan: 2 }, { id: 'rt', nama: 'Rumah Tangga', tipe: 'Bersama', pemilik: '', urutan: 3 }],
       users: [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'istri', nama: 'Febie', buku: 'istri' }],
-      kategori: kat, kantong: kan, budget: bud, transaksi: tx, todo: td, komitmen: komitmen
+      kategori: kat, kantong: kan, budget: bud, transaksi: tx, todo: td
     };
   }
 
@@ -2072,7 +1998,7 @@
   if (LS.get('k_ver', null) !== 'v6') {
     if (S.conn && S.conn.mode === 'demo') {
       ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_komitmen'].forEach(LS.del);
-      S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.komitmen = null;
+      S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null;
     }
     LS.set('k_ver', 'v6');
   }

@@ -1,8 +1,7 @@
 // Kantong service worker: network-first untuk app shell (update selalu masuk saat online),
 // fallback ke cache saat offline. Request API (POST ke Supabase / script.google.com) tidak disentuh.
-const CACHE = 'kantong-v9-beranda';
-const SHELL = ['./', 'index.html', 'kantong.html', 'styles.css', 'core.js', 'app.js', 'manifest.webmanifest', 'beranda.css',
-  'ruang-catat/', 'ruang-catat/index.html', 'ruang-catat/ruang-catat.js', 'ruang-catat/ruang-catat.css',
+const CACHE = 'kantong-v10-beranda';
+const SHELL = ['./', 'index.html', 'kantong.html', 'styles.css', 'core.js', 'app.js', 'manifest.webmanifest', 'beranda.css', 'komitmen.html', 'komitmen.css', 'komitmen.js',
   'fonts/nunito.woff2', 'fonts/jakarta.woff2', 'icons/icon.svg', 'icons/icon-animated.svg', 'icons/icon-32.png', 'icons/icon-192.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

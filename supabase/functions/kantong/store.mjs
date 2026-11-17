@@ -7,10 +7,17 @@
  */
 import KantongCore from './core.mjs';
 
-const TABEL = { Buku: 'buku', Users: 'users', Kategori: 'kategori', Kantong: 'kantong', Budget: 'budget', Transaksi: 'transaksi', Todo: 'todo', Komitmen: 'komitmen', Jurnal: 'jurnal' };
-const KOLOM_TANGGAL = { tanggal: 1, per_tanggal: 1, berlaku_sejak: 1 };
-const KOLOM_BOOL = { hitung: 1, aktif: 1, reimburse: 1, selesai: 1 };
-const KOLOM_ANGKA = { nominal: 1, saldo_awal: 1, limit: 1, urutan: 1, durasi: 1 };
+export const TABEL = {
+  Buku: 'buku', Users: 'users', Kategori: 'kategori', Kantong: 'kantong', Budget: 'budget', Transaksi: 'transaksi', Todo: 'todo',
+  KomitmenBab: 'komitmen_bab', KomitmenPasal: 'komitmen_pasal', KomitmenVersi: 'komitmen_versi',
+  KomitmenKeterangan: 'komitmen_keterangan', Pengesahan: 'pengesahan', Evaluasi: 'evaluasi'
+};
+const KOLOM_TANGGAL = { tanggal: 1, per_tanggal: 1 };
+const KOLOM_BOOL = { hitung: 1, aktif: 1, reimburse: 1, selesai: 1, terkunci: 1 };
+const KOLOM_ANGKA = { nominal: 1, saldo_awal: 1, limit: 1, urutan: 1, durasi: 1, versi: 1 };
+// kolom yang tipenya beda per tabel: nomor pasal = angka, nomor bab = teks (I, II, ...)
+const KOLOM_ANGKA_TABEL = { KomitmenPasal: { nomor: 1 } };
+const angka = (tabel, h) => KOLOM_ANGKA[h] || (KOLOM_ANGKA_TABEL[tabel] && KOLOM_ANGKA_TABEL[tabel][h]);
 
 // Postgres -> bentuk yang diharapkan core (null jadi '' / false / 0)
 export function dariDb(tabel, row) {
@@ -18,7 +25,7 @@ export function dariDb(tabel, row) {
   for (const h of KantongCore.SCHEMA[tabel]) {
     const v = row[h];
     if (KOLOM_BOOL[h]) o[h] = v === true;
-    else if (KOLOM_ANGKA[h]) o[h] = Number(v) || 0;
+    else if (angka(tabel, h)) o[h] = Number(v) || 0;
     else o[h] = v === null || v === undefined ? '' : String(v);
   }
   return o;
@@ -31,7 +38,7 @@ export function keDb(tabel, obj) {
     if (v === undefined) v = '';
     if (KOLOM_TANGGAL[h]) v = v ? String(v) : null;
     else if (KOLOM_BOOL[h]) v = v === true || v === 'TRUE' || v === 'true' || v === 1;
-    else if (KOLOM_ANGKA[h]) v = Math.round(Number(v) || 0);
+    else if (angka(tabel, h)) v = Math.round(Number(v) || 0);
     else v = String(v);
     o[h] = v;
   }
