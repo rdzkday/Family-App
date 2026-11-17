@@ -107,7 +107,8 @@ var AturAgenda = {
   render: function (el) {
     var f = todoFilter();
     var timed = todos().filter(function (t) { return C.todoPerluEvent(t); });
-    var gagal = timed.filter(function (t) { return !t._pending && t.gcal_status === 'gagal'; });
+    var today = todayISO();
+    var gagal = timed.filter(function (t) { return C.todoSyncMassal(t, today); });
     var status = S.conn.mode === 'demo' ? 'Mode demo, tidak terhubung ke Google Calendar'
       : gagal.length && /belum disiapkan/i.test(gagal[0].gcal_error || '') ? 'Belum disiapkan (lihat PANDUAN §7)'
       : gagal.length ? gagal.length + ' to-do gagal masuk kalender' : 'Tersinkron ke kalender "Rumah Kita"';

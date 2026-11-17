@@ -415,6 +415,15 @@ var KantongCore = (function () {
     if (bool(t.selesai) && TODO_SELESAI_EVENT === 'hapus') return false;
     return true;
   }
+  // Keputusan #5 brief integrasi: hanya to-do mendatang yang dikirim massal ke kalender.
+  function todoSudahLewat(t, today) { return !!t.tanggal && String(t.tanggal).slice(0, 10) < today; }
+  function todoSyncMassal(t, today) {
+    return todoPerluEvent(t) && !t._pending && t.gcal_status === 'gagal' && !bool(t.selesai) && !todoSudahLewat(t, today);
+  }
+  // to-do lewat yang tak pernah terkirim karena kalender belum disiapkan: tampil netral, bukan error
+  function todoTidakDikirimLewat(t, today) {
+    return todoSudahLewat(t, today) && t.gcal_status === 'gagal' && /belum disiapkan/i.test(t.gcal_error || '');
+  }
   // Samakan Google Calendar dengan isi to-do. Tidak pernah melempar error:
   // kegagalan dicatat di gcal_status supaya to-do tetap tersimpan dan bisa "Coba lagi".
   // store.calendar: { upsert(eventId, spec, todo) -> eventId, remove(eventId, todo) } (opsional).
@@ -1180,6 +1189,7 @@ var KantongCore = (function () {
     computeUtang: computeUtang, computeTalangan: computeTalangan, arahTransfer: arahTransfer,
     KAT_REIMBURSE: KAT_REIMBURSE, KAT_SETORAN: KAT_SETORAN, KAT_SETORAN_MASUK: KAT_SETORAN_MASUK,
     cleanTodo: cleanTodo, canWriteTodo: canWriteTodo, todoEventSpec: todoEventSpec, todoPerluEvent: todoPerluEvent,
+    todoSudahLewat: todoSudahLewat, todoSyncMassal: todoSyncMassal, todoTidakDikirimLewat: todoTidakDikirimLewat,
     komitmenView: komitmenView, cariKomitmen: cariKomitmen, hashLembar: hashLembar, lembarItems: lembarItems, nomorDariKueri: nomorDariKueri, normCari: normCari,
     ayatDari: ayatDari, slotTtd: slotTtd,
     isTime: isTime, TODO_BERSAMA: TODO_BERSAMA, TODO_DURASI: TODO_DURASI, TODO_SELESAI_EVENT: TODO_SELESAI_EVENT,
