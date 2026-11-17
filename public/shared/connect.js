@@ -1,31 +1,45 @@
-/* Kantong — Layar hubungkan & putuskan.
+/* Kantong — Layar login & keluar.
    Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 
-// ================= connect =================
+// ================= login =================
+// Alamat API (Supabase Edge Function). Bisa ditimpa window.KANTONG_API untuk staging.
+var API_URL = window.KANTONG_API || 'https://serskylzlevhjidqrvjm.supabase.co/functions/v1/kantong';
+
 function renderConnect() {
   var app = $('#app');
-  app.innerHTML = '<div class="connect"><img class="logo" src="' + ROOT + 'icons/icon-animated.svg" alt=""><h1>Family App</h1>' +
-    '<p>Catatan keuangan dan to-do rumah tangga. Tempel kode koneksi untuk mulai.</p>' +
-    '<div class="field"><label for="code">Kode koneksi</label><textarea id="code" class="input" placeholder="Tempel kode koneksi (lihat kantong/PANDUAN.md)" autocomplete="off" spellcheck="false"></textarea></div>' +
-    '<div class="err" id="c-err"></div><button class="btn" id="connect">Hubungkan</button>' +
-    '<button class="btn ghost" id="demo" style="margin-top:12px">Coba mode demo</button></div>';
-  $('#connect').addEventListener('click', function () {
-    var raw = $('#code').value.trim(), conn, btn = this;
-    try {
-      var b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
-      while (b64.length % 4) b64 += '=';
-      var o = JSON.parse(atob(b64));
-      // API = Supabase Edge Function (…/functions/v1/kantong)
-      if (!/^https:\/\/[^\s/]+\.[^\s/]+\//.test(o.api) || typeof o.token !== 'string' || o.token.length < 20) throw new Error();
-      conn = { mode: 'remote', api: o.api, token: o.token };
-    } catch (e) { $('#c-err').textContent = 'Kode tidak dikenali. Salin ulang kode koneksi (Supabase: hasil kantong_buat_kode).'; return; }
-    btn.disabled = true; btn.textContent = 'Menghubungkan…';
-    rpc('bootstrap', {}, conn).then(function (boot) {
-      S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
-    }, function (e) {
-      btn.disabled = false; btn.textContent = 'Hubungkan';
-      $('#c-err').textContent = e.code === 'AUTH' ? 'Kode akses ditolak server.' : e.message;
+  app.innerHTML = '<form class="connect" id="login" novalidate><img class="logo" src="' + ROOT + 'icons/icon-animated.svg" alt=""><h1>Family App</h1>' +
+    '<p>Masuk untuk melihat keuangan dan agenda rumah tangga.</p>' +
+    '<div class="field"><label for="l-user">Username</label><input id="l-user" class="input" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>' +
+    '<div class="field"><label for="l-pass">Password</label><div style="display:flex;gap:8px;align-items:stretch">' +
+      '<input id="l-pass" class="input" type="password" name="password" autocomplete="current-password" required style="flex:1;min-width:0">' +
+      '<button type="button" id="l-show" class="btn ghost" aria-label="Tampilkan password" style="width:auto;margin:0;padding:0 16px;flex:none">Lihat</button>' +
+    '</div></div>' +
+    '<div class="err" id="c-err" role="alert" aria-live="polite"></div><button class="btn" id="connect" type="submit">Masuk</button>' +
+    '<button class="btn ghost" id="demo" type="button" style="margin-top:12px">Coba mode demo</button></form>';
+  var u = $('#l-user'), pw = $('#l-pass'), err = $('#c-err');
+  u.focus();
+  $('#l-show').addEventListener('click', function () {
+    var lihat = pw.type === 'password';
+    pw.type = lihat ? 'text' : 'password';
+    this.textContent = lihat ? 'Sembunyi' : 'Lihat';
+    this.setAttribute('aria-label', lihat ? 'Sembunyikan password' : 'Tampilkan password');
+  });
+  $('#login').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var username = u.value.trim().toLowerCase(), password = pw.value, btn = $('#connect');
+    if (!username || !password) { err.textContent = 'Isi username dan password.'; (username ? pw : u).focus(); return; }
+    err.textContent = ''; btn.disabled = true; btn.textContent = 'Masuk…';
+    var base = { mode: 'remote', api: API_URL, token: '' };
+    rpc('login', { username: username, password: password }, base).then(function (d) {
+      var conn = { mode: 'remote', api: API_URL, token: d.token };
+      return rpc('bootstrap', {}, conn).then(function (boot) {
+        S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
+      });
+    }).catch(function (e) {
+      btn.disabled = false; btn.textContent = 'Masuk';
+      err.textContent = e.offline ? 'Tidak ada koneksi internet.' : e.message;
+      pw.value = ''; pw.focus();
     });
   });
   $('#demo').addEventListener('click', function () {
@@ -33,6 +47,7 @@ function renderConnect() {
   });
 }
 function disconnect() {
+  if (S.conn && S.conn.mode === 'remote') rpc('logout', {}).catch(function () {});   // cabut sesi perangkat ini
   ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_komitmen'].forEach(LS.del);
   demoStore = null;
   S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.sub = null; S.tab = PAGE === 'beranda' ? 'beranda' : PAGE === 'agenda' ? 'todo' : 'home'; S.bukuView = null;

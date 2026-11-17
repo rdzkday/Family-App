@@ -39,13 +39,13 @@ Data keuangan pribadi tidak disertakan di repo ini.
 
 ### Pertama kali
 1. Buka URL app di HP → **Install app** (Android: menu ⋮; iPhone: Share → Add to Home Screen).
-2. Buka app dari home screen → tempel **kode koneksi** → **Hubungkan**.
-3. Kode koneksi dibuat di Supabase **SQL Editor** (satu per orang, hasilnya rahasia):
+2. Buka app dari home screen → isi **username + password** → **Masuk**.
+3. Akun dibuat admin di Supabase **SQL Editor** (password min. 8 karakter, di-hash bcrypt):
    ```sql
-   select kantong_buat_kode('riki',  'https://serskylzlevhjidqrvjm.supabase.co/functions/v1/kantong');
-   select kantong_buat_kode('istri', 'https://serskylzlevhjidqrvjm.supabase.co/functions/v1/kantong');
+   select kantong_atur_login('riki',  'riki',  'password-rahasia');
+   select kantong_atur_login('istri', 'febie', 'password-rahasia');
    ```
-   Menjalankan ulang = kode lama langsung mati (dipakai kalau HP hilang).
+   Menjalankan ulang = ganti password + semua perangkat user itu otomatis keluar (dipakai kalau HP hilang). 5x salah password = akun terkunci 15 menit.
 4. **Beranda › Pengaturan › Kantong**: isi saldo tiap kantong sesuai aplikasi bank, atur kategori & budget bulanan.
 5. Belum punya kode? Tombol **Coba mode demo** memakai data contoh di HP saja.
 
