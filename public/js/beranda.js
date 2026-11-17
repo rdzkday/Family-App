@@ -100,27 +100,68 @@ var AgendaView = {
   }
 };
 
-// ---------- Setelan Beranda: tema berlaku di semua halaman ----------
+// ---------- Setelan: semua pengaturan per fitur, satu pintu dari Beranda ----------
+// Tiap fitur = panel expand/collapse. Fitur dengan sub-menu (Kantong) membuka sub-view
+// dengan tombol Kembali di kanan atas → balik ke Setelan.
 var SetelanView = {
+  buka: { umum: true },
   render: function (el) {
-    var demo = S.conn.mode === 'demo';
-    el.innerHTML = '<div class="topbar"><div><h1>Setelan</h1></div></div>' +
-      '<section class="section br-set"><div class="section-h"><h2>Tema</h2></div><div class="menu" style="padding-top:16px"><div class="seg" role="group" aria-label="Tema">' +
-        [['dark', 'Gelap'], ['light', 'Terang']].map(function (x) { return '<button data-theme-set="' + x[0] + '" aria-pressed="' + (themePref() === x[0]) + '">' + x[1] + '</button>'; }).join('') +
-      '</div><p class="faint" style="font-size:12.5px;margin:10px 0 14px">Berlaku di Beranda, Kantong, Komitmen, dan Ruang Catat.</p></div></section>' +
-      '<section class="section"><div class="menu">' +
-        '<a class="menu-a" href="kantong.html#pengaturan"><span class="main">Pengaturan Kantong<div class="t2">Kantong, kategori, budget</div></span>' + ICON.right + '</a>' +
-        '<button data-set="sync"><span class="main">Sinkron sekarang<div class="t2">' + esc(S.lastSync ? 'Terakhir ' + agoLabel(S.lastSync) : 'Belum pernah') + '</div></span>' + ICON.right + '</button>' +
-      '</div></section>' +
-      '<section class="section"><div class="menu"><button data-set="out"><span class="main" style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Putuskan koneksi di HP ini') + '</span></button></div></section>';
-    $$('[data-theme-set]', el).forEach(function (b) { b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme-set')); SetelanView.render(el); }); });
+    if (S.sub && SETELAN_SUB[S.sub.type]) return SETELAN_SUB[S.sub.type].render(el);
+    var self = this, demo = S.conn.mode === 'demo', f = todoFilter();
+    var host = demo ? 'Mode demo, tersimpan di HP ini' : (/supabase\.(co|in)\//.test(S.conn.api || '') ? 'Terhubung ke Supabase' : 'Terhubung ke server');
+    var lain = (db().Users.filter(function (u) { return u.id !== me().id; })[0] || { nama: 'pengguna lain' }).nama;
+    function panel(id, judul, sub, ic, c, isi) {
+      var on = !!self.buka[id];
+      return '<section class="st-panel' + (on ? ' open' : '') + '"><button type="button" class="st-h" data-stp="' + id + '" aria-expanded="' + on + '" aria-controls="st-' + id + '">' +
+        '<span class="br-ic" style="--c:var(' + c + ');--cb:var(' + c + '-bg)">' + ic + '</span><span class="main"><span class="t1">' + judul + '</span><span class="t2">' + sub + '</span></span>' +
+        '<span class="st-chev" aria-hidden="true">' + ICON.right + '</span></button><div class="st-body menu" id="st-' + id + '"' + (on ? '' : ' hidden') + '>' + isi + '</div></section>';
+    }
+    function item(attr, t1, t2, chev) { return '<button type="button" ' + attr + '><span class="main">' + t1 + (t2 ? '<div class="t2">' + t2 + '</div>' : '') + '</span>' + (chev ? ICON.right : '') + '</button>'; }
+    function link(href, t1, t2) { return '<a class="menu-a" href="' + href + '"><span class="main">' + t1 + '<div class="t2">' + t2 + '</div></span>' + ICON.ext + '</a>'; }
+    var nKat = db().Kategori.filter(function (k) { return C.bool(k.aktif) && k.id !== C.KAT_REIMBURSE; }).length;
+    el.innerHTML = '<div class="topbar"><div><h1>Setelan</h1></div>' + syncPill() + '</div>' +
+      '<div class="st-list">' +
+      panel('umum', 'Umum', esc(me().nama) + ' · ' + host, ICON.gear, '--br-agenda',
+        '<div class="st-pad"><span class="lbl">Tema</span><div class="seg" role="group" aria-label="Tema">' +
+          [['dark', 'Gelap'], ['light', 'Terang']].map(function (x) { return '<button data-theme-set="' + x[0] + '" aria-pressed="' + (themePref() === x[0]) + '">' + x[1] + '</button>'; }).join('') +
+        '</div><p class="faint" style="font-size:12.5px;margin:10px 0 0">Berlaku di Beranda, Kantong, Komitmen, dan Ruang Catat.</p></div>' +
+        item('data-set="sync"', 'Sinkron sekarang', esc(S.lastSync ? 'Terakhir ' + agoLabel(S.lastSync) : 'Belum pernah') + (S.outbox.length ? ', ' + S.outbox.length + ' belum terkirim' : '')) +
+        (demo ? item('data-set="switch"', 'Masuk sebagai ' + esc(lain), 'Coba aturan baca/tulis antar buku') : '')) +
+      panel('kantong', 'Kantong', 'Budget, kategori, kantong', ICON.wallet, '--br-kantong',
+        item('data-sub="budget"', 'Budget bulanan', 'Atur budget per kategori', true) +
+        item('data-sub="kategori"', 'Kategori', nKat + ' kategori aktif', true) +
+        item('data-sub="kantong"', 'Kantong', 'Cash, debit, e-wallet, kartu kredit', true)) +
+      panel('todo', 'To-do & Agenda', 'Filter bawaan, Google Calendar', ICON.check, '--br-agenda',
+        '<div class="st-pad"><span class="lbl">Tampilkan to-do</span><div class="seg" role="group" aria-label="Filter to-do bawaan">' +
+          [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) { return '<button data-tf-set="' + x[0] + '" aria-pressed="' + (f === x[0]) + '">' + x[1] + '</button>'; }).join('') +
+        '</div><p class="faint" style="font-size:12.5px;margin:10px 0 0">To-do berwaktu otomatis masuk Google Calendar "Rumah Kita".</p></div>') +
+      panel('komitmen', 'Komitmen', 'Kesepakatan & evaluasi bulanan', ICON.heart, '--br-komit',
+        link('komitmen.html', 'Buka Komitmen', 'Kelola pasal, tanda tangan, dan riwayat')) +
+      panel('catat', 'Ruang Catat', 'Profil, prompt, cadangan', ICON.book, '--br-catat',
+        link(RUANG_CATAT_URL + '#setting', 'Setting Ruang Catat', 'Profil, kondisi, prompt custom, cadangan data')) +
+      '</div>' +
+      '<section class="section"><div class="menu">' + item('data-set="out"', '<span style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Putuskan koneksi di HP ini') + '</span>') + '</div>' +
+      '<p class="faint" style="font-size:12px;text-align:center;margin-top:20px">Kantong v' + ((S.boot && S.boot.version) || C.VERSION) + '</p></section>';
+    $$('[data-stp]', el).forEach(function (b) { b.addEventListener('click', function () {
+      var id = b.getAttribute('data-stp'), on = !self.buka[id]; self.buka[id] = on;
+      b.setAttribute('aria-expanded', String(on)); b.parentNode.classList.toggle('open', on); $('#st-' + id, el).hidden = !on;
+    }); });
+    $$('[data-theme-set]', el).forEach(function (b) { b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme-set')); self.render(el); }); });
+    $$('[data-tf-set]', el).forEach(function (b) { b.addEventListener('click', function () { S.prefs.todoFilter = b.getAttribute('data-tf-set'); persist(); self.render(el); }); });
+    $$('[data-sub]', el).forEach(function (b) { b.addEventListener('click', function () { goSub({ type: b.getAttribute('data-sub') }); }); });
     $$('[data-set]', el).forEach(function (b) { b.addEventListener('click', function () {
       var a = b.getAttribute('data-set');
       if (a === 'sync') { sync(); toast('Menyinkronkan…'); }
+      if (a === 'switch') { S.prefs.demoUser = S.prefs.demoUser === 'riki' ? 'istri' : 'riki'; S.bukuView = null; persist(); S.boot = null; S.todos = null; renderView(); sync(); }
       if (a === 'out' && confirm(demo ? 'Keluar dari mode demo? Data demo dihapus.' : 'Putuskan koneksi? Perubahan yang belum terkirim akan hilang dari HP ini.')) disconnect();
     }); });
+  },
+  update: function (el) {
+    if (S.sub && S.sub.type === 'budget') return BudgetEdit.update(el);
+    this.render(el);
   }
 };
+var SETELAN_SUB = { budget: BudgetEdit, kategori: KategoriList, kantong: KantongList };
 
 function openTxBaru() {
   openSheet('Catat transaksi', function (sh) { txForm(sh.el, null, { onDone: function () { sh.close(); } }); });

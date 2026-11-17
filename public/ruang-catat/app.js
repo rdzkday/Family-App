@@ -168,7 +168,7 @@
   // Minta browser tidak menghapus data otomatis (terutama Safari/iPhone)
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
 
-  let tab = 'today';
+  let tab = location.hash === '#setting' ? 'settings' : 'today';
   let onboardStep = 0;
   let draftProfile = {name:'', age:'', conditions:[], extraTags:[]};
   let calMonth = new Date(); calMonth.setDate(1);
