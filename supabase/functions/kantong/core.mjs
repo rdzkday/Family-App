@@ -16,14 +16,25 @@ var KantongCore = (function () {
     Transaksi: ['id', 'tanggal', 'tipe', 'nominal', 'buku', 'kategori', 'kantong', 'kantong_tujuan',
       'keterangan', 'reimburse', 'oleh', 'sumber', 'dibuat', 'diubah', 'dihapus', 'terbayar', 'tx_balik'],
     Todo: ['id', 'judul', 'pemilik', 'tanggal', 'jam', 'durasi', 'selesai', 'selesai_oleh',
-      'gcal_event_id', 'gcal_status', 'gcal_error', 'oleh', 'dibuat', 'diubah', 'dihapus']
+      'gcal_event_id', 'gcal_status', 'gcal_error', 'oleh', 'dibuat', 'diubah', 'dihapus'],
+    // ---- Komitmen (claude/komitmen-brief.md §10) ----
+    KomitmenBab: ['id', 'nomor', 'judul', 'urutan', 'dibuat_at', 'dihapus'],
+    KomitmenPasal: ['id', 'nomor', 'bab_id', 'tipe', 'judul', 'kata_kunci', 'sumber_asal', 'rujukan_asli', 'terkunci',
+      'status', 'versi_berlaku_id', 'dibuat_oleh', 'dibuat_at', 'diubah_at', 'dihapus'],
+    KomitmenVersi: ['id', 'pasal_id', 'versi', 'isi_ayat', 'alasan', 'jenis', 'sumber', 'evaluasi_id', 'pengesahan_id',
+      'status', 'berlaku_sejak', 'dibuat_oleh', 'dibuat_at'],
+    KomitmenKeterangan: ['id', 'pasal_id', 'isi', 'menggantikan_id', 'jenis', 'evaluasi_id', 'pengesahan_id', 'status',
+      'berlaku_sejak', 'dibuat_oleh', 'dibuat_at'],
+    Pengesahan: ['id', 'judul', 'jenis', 'evaluasi_id', 'ttd_riki', 'ttd_riki_at', 'ttd_febie', 'ttd_febie_at', 'isi_hash',
+      'status', 'dibuat_at'],
+    Evaluasi: ['id', 'tanggal', 'catatan', 'dibuat_oleh', 'selesai_at']
   };
   var KAT_REIMBURSE = 'reimburse-masuk';   // kategori pemasukan otomatis, tidak dihitung sebagai pendapatan
   var KAT_SETORAN = 'setoran-rt';          // pengeluaran otomatis: topup dari kantong pribadi ke dompet bersama
   var KAT_SETORAN_MASUK = 'setoran-rt-in'; // pemasukan otomatis di sisi dompet bersama
   var TIPE_TX = ['Pengeluaran', 'Pemasukan', 'Transfer'];
   var JENIS_KANTONG = ['Cash', 'Debit', 'E-wallet', 'Kredit'];
-  var VERSION = '1.3.0';
+  var VERSION = '1.4.0';
   // ---------- to-do ----------
   var TODO_BERSAMA = 'bersama';          // pemilik to-do bersama (selain itu: id user)
   var TODO_DURASI = 30;                  // menit, dipakai kalau jam diisi tapi durasi kosong
@@ -449,6 +460,159 @@ var KantongCore = (function () {
     throw err('Aksi tidak dikenal: ' + action);
   }
 
+  // ---------- komitmen: baca & cari (Fase 4a) ----------
+  // Pasal = map (nomor & judul tetap), Versi = isi pada satu waktu. Yang tampil = versi berlaku (atau usulan untuk pasal baru).
+  function ayatDari(v) {
+    if (Object.prototype.toString.call(v) === '[object Array]') return v.map(function (x) { return String(x == null ? '' : x); });
+    var s = String(v == null ? '' : v).trim();
+    if (!s) return [];
+    try { var a = JSON.parse(s); if (Object.prototype.toString.call(a) === '[object Array]') return a.map(function (x) { return String(x == null ? '' : x); }); }
+    catch (e) { /* teks biasa: satu ayat */ }
+    return [s];
+  }
+  function listDari(s) { return String(s || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean); }
+  // kotak TTD milik user: 'riki' untuk pemilik buku riki, selain itu 'febie' (claude/komitmen-brief.md §17)
+  function slotTtd(user) { return user && (user.id === 'riki' || user.buku === 'riki') ? 'riki' : 'febie'; }
+  function kelompok(list, key) {
+    var m = {};
+    (list || []).forEach(function (r) { var k = String(r[key] || ''); (m[k] = m[k] || []).push(r); });
+    return m;
+  }
+  function terakhir(list, fn) { var out = null; list.forEach(function (r) { if (fn(r)) out = r; }); return out; }
+  function normCari(s) {
+    s = String(s == null ? '' : s).toLowerCase();
+    if (s.normalize) s = s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return s.replace(/\s+/g, ' ').trim();
+  }
+  function cocokToken(teks, tok) {
+    if (/^\d+$/.test(tok)) return new RegExp('(^|[^0-9])' + tok + '([^0-9]|$)').test(teks);   // "3" tidak cocok dengan "13"
+    return teks.indexOf(tok) >= 0;
+  }
+  function kataUtuh(teks, kata) {
+    var i = teks.indexOf(kata);
+    while (i >= 0) {
+      var a = i === 0 ? ' ' : teks.charAt(i - 1), b = teks.charAt(i + kata.length) || ' ';
+      if (!/[a-z0-9]/.test(a) && !/[a-z0-9]/.test(b)) return true;
+      i = teks.indexOf(kata, i + 1);
+    }
+    return false;
+  }
+
+  function komitmenView(db, user) {
+    var versiBy = kelompok(db.KomitmenVersi, 'pasal_id'), ketBy = kelompok(db.KomitmenKeterangan, 'pasal_id');
+    var sah = byId(db.Pengesahan || []), dipakai = {};
+    var bab = sortBy((db.KomitmenBab || []).filter(function (b) { return !b.dihapus; }), 'urutan').map(function (b) {
+      return { id: b.id, nomor: String(b.nomor || ''), judul: String(b.judul || ''), urutan: num(b.urutan) };
+    });
+    var pasal = (db.KomitmenPasal || []).filter(function (p) { return !p.dihapus; }).map(function (p) {
+      var vs = (versiBy[p.id] || []).slice().sort(function (a, b) { return num(a.versi) - num(b.versi); });
+      var sahV = function (v) { return v.status === 'berlaku' || v.status === 'digantikan'; };
+      var cur = byId(vs)[p.versi_berlaku_id] || terakhir(vs, function (v) { return v.status === 'berlaku'; });
+      if (!cur && p.status === 'usulan') cur = terakhir(vs, function (v) { return v.status === 'usulan'; });
+      var isi = cur && cur.jenis === 'cabut' ? terakhir(vs, function (v) { return v.jenis !== 'cabut' && sahV(v); }) : cur;
+      var cabut = p.status === 'dicabut' ? terakhir(vs, function (v) { return v.jenis === 'cabut' && v.status === 'berlaku'; }) : null;
+      var kets = ketBy[p.id] || [];
+      var ket = kets.filter(function (k) { return k.status === 'berlaku' && k.jenis !== 'cabut'; })
+        .sort(function (a, b) { return String(a.berlaku_sejak).localeCompare(String(b.berlaku_sejak)); })
+        .map(function (k) {
+          if (k.pengesahan_id) dipakai[k.pengesahan_id] = 1;
+          return { id: k.id, isi: String(k.isi || ''), berlaku_sejak: String(k.berlaku_sejak || ''), pengesahan_id: String(k.pengesahan_id || '') };
+        });
+      var pid = cur ? String(cur.pengesahan_id || '') : '';
+      if (pid && cur.status === 'berlaku') dipakai[pid] = 1;
+      return {
+        id: p.id, nomor: num(p.nomor), bab_id: String(p.bab_id || ''), tipe: p.tipe === 'definisi' ? 'definisi' : 'kesepakatan',
+        judul: String(p.judul || ''), kata_kunci: listDari(p.kata_kunci), sumber_asal: p.sumber_asal === 'pranikah' ? 'pranikah' : 'app',
+        rujukan_asli: String(p.rujukan_asli || ''), terkunci: bool(p.terkunci), status: String(p.status || 'usulan'),
+        versi: isi ? num(isi.versi) : 0, ayat: isi ? ayatDari(isi.isi_ayat) : [], sumber: isi ? String(isi.sumber || '') : '',
+        berlaku_sejak: cur && cur.status === 'berlaku' ? String(cur.berlaku_sejak || '') : '',
+        pengesahan_id: cur && cur.status === 'berlaku' ? pid : '',
+        dicabut: cabut ? { tanggal: String(cabut.berlaku_sejak || ''), alasan: String(cabut.alasan || '') } : null,
+        keterangan: ket,
+        ada_usulan: vs.some(function (v) { return v.status === 'usulan'; }) || kets.some(function (k) { return k.status === 'usulan'; })
+      };
+    }).sort(function (a, b) { return a.nomor - b.nomor; });
+    // "Lihat juga": pasal lain yang memakai istilah sebuah definisi
+    pasal.forEach(function (d) {
+      d.lihat_juga = [];
+      var istilah = normCari(d.judul);
+      if (d.tipe !== 'definisi' || !istilah) return;
+      pasal.forEach(function (p) {
+        if (p.id === d.id || p.status === 'dicabut') return;
+        var teks = normCari(p.ayat.join(' ') + ' ' + p.keterangan.map(function (k) { return k.isi; }).join(' '));
+        if (kataUtuh(teks, istilah)) d.lihat_juga.push(p.nomor);
+      });
+    });
+    var slot = slotTtd(user);
+    var lembar = {};
+    Object.keys(dipakai).forEach(function (id) {
+      var s = sah[id]; if (!s) return;
+      lembar[id] = { id: s.id, judul: String(s.judul || ''), jenis: String(s.jenis || ''), status: String(s.status || ''),
+        ttd_riki: String(s.ttd_riki || ''), ttd_riki_at: String(s.ttd_riki_at || ''),
+        ttd_febie: String(s.ttd_febie || ''), ttd_febie_at: String(s.ttd_febie_at || '') };
+    });
+    return {
+      bab: bab, pasal: pasal, pengesahan: lembar,
+      berlaku: pasal.filter(function (p) { return p.status === 'berlaku'; }).length,
+      menunggu_ttd: (db.Pengesahan || []).filter(function (s) { return s.status === 'menunggu' && !s['ttd_' + slot]; }).length
+    };
+  }
+
+  // Cari di daftar pasal hasil komitmenView. Urutan: nomor (0) → judul (1) → kata kunci/rujukan (2) → isi/keterangan (3).
+  // Hasil: [{ pasal, tingkat, lokasi: [{ di: 'nomor'|'judul'|'kata_kunci'|'rujukan'|'ayat'|'keterangan', idx }] }]
+  function nomorDariKueri(q) {
+    var m = /^(?:pasal|psl|ps)?\.?\s*(\d{1,4})$/.exec(normCari(q));
+    return m ? Number(m[1]) : 0;
+  }
+  function cariKomitmen(pasal, q) {
+    var nq = normCari(q);
+    if (!nq) return [];
+    var nomor = nomorDariKueri(q), toks = nq.split(' '), out = [];
+    var TINGKAT = { judul: 1, kata_kunci: 2, rujukan: 2, ayat: 3, keterangan: 3 };
+    (pasal || []).forEach(function (p) {
+      var f = [['judul', -1, p.judul], ['kata_kunci', -1, (p.kata_kunci || []).join(', ')], ['rujukan', -1, p.rujukan_asli]];
+      (p.ayat || []).forEach(function (a, i) { f.push(['ayat', i, a]); });
+      (p.keterangan || []).forEach(function (k, i) { f.push(['keterangan', i, k.isi]); });
+      var lokasi = [], semua = '';
+      f.forEach(function (x) {
+        var n = normCari(x[2]); semua += ' | ' + n;
+        if (n && (n.indexOf(nq) >= 0 || toks.some(function (t) { return cocokToken(n, t); }))) lokasi.push({ di: x[0], idx: x[1], frasa: n.indexOf(nq) >= 0 });
+      });
+      var tingkat = 9;
+      if (nomor && p.nomor === nomor) { tingkat = 0; lokasi.unshift({ di: 'nomor', idx: -1, frasa: true }); }
+      else if (toks.every(function (t) { return cocokToken(semua, t); })) {
+        lokasi.sort(function (a, b) { return (b.frasa - a.frasa) || (TINGKAT[a.di] - TINGKAT[b.di]); });
+        lokasi.forEach(function (l) { tingkat = Math.min(tingkat, TINGKAT[l.di]); });
+      }
+      if (tingkat < 9) out.push({ pasal: p, tingkat: tingkat, frasa: lokasi.some(function (l) { return l.frasa; }), lokasi: lokasi });
+    });
+    return out.sort(function (a, b) { return (a.tingkat - b.tingkat) || (b.frasa - a.frasa) || (a.pasal.nomor - b.pasal.nomor); });
+  }
+
+  function komitmenAksi(store, db, user, action, payload) {
+    if (action === 'komitmen.list') return komitmenView(db, user);
+    if (action === 'komitmen.history') {
+      var id = String(payload.pasal_id || '');
+      var p = byId(db.KomitmenPasal || [])[id];
+      if (!p || p.dihapus) throw err('Pasal tidak ditemukan');
+      var sah = byId(db.Pengesahan || []);
+      var item = (db.KomitmenVersi || []).filter(function (v) { return v.pasal_id === id; }).map(function (v) {
+        return { jenis_item: 'versi', id: v.id, versi: num(v.versi), jenis: v.jenis, status: v.status, ayat: ayatDari(v.isi_ayat), alasan: String(v.alasan || ''),
+          sumber: String(v.sumber || ''), berlaku_sejak: String(v.berlaku_sejak || ''), dibuat_at: String(v.dibuat_at || ''),
+          pengesahan_id: String(v.pengesahan_id || ''), pengesahan_judul: sah[v.pengesahan_id] ? String(sah[v.pengesahan_id].judul || '') : '' };
+      }).concat((db.KomitmenKeterangan || []).filter(function (k) { return k.pasal_id === id; }).map(function (k) {
+        return { jenis_item: 'keterangan', id: k.id, jenis: k.jenis, status: k.status, isi: String(k.isi || ''), menggantikan_id: String(k.menggantikan_id || ''),
+          berlaku_sejak: String(k.berlaku_sejak || ''), dibuat_at: String(k.dibuat_at || ''),
+          pengesahan_id: String(k.pengesahan_id || ''), pengesahan_judul: sah[k.pengesahan_id] ? String(sah[k.pengesahan_id].judul || '') : '' };
+      }));
+      // terbaru dulu; usulan (belum disahkan) paling atas; seri → versi lebih tinggi dulu
+      var kunci = function (r) { return (r.status === 'usulan' ? '9' : '0') + String(r.berlaku_sejak || r.dibuat_at); };
+      item.sort(function (a, b) { return kunci(b).localeCompare(kunci(a)) || (num(b.versi) - num(a.versi)); });
+      return { pasal_id: id, riwayat: item };
+    }
+    throw err('Aksi belum tersedia: ' + action);
+  }
+
   // ---------- API handler (dipakai server & mode demo) ----------
   // store: { all(table) -> array, upsert(table, obj) -> obj, calendar?: { upsert, remove } }
   function handle(store, user, action, payload, nowIso) {
@@ -686,6 +850,7 @@ var KantongCore = (function () {
       }
       default:
         if (String(action).indexOf('todo.') === 0) return todoAksi(store, db, user, action, payload, nowIso);
+        if (String(action).indexOf('komitmen.') === 0) return komitmenAksi(store, db, user, action, payload);
         throw err('Aksi tidak dikenal: ' + action);
     }
   }
@@ -724,6 +889,8 @@ var KantongCore = (function () {
     computeUtang: computeUtang, computeTalangan: computeTalangan, arahTransfer: arahTransfer,
     KAT_REIMBURSE: KAT_REIMBURSE, KAT_SETORAN: KAT_SETORAN, KAT_SETORAN_MASUK: KAT_SETORAN_MASUK,
     cleanTodo: cleanTodo, canWriteTodo: canWriteTodo, todoEventSpec: todoEventSpec, todoPerluEvent: todoPerluEvent,
+    komitmenView: komitmenView, cariKomitmen: cariKomitmen, nomorDariKueri: nomorDariKueri, normCari: normCari,
+    ayatDari: ayatDari, slotTtd: slotTtd,
     isTime: isTime, TODO_BERSAMA: TODO_BERSAMA, TODO_DURASI: TODO_DURASI, TODO_SELESAI_EVENT: TODO_SELESAI_EVENT
   };
 })();

@@ -31,7 +31,7 @@ supabase db push
 
 Ini membuat tabel `buku, users, kategori, kantong, budget, transaksi, todo, akses` beserta fungsi `kantong_muat`, `kantong_simpan`, `kantong_buat_kode`. Semua tabel memakai RLS tanpa policy: hanya Edge Function (service role) yang bisa membaca/menulis.
 
-Alternatif tanpa CLI: buka **SQL Editor**, tempel isi `supabase/migrations/20261116000000_kantong.sql`, **Run**.
+Alternatif tanpa CLI: buka **SQL Editor**, tempel isi tiap file di `supabase/migrations/` **berurutan** (`20261116000000_kantong.sql`, lalu `20261117000000_komitmen.sql`), **Run**.
 
 Lalu di **Table Editor → users** dan **buku**: ganti nama `Istri` sesuai nama pasangan. Kolom `id` jangan diubah.
 
@@ -114,6 +114,13 @@ Aturan yang dijalankan server:
 - Gagal masuk kalender (secret belum diisi, kalender belum di-share): to-do tetap tersimpan, barisnya merah dengan tombol **Coba lagi**.
 
 ---
+
+## 8. Komitmen (kamus kesepakatan)
+
+- Halaman: `komitmen.html` (dari Beranda → Komitmen). Brief: `claude/komitmen-brief.md`.
+- Butuh migrasi `20261117000000_komitmen.sql` + deploy ulang Edge Function (core baru).
+- Fase 4a sudah ada: baca, cari (nomor + isi), filter, A–Z. Usul/ubah/TTD menyusul (4b).
+- Isi asli kesepakatan & perjanjian pranikah **hanya** di database. Jangan taruh di repo.
 
 ## Aturan akses
 

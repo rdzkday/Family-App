@@ -99,7 +99,7 @@
     return '<section class="apps" aria-label="Aplikasi">' +
       a('./', 'var(--b-riki)', ICON.wallet, 'Kantong', 'Keuangan') +
       a('#todo', '#C7D3FF', ICON.cal, 'Agenda', 'To-do & catatan, baru tersimpan di browser ini', false, true) +
-      a('#komitmen', 'var(--b-rt)', ICON.heart, 'Komitmen', 'Kesepakatan berdua, baru pengingat tanggal', false, true) +
+      a('komitmen.html', 'var(--b-rt)', ICON.heart, 'Komitmen', 'Kesepakatan berdua: baca & cari pasal', false, true) +
       a(RUANG_CATAT_URL || '#ruangcatat', '#E4D7FF', ICON.book, 'Ruang Catat', RUANG_CATAT_URL ? 'App terpisah' : 'App terpisah, belum tersambung', !!RUANG_CATAT_URL, !RUANG_CATAT_URL) + '</section>';
   }
   function kantongHtml() {
@@ -178,6 +178,13 @@
       }).join('') + '</div>' : '') + '</section>';
   }
 
+  // ringkasan dari cache halaman Komitmen (komitmen.js menyimpan hasil komitmen.list di k_komitmen)
+  function komitRingkas() {
+    var c = LS.get('k_komitmen', null), d = c && c.data;
+    if (!d) return '';
+    return '<p class="t2" style="margin:0">' + d.berlaku + ' kesepakatan aktif' +
+      (d.menunggu_ttd ? ' · <b>' + d.menunggu_ttd + ' lembar menunggu tanda tanganmu</b>' : '') + '</p>';
+  }
   function komitHtml() {
     var tgl = D.evalTgl, today = todayISO();
     if (D.evalTunda === today) return '';
@@ -194,7 +201,8 @@
     return '<section class="panel komit" id="komitmen" aria-label="Pengingat evaluasi bulanan"><div class="head"><span class="ic">' + ICON.heart + '</span><div><h2>' + esc(head) + ' <span class="dev-tag">Dalam pengembangan</span></h2><span class="t2">' + esc(sub) + '</span></div></div>' +
       '<p>' + body + '</p><div class="acts"><label class="btn primary" style="position:relative;cursor:pointer">' + (tgl ? 'Ubah tanggal' : 'Atur tanggal') +
       '<input type="date" id="eval-tgl" value="' + esc(tgl) + '" aria-label="Tanggal evaluasi" style="position:absolute;inset:0;opacity:0;width:100%;cursor:pointer"></label>' +
-      (tgl ? '<button type="button" class="btn ghost" id="eval-tunda">Ingatkan besok</button>' : '') + '</div></section>';
+      (tgl ? '<button type="button" class="btn ghost" id="eval-tunda">Ingatkan besok</button>' : '') +
+      '<a class="btn ghost" href="komitmen.html">Lihat kesepakatan</a></div>' + komitRingkas() + '</section>';
   }
 
   var MOODS = [['berat', 'Berat', '#FFADB9'], ['lelah', 'Lelah', '#FFD1C2'], ['biasa', 'Biasa', '#FFE29A'], ['baik', 'Baik', '#BDEBD3'], ['senang', 'Senang', '#8EE3BC']];

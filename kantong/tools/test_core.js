@@ -84,7 +84,7 @@ function utangAntara(store, bersama, pribadi) {
 }
 
 // ---------------------------------------------------------------- versi & salinan core
-eq('versi core naik ke 1.3.0', C.VERSION, '1.3.0');
+eq('versi core naik ke 1.4.0', C.VERSION, '1.4.0');
 (function () {
   // core.mjs (Supabase) dan Core.gs (Apps Script) harus persis hasil build_core.js
   var fs = require('fs'), build = require(path.join(__dirname, 'build_core.js'));
@@ -526,6 +526,170 @@ function todoById(store, id) { return C.byId(store.all('Todo'))[id]; }
   todoCall(st, 'u-riki', 'todo.save', { id: 'l3', judul: 'Belum selesai' }, '2026-09-01T10:00:00+07:00');
   var ids = todoCall(st, 'u-riki', 'todo.list', {}).todos.map(function (t) { return t.id; }).sort().join(',');
   eq('todo.list: selesai lama disembunyikan, yang belum selesai tetap', ids, 'l2,l3');
+})();
+
+// ================================================================ KOMITMEN (Fase 4a: baca & cari)
+// Isi di bawah sintetis/placeholder, BUKAN isi kesepakatan asli.
+function komitmenSeed() {
+  var s = seed();
+  var T1 = '2026-10-01T20:00:00+07:00', T2 = '2026-11-01T20:00:00+07:00';
+  var A = function (x) { return JSON.stringify(x); };
+  s.KomitmenBab = [
+    { id: 'bab-def', nomor: 'II', judul: 'Definisi', urutan: 2, dibuat_at: T1, dihapus: '' },
+    { id: 'bab-pra', nomor: 'I', judul: 'Perjanjian Pranikah', urutan: 1, dibuat_at: T1, dihapus: '' },
+    { id: 'bab-lama', nomor: 'IX', judul: 'Terhapus', urutan: 9, dibuat_at: T1, dihapus: T2 }
+  ];
+  var P = function (id, nomor, bab, tipe, judul, status, versiId, extra) {
+    var o = { id: id, nomor: nomor, bab_id: bab, tipe: tipe, judul: judul, kata_kunci: '', sumber_asal: 'app', rujukan_asli: '', terkunci: false,
+      status: status, versi_berlaku_id: versiId, dibuat_oleh: 'u-riki', dibuat_at: T1, diubah_at: T1, dihapus: '' };
+    Object.keys(extra || {}).forEach(function (k) { o[k] = extra[k]; });
+    return o;
+  };
+  s.KomitmenPasal = [
+    P('p3', 3, 'bab-pra', 'kesepakatan', 'Harta bawaan', 'berlaku', 'v3-1', { sumber_asal: 'pranikah', terkunci: 'TRUE', rujukan_asli: 'Pasal 3 Perjanjian Pranikah', kata_kunci: 'aset, harta' }),
+    P('p4', 4, 'bab-def', 'kesepakatan', 'Chat pribadi', 'berlaku', 'v4-2'),
+    P('p12', 12, 'bab-def', 'kesepakatan', 'Waktu berdua', 'berlaku', 'v12-1', { kata_kunci: 'kencan' }),
+    P('p13', 13, 'bab-pra', 'kesepakatan', 'Utang', 'berlaku', 'v13-1', { sumber_asal: 'pranikah', terkunci: true, rujukan_asli: 'Pasal 13 Perjanjian Pranikah' }),
+    P('p16', 16, 'bab-def', 'definisi', 'Selingkuh', 'berlaku', 'v16-1'),
+    P('p17', 17, 'bab-def', 'definisi', 'Lawan jenis', 'berlaku', 'v17-1'),
+    P('p18', 18, 'bab-def', 'kesepakatan', 'Aturan lama', 'dicabut', 'v18-2'),
+    P('p19', 19, 'bab-def', 'kesepakatan', 'Usulan baru', 'usulan', ''),
+    P('p20', 20, 'bab-def', 'kesepakatan', 'Salah input', 'berlaku', 'v20-1', { dihapus: T2 })
+  ];
+  var V = function (id, pasal, versi, ayat, jenis, status, sejak, sah, alasan) {
+    return { id: id, pasal_id: pasal, versi: versi, isi_ayat: typeof ayat === 'string' ? ayat : A(ayat), alasan: alasan || '', jenis: jenis, sumber: 'evaluasi',
+      evaluasi_id: '', pengesahan_id: sah || '', status: status, berlaku_sejak: sejak || '', dibuat_oleh: 'u-riki', dibuat_at: sejak || T2 };
+  };
+  s.KomitmenVersi = [
+    V('v3-1', 'p3', 1, ['[Contoh] Harta yang dibawa sebelum menikah tetap milik masing-masing.', '[Contoh] Hasilnya juga.'], 'baru', 'berlaku', T1, 'sah-pra'),
+    V('v4-1', 'p4', 1, ['Versi lama ayat satu.'], 'baru', 'digantikan', T1, 'sah-pra'),
+    V('v4-2', 'p4', 2, ['Chat dengan lawan jenis secukupnya.', 'Tidak menyembunyikan percakapan yang bisa dianggap selingkuh.'], 'ubah', 'berlaku', T2, 'sah-okt', 'Diperjelas'),
+    V('v4-3', 'p4', 3, ['Usulan perubahan.'], 'ubah', 'usulan', '', 'sah-nov'),
+    V('v12-1', 'p12', 1, ['Satu malam per minggu tanpa HP.'], 'baru', 'berlaku', T1, 'sah-pra'),
+    V('v13-1', 'p13', 1, ['Utang 12 bulan sebelum menikah ditanggung sendiri.'], 'baru', 'berlaku', T1, 'sah-pra'),
+    V('v16-1', 'p16', 1, 'Selingkuh adalah [placeholder].', 'baru', 'berlaku', T1, 'sah-pra'),
+    V('v17-1', 'p17', 1, ['Lawan jenis adalah [placeholder].'], 'baru', 'berlaku', T1, 'sah-pra'),
+    V('v18-1', 'p18', 1, ['Isi aturan lama.'], 'baru', 'digantikan', T1, 'sah-pra'),
+    V('v18-2', 'p18', 2, [], 'cabut', 'berlaku', T2, 'sah-okt', 'Sudah tidak relevan'),
+    V('v19-1', 'p19', 1, ['Isi usulan.'], 'baru', 'usulan', '', 'sah-nov'),
+    V('v20-1', 'p20', 1, ['Terhapus permanen.'], 'baru', 'berlaku', T1, 'sah-pra')
+  ];
+  var K = function (id, pasal, isi, status, sejak, jenis) {
+    return { id: id, pasal_id: pasal, isi: isi, menggantikan_id: '', jenis: jenis || 'baru', evaluasi_id: '', pengesahan_id: 'sah-okt', status: status,
+      berlaku_sejak: sejak, dibuat_oleh: 'u-febie', dibuat_at: sejak || T2 };
+  };
+  s.KomitmenKeterangan = [
+    K('k2', 'p3', 'Keterangan kedua, termasuk hadiah dari lawan jenis.', 'berlaku', T2),
+    K('k1', 'p3', 'Keterangan pertama.', 'berlaku', T1),
+    K('k0', 'p3', 'Keterangan yang sudah diganti.', 'digantikan', T1),
+    K('k9', 'p3', 'Keterangan usulan.', 'usulan', '')
+  ];
+  s.Pengesahan = [
+    { id: 'sah-pra', judul: 'Perjanjian Pranikah', jenis: 'pranikah', evaluasi_id: '', ttd_riki: 'M0 0L10 10', ttd_riki_at: T1, ttd_febie: 'M0 10L10 0', ttd_febie_at: T1, isi_hash: 'x', status: 'sah', dibuat_at: T1 },
+    { id: 'sah-okt', judul: 'Evaluasi Okt 2026', jenis: 'evaluasi', evaluasi_id: '', ttd_riki: 'M1 1', ttd_riki_at: T2, ttd_febie: 'M2 2', ttd_febie_at: T2, isi_hash: 'y', status: 'sah', dibuat_at: T2 },
+    { id: 'sah-nov', judul: 'Evaluasi Nov 2026', jenis: 'evaluasi', evaluasi_id: '', ttd_riki: 'M3 3', ttd_riki_at: T2, ttd_febie: '', ttd_febie_at: '', isi_hash: 'z', status: 'menunggu', dibuat_at: T2 },
+    { id: 'sah-batal', judul: 'Batal', jenis: 'tunggal', evaluasi_id: '', ttd_riki: '', ttd_riki_at: '', ttd_febie: '', ttd_febie_at: '', isi_hash: '', status: 'batal', dibuat_at: T2 }
+  ];
+  return s;
+}
+function komCall(st, uid, action, payload) {
+  var u = st.all('Users').filter(function (x) { return x.id === uid; })[0];
+  return C.handle(st, u, action, payload || {}, NOW);
+}
+
+(function () {
+  var st = C.memoryStore(komitmenSeed());
+  var L = komCall(st, 'u-riki', 'komitmen.list');
+  var by = {}; L.pasal.forEach(function (p) { by[p.nomor] = p; });
+  eq('komitmen.bab urut & yang dihapus hilang', L.bab.map(function (b) { return b.nomor; }).join(','), 'I,II');
+  eq('komitmen.pasal terhapus tidak dikirim', !!by[20], false);
+  eq('komitmen.urut nomor', L.pasal.map(function (p) { return p.nomor; }).join(','), '3,4,12,13,16,17,18,19');
+  eq('komitmen.jumlah berlaku', L.berlaku, 6);
+  // pranikah
+  eq('komitmen.pranikah terkunci', by[3].terkunci, true);
+  eq('komitmen.pranikah sumber_asal', by[3].sumber_asal, 'pranikah');
+  eq('komitmen.kata kunci jadi array', by[3].kata_kunci.join('|'), 'aset|harta');
+  eq('komitmen.ayat dari JSON', by[3].ayat.length, 2);
+  eq('komitmen.ayat teks biasa = satu ayat', by[16].ayat.join('|'), 'Selingkuh adalah [placeholder].');
+  eq('komitmen.keterangan hanya yang berlaku, urut tanggal', by[3].keterangan.map(function (k) { return k.id; }).join(','), 'k1,k2');
+  eq('komitmen.ada usulan keterangan ditandai', by[3].ada_usulan, true);
+  // versi
+  eq('komitmen.ubah: tampil versi 2', by[4].versi, 2);
+  eq('komitmen.ubah: isi versi berlaku, bukan usulan', by[4].ayat[0], 'Chat dengan lawan jenis secukupnya.');
+  eq('komitmen.ubah: tanggal = TTD versi berlaku', by[4].berlaku_sejak, '2026-11-01T20:00:00+07:00');
+  eq('komitmen.ubah: usulan perubahan ditandai', by[4].ada_usulan, true);
+  eq('komitmen.versi 1 tanpa usulan', by[12].ada_usulan, false);
+  // cabut & usulan
+  eq('komitmen.dicabut: status', by[18].status, 'dicabut');
+  eq('komitmen.dicabut: isi terakhir tetap terbaca', by[18].ayat[0], 'Isi aturan lama.');
+  eq('komitmen.dicabut: alasan', by[18].dicabut && by[18].dicabut.alasan, 'Sudah tidak relevan');
+  eq('komitmen.usulan pasal baru: isi usulan tampil', by[19].ayat[0], 'Isi usulan.');
+  eq('komitmen.usulan pasal baru: belum ada tanggal berlaku', by[19].berlaku_sejak, '');
+  eq('komitmen.usulan pasal baru: belum ada TTD', by[19].pengesahan_id, '');
+  // pengesahan
+  ok('komitmen.lembar dirujuk ikut dikirim', !!L.pengesahan['sah-pra'] && !!L.pengesahan['sah-okt']);
+  eq('komitmen.lembar yang belum sah tidak dikirim sebagai TTD pasal', !!L.pengesahan['sah-nov'], false);
+  eq('komitmen.menunggu TTD Riki (sudah TTD)', L.menunggu_ttd, 0);
+  eq('komitmen.menunggu TTD Febie', komCall(st, 'u-febie', 'komitmen.list').menunggu_ttd, 1);
+  eq('komitmen.slot TTD Riki', C.slotTtd({ id: 'u-riki', buku: 'riki' }), 'riki');
+  eq('komitmen.slot TTD pasangan', C.slotTtd({ id: 'istri', buku: 'istri' }), 'febie');
+  // lihat juga
+  eq('komitmen.lihat juga definisi Selingkuh', by[16].lihat_juga.join(','), '4');
+  eq('komitmen.lihat juga definisi Lawan jenis (ayat + keterangan)', by[17].lihat_juga.join(','), '3,4');
+  eq('komitmen.lihat juga hanya untuk definisi', by[4].lihat_juga.length, 0);
+  // tidak menyentuh kalender
+  eq('komitmen.tidak membuat event kalender', Object.keys(st.calendar.events).length, 0);
+  // riwayat
+  var H = komCall(st, 'u-febie', 'komitmen.history', { pasal_id: 'p4' });
+  eq('komitmen.history terbaru dulu', H.riwayat.map(function (r) { return r.id; }).join(','), 'v4-3,v4-2,v4-1');
+  eq('komitmen.history judul lembar', H.riwayat[1].pengesahan_judul, 'Evaluasi Okt 2026');
+  ok('komitmen.history pranikah memuat keterangan', komCall(st, 'u-riki', 'komitmen.history', { pasal_id: 'p3' }).riwayat.some(function (r) { return r.jenis_item === 'keterangan'; }));
+  lempar('komitmen.history pasal tak dikenal', function () { komCall(st, 'u-riki', 'komitmen.history', { pasal_id: 'x' }); });
+  lempar('komitmen.history pasal terhapus', function () { komCall(st, 'u-riki', 'komitmen.history', { pasal_id: 'p20' }); });
+  lempar('komitmen.aksi fase berikutnya belum ada', function () { komCall(st, 'u-riki', 'komitmen.propose', {}); });
+  // kosong
+  var kosong = C.handle(C.memoryStore(seed()), { id: 'u-riki', nama: 'Riki', buku: 'riki' }, 'komitmen.list', {}, NOW);
+  eq('komitmen.tanpa data: daftar kosong', kosong.pasal.length + kosong.bab.length + kosong.berlaku, 0);
+})();
+
+// ---------------------------------------------------------------- komitmen: pencarian
+(function () {
+  var L = C.handle(C.memoryStore(komitmenSeed()), { id: 'u-riki', nama: 'Riki', buku: 'riki' }, 'komitmen.list', {}, NOW);
+  var cari = function (q) { return C.cariKomitmen(L.pasal, q); };
+  var nomor = function (q) { return cari(q).map(function (h) { return h.pasal.nomor; }).join(','); };
+  eq('cari.angka: nomor', C.nomorDariKueri('12'), 12);
+  eq('cari."pasal 12"', C.nomorDariKueri('pasal 12'), 12);
+  eq('cari."Psl. 12"', C.nomorDariKueri('Psl. 12'), 12);
+  eq('cari."  PASAL   7 "', C.nomorDariKueri('  PASAL   7 '), 7);
+  eq('cari."12a" bukan nomor', C.nomorDariKueri('12a'), 0);
+  eq('cari."12" → Pasal 12 paling atas', cari('12')[0].pasal.nomor, 12);
+  eq('cari."12" juga temukan angka 12 di isi', nomor('12'), '12,13');
+  eq('cari."pasal 12" → Pasal 12 paling atas', cari('pasal 12')[0].pasal.nomor, 12);
+  eq('cari."psl 12" → Pasal 12 paling atas', cari('psl 12')[0].pasal.nomor, 12);
+  eq('cari.nomor tingkat 0', cari('psl 12')[0].tingkat, 0);
+  eq('cari."3" tidak cocok "13"', nomor('3'), '3');
+  eq('cari.kosong', cari('   ').length, 0);
+  // isi
+  var lj = cari('lawan jenis');
+  eq('cari."lawan jenis": judul dulu, lalu isi & keterangan', lj.map(function (h) { return h.pasal.nomor; }).join(','), '17,3,4');
+  var h4 = lj.filter(function (h) { return h.pasal.nomor === 4; })[0];
+  eq('cari."lawan jenis": lokasi di ayat (1)', h4.lokasi[0].di + h4.lokasi[0].idx, 'ayat0');
+  var h3 = lj.filter(function (h) { return h.pasal.nomor === 3; })[0];
+  eq('cari."lawan jenis": lokasi di keterangan', h3.lokasi[0].di, 'keterangan');
+  eq('cari.huruf besar diabaikan', nomor('SELINGKUH'), nomor('selingkuh'));
+  eq('cari."selingkuh": definisi dulu, pemakai istilah sesudahnya', nomor('selingkuh'), '16,4');
+  eq('cari.kata kunci', cari('kencan')[0].pasal.nomor, 12);
+  eq('cari.kata kunci tingkat 2', cari('kencan')[0].tingkat, 2);
+  eq('cari."pasal 3 pranikah" → rujukan asli', nomor('pasal 3 pranikah'), '3');
+  eq('cari.rujukan: lokasi', cari('pasal 3 pranikah')[0].lokasi[0].di, 'rujukan');
+  eq('cari.semua kata harus ada', nomor('selingkuh kencan'), '');
+  eq('cari.tidak ketemu', cari('zzz').length, 0);
+  eq('cari.aksen diabaikan', C.normCari('Kafé'), 'kafe');
+  ok('cari.isi dicabut tetap bisa dicari (UI yang menyaring)', cari('aturan lama').length === 1);
+  eq('cari.ayatDari array', C.ayatDari(['a', 2]).join('|'), 'a|2');
+  eq('cari.ayatDari kosong', C.ayatDari('').length, 0);
+  var t0 = Date.now(); for (var i = 0; i < 200; i++) cari('lawan jenis'); 
+  ok('cari.cepat (200 kali < 1 detik)', Date.now() - t0 < 1000, (Date.now() - t0) + ' ms');
 })();
 
 console.log('\n' + lulus + ' cek lulus, ' + gagal + ' gagal.');

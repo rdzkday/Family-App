@@ -4,7 +4,7 @@
 # Tanpa PGURL: membuat cluster sementara dengan pg_ctlcluster (Ubuntu) di direktori temp.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SQL="$ROOT/supabase/migrations/20261116000000_kantong.sql"
+MIGRASI=("$ROOT"/supabase/migrations/*.sql)   # urut nama file = urut waktu
 TMP=""
 if [ -z "${PGURL:-}" ]; then
   TMP="$(mktemp -d)"
@@ -23,8 +23,8 @@ if [ -z "${PGURL:-}" ]; then
   end \$\$;"
 fi
 
-psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$SQL"
-psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$SQL"   # idempoten: boleh dijalankan dua kali
+for f in "${MIGRASI[@]}"; do psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$f"; done
+for f in "${MIGRASI[@]}"; do psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$f"; done   # idempoten: boleh dijalankan dua kali
 echo "✓ migrasi jalan dua kali tanpa error"
 
 q() { psql -qtA -v ON_ERROR_STOP=1 "$PGURL" -c "$1"; }
@@ -70,6 +70,28 @@ a.strictEqual(s.todo[0].tanggal, null); a.strictEqual(s.todo[0].selesai, false);
 a.strictEqual(s.akses.length, 1); a.ok(s.akses[0].token_hash.length === 64);
 ' "$MUAT"
 echo "✓ kantong_muat: snapshot lengkap, tipe kolom sesuai harapan core"
+
+# Komitmen: tabel ikut snapshot, nomor pasal unik, enum dijaga check constraint (isi sintetis)
+KOM='[{"tabel":"komitmen_bab","baris":{"id":"bab-1","nomor":"I","judul":"Contoh","urutan":1,"dibuat_at":"","dihapus":""}},
+      {"tabel":"komitmen_pasal","baris":{"id":"p-1","nomor":1,"bab_id":"bab-1","tipe":"definisi","judul":"Contoh","kata_kunci":"","sumber_asal":"pranikah","rujukan_asli":"","terkunci":true,"status":"berlaku","versi_berlaku_id":"v-1","dibuat_oleh":"riki","dibuat_at":"","diubah_at":"","dihapus":""}},
+      {"tabel":"komitmen_versi","baris":{"id":"v-1","pasal_id":"p-1","versi":1,"isi_ayat":"[\"[placeholder]\"]","alasan":"","jenis":"baru","sumber":"pranikah","evaluasi_id":"","pengesahan_id":"s-1","status":"berlaku","berlaku_sejak":"2026-12-01T20:00:00+07:00","dibuat_oleh":"riki","dibuat_at":""}},
+      {"tabel":"pengesahan","baris":{"id":"s-1","judul":"Contoh","jenis":"pranikah","evaluasi_id":"","ttd_riki":"M0 0L1 1","ttd_riki_at":"","ttd_febie":"","ttd_febie_at":"","isi_hash":"","status":"menunggu","dibuat_at":""}},
+      {"tabel":"evaluasi","baris":{"id":"e-1","tanggal":"2026-12-01","catatan":"","dibuat_oleh":"riki","selesai_at":""}}]'
+[ "$(q "select kantong_simpan('$KOM'::jsonb)")" = "5" ] || { echo "simpan komitmen harus 5 baris"; exit 1; }
+node -e '
+const s = JSON.parse(process.argv[1]); const a = require("assert");
+a.strictEqual(s.komitmen_pasal[0].nomor, 1); a.strictEqual(s.komitmen_pasal[0].terkunci, true);
+a.strictEqual(s.komitmen_bab[0].nomor, "I"); a.strictEqual(s.komitmen_versi[0].versi, 1);
+a.deepStrictEqual(JSON.parse(s.komitmen_versi[0].isi_ayat), ["[placeholder]"]);
+a.strictEqual(s.evaluasi[0].tanggal, "2026-12-01"); a.strictEqual(s.pengesahan[0].ttd_riki, "M0 0L1 1");
+a.ok(Array.isArray(s.komitmen_keterangan));
+' "$(q "select kantong_muat()")"
+DUP='[{"tabel":"komitmen_pasal","baris":{"id":"p-2","nomor":1,"bab_id":"bab-1","tipe":"kesepakatan","judul":"x","kata_kunci":"","sumber_asal":"app","rujukan_asli":"","terkunci":false,"status":"usulan","versi_berlaku_id":"","dibuat_oleh":"riki","dibuat_at":"","diubah_at":"","dihapus":""}}]'
+if q "select kantong_simpan('$DUP'::jsonb)" 2>/dev/null; then echo "nomor pasal dobel harus ditolak"; exit 1; fi
+BAD='[{"tabel":"komitmen_pasal","baris":{"id":"p-3","nomor":3,"bab_id":"","tipe":"lain","judul":"x","kata_kunci":"","sumber_asal":"app","rujukan_asli":"","terkunci":false,"status":"usulan","versi_berlaku_id":"","dibuat_oleh":"","dibuat_at":"","diubah_at":"","dihapus":""}}]'
+if q "select kantong_simpan('$BAD'::jsonb)" 2>/dev/null; then echo "tipe pasal tak dikenal harus ditolak"; exit 1; fi
+[ "$(psql -qtA "$PGURL" -c "set role anon; select count(*) from komitmen_pasal" 2>&1 | tr -d '\n' | grep -c 'permission denied\|^0$')" = "1" ] || { echo "anon tidak boleh membaca komitmen"; exit 1; }
+echo "✓ komitmen: 6 tabel di snapshot, nomor pasal unik, enum dijaga, anon ditolak"
 
 # RLS: anon tidak bisa baca apa pun, tidak bisa memanggil RPC
 [ "$(psql -qtA "$PGURL" -c "set role anon; select count(*) from transaksi" 2>&1 | tr -d '\n' | grep -c 'permission denied\|^0$')" = "1" ] || { echo "anon harus ditolak/kosong"; exit 1; }

@@ -21,6 +21,17 @@ function mockDb() {
     kantong: [{ id: 'bca', nama: 'BCA', jenis: 'Debit', buku: 'riki', saldo_awal: 1000000, per_tanggal: '2026-10-31', limit: 0, aktif: true, urutan: 1 },
       { id: 'kas-rt', nama: 'Dompet RT', jenis: 'Debit', buku: 'rt', saldo_awal: 0, per_tanggal: '2026-10-31', limit: 0, aktif: true, urutan: 2 }],
     budget: [], transaksi: [], todo: [],
+    // Komitmen: bentuk persis dari Postgres (nomor pasal integer, terkunci boolean). Isi placeholder.
+    komitmen_bab: [{ id: 'bab-1', nomor: 'I', judul: 'Perjanjian Pranikah', urutan: 1, dibuat_at: '', dihapus: '' }],
+    komitmen_pasal: [{ id: 'p-1', nomor: 1, bab_id: 'bab-1', tipe: 'kesepakatan', judul: 'Contoh', kata_kunci: 'harta', sumber_asal: 'pranikah',
+      rujukan_asli: 'Pasal 1 Perjanjian Pranikah', terkunci: true, status: 'berlaku', versi_berlaku_id: 'v-1', dibuat_oleh: 'riki', dibuat_at: '', diubah_at: '', dihapus: '' }],
+    komitmen_versi: [{ id: 'v-1', pasal_id: 'p-1', versi: 1, isi_ayat: '["[placeholder] ayat satu"]', alasan: '', jenis: 'baru', sumber: 'pranikah',
+      evaluasi_id: '', pengesahan_id: 's-1', status: 'berlaku', berlaku_sejak: '2026-12-01T20:00:00+07:00', dibuat_oleh: 'riki', dibuat_at: '' }],
+    komitmen_keterangan: [],
+    pengesahan: [{ id: 's-1', judul: 'Perjanjian Pranikah', jenis: 'pranikah', evaluasi_id: '', ttd_riki: 'M0 0L1 1', ttd_riki_at: 'x', ttd_febie: 'M1 1L0 0',
+      ttd_febie_at: 'y', isi_hash: '', status: 'sah', dibuat_at: '' }, { id: 's-2', judul: 'Usulan', jenis: 'tunggal', evaluasi_id: '', ttd_riki: 'M0 0',
+      ttd_riki_at: 'x', ttd_febie: '', ttd_febie_at: '', isi_hash: '', status: 'menunggu', dibuat_at: '' }],
+    evaluasi: [],
     akses: [{ user_id: 'riki', token_hash: sha('r'.repeat(40)) }, { user_id: 'istri', token_hash: sha('i'.repeat(40)) }]
   };
   const calls = [];
@@ -213,6 +224,18 @@ function mockGoogle() {
     const rusak = { ...deps, fetch: async (url, opt) => url.endsWith('kantong_simpan') ? { ok: false, status: 500, text: async () => 'boom' } : db.fetch(url, opt) };
     const r = await call(R, 'tx.save', { ...tx1, id: 'tx-9' }, rusak);
     assert.strictEqual(r.ok, false); assert.match(r.error, /Gagal menyimpan/);
+  });
+  await t('komitmen.list lewat Edge Function: tipe kolom benar, kotak TTD per user', async () => {
+    const d = ok(await call(R, 'komitmen.list', {}));
+    const p = d.pasal[0];
+    assert.strictEqual(p.nomor, 1); assert.strictEqual(p.terkunci, true); assert.strictEqual(d.bab[0].nomor, 'I');
+    assert.deepStrictEqual(p.ayat, ['[placeholder] ayat satu']);
+    assert.strictEqual(d.pengesahan['s-1'].ttd_febie, 'M1 1L0 0');
+    assert.strictEqual(d.menunggu_ttd, 0, 'Riki sudah TTD lembar s-2');
+    assert.strictEqual(ok(await call(I, 'komitmen.list', {})).menunggu_ttd, 1, 'Febie belum TTD lembar s-2');
+    assert.strictEqual(keDb('KomitmenPasal', { nomor: '7', terkunci: 'TRUE' }).nomor, 7);
+    assert.strictEqual(keDb('KomitmenBab', { nomor: 'IV' }).nomor, 'IV');
+    assert.strictEqual(dariDb('KomitmenVersi', { versi: 2 }).versi, 2);
   });
   resetTokenCache();
   console.log(`\n${lulus} test lulus`);
