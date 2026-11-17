@@ -2,14 +2,18 @@
  * Adapter Google Calendar untuk to-do, dipakai KantongCore.syncTodoCalendar lewat store.calendar:
  *   upsert(eventId, spec) -> eventId     remove(eventId)
  * Memakai service account (JWT RS256 lewat WebCrypto) + Calendar REST v3. Tanpa library.
- * Kalender "Rumah Kita" dibuat manual di akun Riki, lalu di-share ke email service account
- * dengan izin "Make changes to events". Lihat kantong/PANDUAN.md.
+ * Kalender "Rumah Kita":
+ *   - TODO_CAL_ID diisi  -> pakai kalender itu (dibuat manual, di-share ke service account).
+ *   - TODO_CAL_ID kosong -> service account memiliki kalendernya sendiri. Dibuat saat email pertama
+ *     dimasukkan di Pengaturan app (siapkan/bagikan), dicari lagi lewat calendarList (tanpa tabel baru).
  */
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const API = 'https://www.googleapis.com/calendar/v3';
 const TZ = 'Asia/Jakarta';
 // id warna Google Calendar: 9 blueberry, 4 flamingo, 10 basil, 6 tangerine, 5 banana, 8 graphite
 const WARNA = ['9', '4', '10', '6'];
+export const NAMA_KALENDER = 'Rumah Kita';
+export const BELUM_SIAP = 'Google Calendar belum disiapkan: masukkan email di Pengaturan > Agenda';
 
 function b64url(bytes) {
   let s = '';
@@ -37,14 +41,35 @@ export async function buatJwt(sa, now, cryptoImpl) {
 let cache = { token: '', exp: 0 };
 export function resetTokenCache() { cache = { token: '', exp: 0 }; }
 
-// cfg: { saJson, calendarId, fetch, crypto?, now? } -> adapter atau null kalau belum disetel
+// cfg: { saJson, calendarId?, fetch, crypto?, now? } -> adapter atau null kalau kunci service account belum disetel
 export function createCalendarAdapter(cfg) {
-  if (!cfg || !cfg.saJson || !cfg.calendarId) return null;
+  if (!cfg || !cfg.saJson) return null;
   let sa;
   try { sa = typeof cfg.saJson === 'string' ? JSON.parse(cfg.saJson) : cfg.saJson; } catch (e) { return null; }
   if (!sa.client_email || !sa.private_key) return null;
   const f = cfg.fetch, cryptoImpl = cfg.crypto || globalThis.crypto, now = cfg.now || (() => Date.now());
-  const calUrl = API + '/calendars/' + encodeURIComponent(cfg.calendarId) + '/events';
+  let calId = cfg.calendarId || '';
+  const calBase = () => API + '/calendars/' + encodeURIComponent(calId);
+
+  // cari kalender milik service account; buat=true -> buat kalau belum ada
+  async function pastikanKalender(buat) {
+    if (calId) return calId;
+    const l = await call('GET', API + '/users/me/calendarList?minAccessRole=owner&maxResults=250');
+    if (!l.ok) throw new Error('Google Calendar ' + l.status + ': ' + pesan(l));
+    const ada = ((l.json && l.json.items) || []).find((c) => c.summary === NAMA_KALENDER);
+    if (ada) return (calId = ada.id);
+    if (!buat) throw new Error(BELUM_SIAP);
+    const c = await call('POST', API + '/calendars', { summary: NAMA_KALENDER, timeZone: TZ, description: 'To-do dari app keluarga' });
+    if (!c.ok || !c.json || !c.json.id) throw new Error('Gagal membuat kalender: ' + c.status + ' ' + pesan(c));
+    return (calId = c.json.id);
+  }
+  async function aksesUser() {
+    const r = await call('GET', calBase() + '/acl');
+    if (!r.ok) throw new Error('Google Calendar ' + r.status + ': ' + pesan(r));
+    return ((r.json && r.json.items) || [])
+      .filter((a) => a.scope && a.scope.type === 'user' && a.scope.value && a.scope.value.toLowerCase() !== sa.client_email.toLowerCase())
+      .map((a) => ({ email: a.scope.value.toLowerCase(), role: a.role }));
+  }
 
   async function token() {
     if (cache.token && cache.exp > now() + 60000) return cache.token;
@@ -78,7 +103,30 @@ export function createCalendarAdapter(cfg) {
     return b;
   }
   return {
+    serviceEmail: sa.client_email,
+    // status untuk Pengaturan: { siap, calendarId, akses:[{email, role}] }
+    async status() {
+      try { await pastikanKalender(false); }
+      catch (e) { if (String(e.message) === BELUM_SIAP) return { siap: false, calendarId: '', akses: [] }; throw e; }
+      return { siap: true, calendarId: calId, akses: await aksesUser() };
+    },
+    // bagikan kalender ke email (izin ubah event); Google mengirim email undangan
+    async bagikan(email) {
+      await pastikanKalender(true);
+      const r = await call('POST', calBase() + '/acl?sendNotifications=true',
+        { role: 'writer', scope: { type: 'user', value: email } });
+      if (!r.ok) throw new Error('Gagal membagikan ke ' + email + ': ' + r.status + ' ' + pesan(r));
+      return { siap: true, calendarId: calId, akses: await aksesUser() };
+    },
+    async cabut(email) {
+      await pastikanKalender(false);
+      const r = await call('DELETE', calBase() + '/acl/' + encodeURIComponent('user:' + email));
+      if (!r.ok && r.status !== 404 && r.status !== 410) throw new Error('Gagal mencabut ' + email + ': ' + r.status + ' ' + pesan(r));
+      return { siap: true, calendarId: calId, akses: await aksesUser() };
+    },
     async upsert(eventId, spec) {
+      await pastikanKalender(false);
+      const calUrl = calBase() + '/events';
       const b = body(spec);
       if (eventId) {
         const r = await call('PUT', calUrl + '/' + encodeURIComponent(eventId), b);
@@ -91,6 +139,8 @@ export function createCalendarAdapter(cfg) {
       return c.json.id;
     },
     async remove(eventId) {
+      await pastikanKalender(false);
+      const calUrl = calBase() + '/events';
       const r = await call('DELETE', calUrl + '/' + encodeURIComponent(eventId));
       if (!r.ok && r.status !== 404 && r.status !== 410) throw new Error('Google Calendar ' + r.status + ': ' + pesan(r));
     }

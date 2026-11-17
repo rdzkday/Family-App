@@ -62,6 +62,7 @@ function todoStatusHtml(t) {
     var sedang = S.syncing || !S.lastError;
     return '<span class="td-st wait">' + ICON.clock + waktu + ' · ' + (sedang ? 'Menyinkronkan…' : 'Menunggu koneksi') + '</span>';
   }
+  if (C.todoTidakDikirimLewat(t, todayISO())) return '<span class="td-st">' + ICON.cal + waktu + ' · Tidak dikirim (sudah lewat)</span>';
   if (t.gcal_status === 'gagal') return '<span class="td-st bad">' + ICON.calx + waktu + '</span>';
   if (t.gcal_status === 'ok') return '<span class="td-st ok">' + ICON.cal + waktu + '</span>';
   return '<span class="td-st">' + ICON.cal + waktu + '</span>';
@@ -73,11 +74,12 @@ function todoRow(t) {
   if (t.pemilik !== me().id) tags += '<span class="tag" style="--c:' + p.warna + '"><i></i>' + esc(p.nama) + '</span>';
   if (selesai && t.pemilik === C.TODO_BERSAMA && t.selesai_oleh) tags += '<span class="tag">oleh ' + esc(userName(t.selesai_oleh)) + '</span>';
   var gagal = !t._pending && t.gcal_status === 'gagal' && C.todoPerluEvent(t);
+  var lewatNetral = gagal && C.todoTidakDikirimLewat(t, todayISO());
   return '<div class="todo-row' + (selesai ? ' done' : '') + (todoTerlewat(t) ? ' late' : '') + '">' +
     '<button type="button" class="todo-chk" role="checkbox" aria-checked="' + selesai + '" data-tdone="' + esc(t.id) + '" aria-label="' + (selesai ? 'Batalkan selesai' : 'Tandai selesai') + ': ' + esc(t.judul) + '"' + (bisa ? '' : ' disabled') + '></button>' +
     '<div class="todo-main" role="button" tabindex="0" data-todo="' + esc(t.id) + '"><span class="t1">' + esc(t.judul) + '</span>' +
     '<span class="t2">' + todoStatusHtml(t) + tags + '</span>' +
-    (gagal ? '<button type="button" class="td-retry" data-tretry="' + esc(t.id) + '"' + (bisa ? '' : ' disabled') + '>' + ICON.calx + 'Gagal masuk kalender. Coba lagi</button>' : '') +
+    (gagal ? '<button type="button" class="td-retry" data-tretry="' + esc(t.id) + '"' + (bisa ? '' : ' disabled') + '>' + (lewatNetral ? ICON.cal + 'Kirim ke kalender' : ICON.calx + 'Gagal masuk kalender. Coba lagi') + '</button>' : '') +
     '</div></div>';
 }
 function catatanRow(t) {

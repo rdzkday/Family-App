@@ -833,5 +833,20 @@ function komCall(st, uid, action, payload) {
   eq('4b: tidak ada lembar tersisa untuk pasal baru', P(b.nomor).lembar_usulan.length, 0);
 })();
 
+(function () {
+  var T = '2026-11-17', dasar = { tipe: 'todo', judul: 'x', gcal_status: 'gagal', gcal_error: 'Google Calendar belum disiapkan' };
+  var kemarin = Object.assign({}, dasar, { tanggal: '2026-11-16' }), besok = Object.assign({}, dasar, { tanggal: '2026-11-18' });
+  var hariIni = Object.assign({}, dasar, { tanggal: '2026-11-17' }), selesai = Object.assign({}, besok, { selesai: true });
+  eq('sync massal: to-do kemarin tidak ikut', C.todoSyncMassal(kemarin, T), false);
+  eq('sync massal: to-do besok ikut', C.todoSyncMassal(besok, T), true);
+  eq('sync massal: to-do hari ini ikut', C.todoSyncMassal(hariIni, T), true);
+  eq('sync massal: to-do selesai tidak ikut', C.todoSyncMassal(selesai, T), false);
+  eq('sync massal: pending tidak ikut', C.todoSyncMassal(Object.assign({ _pending: true }, besok), T), false);
+  eq('sync massal: status ok tidak ikut', C.todoSyncMassal(Object.assign({}, besok, { gcal_status: 'ok' }), T), false);
+  eq('lewat belum disiapkan tampil netral', C.todoTidakDikirimLewat(kemarin, T), true);
+  eq('mendatang belum disiapkan tetap error', C.todoTidakDikirimLewat(besok, T), false);
+  eq('lewat gagal 403 tetap error', C.todoTidakDikirimLewat(Object.assign({}, kemarin, { gcal_error: 'Google Calendar 403' }), T), false);
+})();
+
 console.log('\n' + lulus + ' cek lulus, ' + gagal + ' gagal.');
 process.exit(gagal ? 1 : 0);

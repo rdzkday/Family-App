@@ -114,28 +114,97 @@ var AturKantongFitur = {
 };
 
 // ---------- Agenda ----------
+// S.kal = hasil kalender.status dari server: { siap, kunci, akses:[{email, role}] }
+function muatKalender(force) {
+  if (!S.conn || S.conn.mode === 'demo') return Promise.resolve(null);
+  if (S.kal && !force) return Promise.resolve(S.kal);
+  if (S.kalMuat) return S.kalMuat;
+  S.kalMuat = rpc('kalender.status').then(function (d) { S.kal = d; return d; })
+    .catch(function () { return null; })
+    .then(function (d) { S.kalMuat = null; return d; });
+  return S.kalMuat;
+}
+function kirimUlangMendatang() {
+  var today = todayISO();
+  var antre = todos().filter(function (t) { return C.todoSyncMassal(t, today); });
+  antre.forEach(function (t) { enqueue('todo.sync', { id: t.id }); });
+  return antre.length;
+}
 var AturAgenda = {
   render: function (el) {
-    var f = todoFilter();
+    var f = todoFilter(), kal = S.kal;
+    var today = todayISO();
     var timed = todos().filter(function (t) { return C.todoPerluEvent(t); });
-    var gagal = timed.filter(function (t) { return !t._pending && t.gcal_status === 'gagal'; });
+    var gagal = timed.filter(function (t) { return C.todoSyncMassal(t, today); });
+    var nEmail = kal && kal.akses ? kal.akses.length : 0;
     var status = S.conn.mode === 'demo' ? 'Mode demo, tidak terhubung ke Google Calendar'
-      : gagal.length && /belum disiapkan/i.test(gagal[0].gcal_error || '') ? 'Belum disiapkan (lihat PANDUAN §7)'
-      : gagal.length ? gagal.length + ' to-do gagal masuk kalender' : 'Tersinkron ke kalender "Rumah Kita"';
+      : kal && !kal.kunci ? 'Kunci robot Google belum diisi di server (GOOGLE_SA_JSON)'
+      : kal && !kal.siap ? 'Belum terhubung. Masukkan email Google untuk mulai'
+      : gagal.length && /belum disiapkan/i.test(gagal[0].gcal_error || '') ? 'Belum disiapkan. Masukkan email Google'
+      : gagal.length ? gagal.length + ' to-do mendatang gagal masuk kalender' : 'Tersinkron ke kalender "Rumah Kita"';
+    var subEmail = !kal ? 'Memuat…' : nEmail ? kal.akses.map(function (a) { return a.email; }).join(', ') : 'Belum ada email';
     el.innerHTML = '<div class="atur-lbl">Filter awal To-do & Catatan</div><div class="seg" role="group" aria-label="Filter awal">' +
         [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) { return '<button type="button" data-ag-f="' + x[0] + '" aria-pressed="' + (f === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>' +
-      aturBaris('Google Calendar', esc(status), gagal.length ? '<span class="atur-badge bad">Coba lagi</span>' : '', ' data-ag="gcal"') +
+      aturBaris('Google Calendar', esc(status), gagal.length && kal && kal.siap ? '<span class="atur-badge bad">Coba lagi</span>' : '', ' data-ag="gcal"') +
+      (S.conn.mode === 'demo' ? '' : aturBaris('Email penerima kalender', esc(subEmail), '', ' data-ag="email"')) +
       aturBaris('Jadwalkan evaluasi bulanan', 'Pengingat muncul di Beranda ' + C.EVALUASI_PENGINGAT_JAM + ' jam sebelumnya', '', ' data-ag="eval"') +
       aturBaris('Buka Agenda', 'To-do, catatan, jadwal', '', ' data-ag="buka"');
     $$('[data-ag-f]', el).forEach(function (b) { b.addEventListener('click', function () { S.prefs.todoFilter = b.getAttribute('data-ag-f'); persist(); refresh(); AturAgenda.render(el); }); });
     $$('[data-ag]', el).forEach(function (b) { b.addEventListener('click', function () {
       var a = b.getAttribute('data-ag');
-      if (a === 'gcal') { gagal.forEach(function (t) { enqueue('todo.sync', { id: t.id }); }); if (!gagal.length) sync(); toast('Menyinkronkan…'); }
+      if (a === 'gcal') {
+        if (kal && (!kal.siap || !kal.kunci)) { openKalenderSheet(el); return; }
+        if (!kirimUlangMendatang()) sync(); toast('Menyinkronkan…');
+      }
+      if (a === 'email') openKalenderSheet(el);
       if (a === 'eval') openTodoSheet(null, { tipe: 'evaluasi', pemilik: C.TODO_BERSAMA });
       if (a === 'buka') location.href = FITUR_URL.agenda;
     }); });
+    if (!kal) muatKalender().then(function (d) { if (d && el.isConnected) AturAgenda.render(el); });
   }
 };
+
+// Sheet: masukkan email Google -> kalender "Rumah Kita" dibagikan ke email itu (izin ubah event).
+function openKalenderSheet(atur) {
+  openSheet('Hubungkan Google Calendar', function (sh) {
+    var sibuk = false;
+    function gambar(err) {
+      var kal = S.kal || { akses: [] };
+      sh.el.innerHTML =
+        (kal.kunci === false ? '<div class="hint" style="color:var(--todo-bad)">Kunci robot Google (GOOGLE_SA_JSON) belum diisi di Supabase. Isi dulu, lalu buka lagi.</div>' : '') +
+        '<div class="hint">Masukkan email Google. Kalender "Rumah Kita" dibagikan ke email itu dan Google mengirim undangan. Buka undangannya lalu klik <b>Add this calendar</b>.</div>' +
+        (kal.akses && kal.akses.length ? '<div class="atur-lbl">Sudah terhubung</div>' + kal.akses.map(function (a) {
+          return '<div class="field row2" style="align-items:center"><div>' + esc(a.email) + '</div>' +
+            '<button type="button" class="btn small ghost" data-cabut="' + esc(a.email) + '"' + (sibuk ? ' disabled' : '') + '>Hapus</button></div>';
+        }).join('') : '') +
+        '<div class="field"><label for="kal-email">Email Google</label><input id="kal-email" class="input" type="email" inputmode="email" autocomplete="email" placeholder="nama@gmail.com"' + (sibuk ? ' disabled' : '') + '></div>' +
+        (err ? '<div class="hint" style="color:var(--todo-bad)">' + esc(err) + '</div>' : '') +
+        '<button type="button" class="btn" id="kal-add"' + (sibuk || kal.kunci === false ? ' disabled' : '') + '>' + (sibuk ? 'Menghubungkan…' : 'Bagikan kalender') + '</button>' +
+        '<div class="hint">Atur pengingat 30 menit sendiri di Google Calendar: Settings › Rumah Kita › Event notifications. Setelan ini per orang.</div>';
+      var inp = $('#kal-email', sh.el);
+      $('#kal-add', sh.el).addEventListener('click', function () { jalan('kalender.bagikan', inp.value); });
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') jalan('kalender.bagikan', inp.value); });
+      $$('[data-cabut]', sh.el).forEach(function (b) { b.addEventListener('click', function () {
+        if (confirm('Hapus akses ' + b.getAttribute('data-cabut') + ' ke kalender "Rumah Kita"?')) jalan('kalender.cabut', b.getAttribute('data-cabut'));
+      }); });
+    }
+    function jalan(aksi, email) {
+      email = String(email || '').trim();
+      if (aksi === 'kalender.bagikan' && !/^\S+@\S+\.\S+$/.test(email)) { gambar('Alamat email tidak valid'); return; }
+      sibuk = true; gambar();
+      rpc(aksi, { email: email }).then(function (d) {
+        S.kal = d; sibuk = false; gambar();
+        if (aksi === 'kalender.bagikan') {
+          var n = kirimUlangMendatang();
+          toast('Undangan dikirim ke ' + email + (n ? '. ' + n + ' to-do mendatang dikirim ke kalender' : ''));
+        } else toast('Akses dihapus');
+        if (atur && atur.isConnected) AturAgenda.render(atur);
+      }, function (e) { sibuk = false; gambar(e.message || 'Gagal'); });
+    }
+    gambar();
+    muatKalender(true).then(function (d) { if (d && !sh.closed) gambar(); });
+  });
+}
 
 // ---------- Komitmen ----------
 var AturKomitmen = {
