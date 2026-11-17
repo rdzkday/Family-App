@@ -10,19 +10,28 @@ Data keuangan pribadi tidak disertakan di repo ini.
 
 ---
 
-## Yang sudah jalan
+## Fitur aktif — versi terbaru (v1.6.0 · 17 Nov 2026)
 
-| Status | Bagian |
-|---|---|
-| ✅ Live | Database Supabase (8 tabel, RLS, 3 fungsi RPC) |
-| ✅ Live | Edge Function `kantong` (API, kode akses per user) |
-| ✅ Live | PWA di Vercel: Beranda, Kantong, Agenda, Komitmen, Daily Mood |
-| ✅ Live | Offline: catatan tersimpan di HP, dikirim saat online |
-| ⏳ Perlu setup sekali | Sync to-do ke Google Calendar "Rumah Kita" (secret belum diisi, PANDUAN §7) |
-| 🆕 Baru | Beranda (`/`): ringkasan Kantong, to-do & catatan, pengingat evaluasi, mood → Daily Mood, **Pengaturan** semua fitur (expand-collapse) |
-| 🧪 Fase 4a | Komitmen (`/komitmen/`): baca & cari pasal, modul Kesepakatan + Definisi A–Z. Usul/ubah/TTD menyusul. Brief: `claude/komitmen-brief.md` |
-| 🆕 Baru | Agenda (`/agenda/`): To-do, Catatan, Jadwal |
-| 🆕 Baru | Daily Mood (`/daily-mood/`, dulu Ruang Catat): jurnal mood di Supabase (tabel `jurnal`, pribadi). Terima `?mood=` dari Beranda |
+| Status | Fitur | Bisa apa |
+|---|---|---|
+| ✅ Live | **Beranda** (`/`) | Sapaan + status sinkron, pintasan ke semua fitur, ringkasan Kantong (sisa dompet RT, budget terpakai, saldo pribadi, 3 transaksi terakhir), catat transaksi cepat, to-do & catatan + tambah cepat, pengingat evaluasi bulanan, pilih mood → lanjut ke Daily Mood |
+| ✅ Live | **Pengaturan terpusat** (di Beranda) | Satu kartu, expand-collapse per fitur: Umum (tema, akun, sinkron, putuskan koneksi) · Kantong (budget, kantong, kategori, setoran di grafik) · Agenda (filter awal, status Google Calendar, jadwalkan evaluasi) · Komitmen · Daily Mood (profil, kondisi, prompt, cadangan) |
+| ✅ Live | **Kantong** (`/kantong/`) | Catat pengeluaran/pemasukan/transfer, 3 buku (Riki, Febie, Rumah Tangga), budget bulanan, talangan, reimburse, Ringkasan (donut per kategori), Riwayat + pencarian |
+| ✅ Live | **Agenda** (`/agenda/`) | Tab To-do, Catatan, Jadwal. Pemilik Riki/Febie/Bersama, filter Untukku/Bersama/Semua, atur tanggal-jam-durasi |
+| ✅ Live | **Komitmen** (`/komitmen/`) | Baca & cari pasal kesepakatan (Kesepakatan + Definisi A–Z), filter (pranikah, usulan, dicabut), riwayat versi & tanda tangan. **Baru:** usul pasal baru & tarik usulan, tersambung ke server |
+| ✅ Live | **Daily Mood** (`/daily-mood/`, dulu Ruang Catat) | Jurnal mood harian + prompt (acak/custom), kalender mood, ringkasan periode → unduh/bagikan PDF, cadangan & pulihkan. Data pribadi di Supabase (pasangan tidak bisa baca) |
+| ✅ Live | **Offline & sinkron** | Input masuk antrean di HP, terkirim otomatis saat online, tanpa data dobel |
+| ✅ Live | **Tema & mode demo** | Gelap/terang berlaku di semua fitur. Mode demo pakai data contoh tanpa server |
+| ⏳ Perlu setup sekali | **Google Calendar "Rumah Kita"** | Sync to-do berwaktu ke kalender. Secret Google belum diisi di Supabase (PANDUAN §7) |
+| 🔜 Menyusul | Komitmen | Ubah pasal & tanda tangan dari app |
+
+### Yang baru di rilis ini
+- Nama app jadi **Family App** (fitur keuangan tetap bernama Kantong).
+- Pengaturan semua fitur pindah ke Beranda (expand-collapse); tab Pengaturan Kantong & halaman Setelan dihapus.
+- Agenda jadi halaman sendiri; Ruang Catat jadi **Daily Mood** dan sinkron ke Supabase.
+- Komitmen: usul & tarik pasal baru.
+- Repo dirapikan per fitur; file redundan dihapus (config Cloudflare, font duplikat).
+- Backend: database 4 migrasi terpasang, Edge Function `kantong` v14.
 
 ---
 
@@ -97,11 +106,11 @@ Data keuangan pribadi tidak disertakan di repo ini.
 ## Update & tes
 
 ```bash
-node kantong/tools/test_core.js        # 250 cek logika bersama
-node kantong/tools/test_supabase.js    # 18 tes Edge Function (DB & Google tiruan)
+node kantong/tools/test_core.js        # 259 cek logika bersama
+node kantong/tools/test_supabase.js    # 19 tes Edge Function (DB & Google tiruan)
 bash kantong/tools/test_sql.sh         # skema SQL di Postgres lokal
 ```
 
 - Ubah `public/shared/core.js` → `node kantong/tools/build_core.js` (salinan untuk Edge Function).
-- Deploy API: `supabase functions deploy kantong --no-verify-jwt` atau `SUPABASE_ACCESS_TOKEN=sbp_xxx node kantong/tools/deploy_supabase.js serskylzlevhjidqrvjm`.
+- Deploy API: `supabase functions deploy kantong --no-verify-jwt` atau `SUPABASE_ACCESS_TOKEN=sbp_xxx node kantong/tools/deploy_supabase.js serskylzlevhjidqrvjm` (di sesi Claude Code cloud: tanpa token, tambah `NODE_USE_ENV_PROXY=1`).
 - PWA: push ke `main`.
