@@ -115,6 +115,8 @@ export async function handleRequest(rawBody, deps) {
   if (!u) return { ok: false, error: 'Sesi berakhir, silakan masuk lagi', code: 'AUTH' };
   const user = { id: u.id, nama: u.nama, buku: u.buku };
 
+  if (typeof body.action === 'string' && body.action.indexOf('kalender.') === 0) return aksiKalender(deps.calendar, body.action, body.payload || {});
+
   const planner = calendarPlanner();
   if (deps.calendar) store.calendar = planner.sync;
 
@@ -127,6 +129,24 @@ export async function handleRequest(rawBody, deps) {
   try { await store.flush(); }
   catch (e) { return { ok: false, error: 'Gagal menyimpan ke database: ' + e.message }; }
   return { ok: true, data };
+}
+
+// Pengaturan > Agenda > Google Calendar: lihat / bagikan / cabut akses kalender "Rumah Kita" per email.
+// Semua user yang login boleh (hanya Riki & Febie punya akun).
+const EMAIL_RE = /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[a-z]{2,}$/i;
+export async function aksiKalender(calendar, action, p) {
+  if (!calendar) return { ok: true, data: { siap: false, kunci: false, akses: [] } };
+  const email = String(p.email || '').trim().toLowerCase();
+  try {
+    let st;
+    if (action === 'kalender.status') st = await calendar.status();
+    else if (action === 'kalender.bagikan' || action === 'kalender.cabut') {
+      if (email.length > 254 || !EMAIL_RE.test(email)) return { ok: false, error: 'Alamat email tidak valid' };
+      if (email === String(calendar.serviceEmail || '').toLowerCase()) return { ok: false, error: 'Itu email robot, pakai email Google kamu' };
+      st = action === 'kalender.bagikan' ? await calendar.bagikan(email) : await calendar.cabut(email);
+    } else return { ok: false, error: 'Aksi tidak dikenal' };
+    return { ok: true, data: { ...st, kunci: true } };
+  } catch (e) { return { ok: false, error: String(e && e.message ? e.message : e).slice(0, 200) }; }
 }
 
 export function corsHeaders(origin) {
