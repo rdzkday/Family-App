@@ -9,6 +9,12 @@
   --font-body:"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: dark;
 }
+:root[data-theme="light"]{
+  --bg:#ECEEF2; --app:#F5F6F8; --surface:#FFFFFF; --ink:#14171C; --muted:#5B6472; --line:#E2E5EB;
+  --accent:#6550C8; --accent-2:#5241B0; --accent-soft:#EEEAFB; --on-accent:#FFFFFF;
+  --m1:#EF5B63; --m2:#F28A2E; --m3:#E9B92C; --m4:#3FB873; --m5:#2E9E6B; --face:#14171C;
+  color-scheme: light;
+}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;display:flex;justify-content:center;overscroll-behavior:none}

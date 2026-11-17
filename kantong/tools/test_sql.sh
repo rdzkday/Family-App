@@ -63,6 +63,10 @@ ROWS3='[{"tabel":"todo","baris":{"id":"c-1","judul":"Catatan","pemilik":"bersama
 [ "$(q "select kantong_simpan('$ROWS3'::jsonb)")" = "1" ] || { echo "kantong_simpan tabel Beranda gagal"; exit 1; }
 [ "$(q "select coalesce(tipe,'') from todo where id='td-1'")" = "" ] || { echo "todo lama: tipe kosong (core membacanya sebagai todo)"; exit 1; }
 echo "✓ catatan tersimpan; to-do versi lama tetap bisa disimpan (tipe kosong = todo)"
+JR='[{"tabel":"jurnal","baris":{"id":"riki|_pengaturan","pemilik":"riki","jenis":"pengaturan","tanggal":null,"isi":"{}","diubah":"x","dihapus":""}},{"tabel":"jurnal","baris":{"id":"riki|2026-11-18","pemilik":"riki","jenis":"entri","tanggal":"2026-11-18","isi":"{}","diubah":"x","dihapus":""}}]'
+[ "$(q "select kantong_simpan('$JR'::jsonb)")" = "2" ] || { echo "simpan jurnal gagal"; exit 1; }
+[ "$(q "select jsonb_array_length(kantong_muat()->'jurnal')")" = "2" ] || { echo "jurnal harus ada di snapshot"; exit 1; }
+echo "✓ jurnal Ruang Catat: tersimpan & ikut snapshot"
 
 # kantong_muat: snapshot semua tabel, tanggal sebagai string, null tetap null
 MUAT="$(q "select kantong_muat()")"

@@ -1,4 +1,6 @@
 (function(){
+  // tema dari Beranda > Setelan (sama untuk semua halaman)
+  try { if (JSON.parse(localStorage.getItem('k_theme')) === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
   const KEY = 'ruang-catat-v2';
   const MOODS = [
     {v:1,label:'Berat',c:'var(--m1)',hex:'#F0646B'},
@@ -71,8 +73,97 @@
   function fresh(){ return {profile:null, entries:seedEntries(), custom:['Apa yang ingin kamu bahas di sesi berikutnya?','Kapan hari ini kamu merasa paling tenang?'], randomToo:true, demo:true}; }
 
   let state;
-  try { state = JSON.parse(localStorage.getItem(KEY)) || fresh(); } catch(e){ state = fresh(); }
-  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){ toast('Gagal menyimpan, memori perangkat penuh?'); } }
+  try { state = JSON.parse(localStorage.getItem(KEY)) || null; } catch(e){ state = null; }
+  if (!state) { state = fresh(); try { const c = JSON.parse(localStorage.getItem('k_conn')); if (c && c.mode === 'remote') { state.entries = {}; state.demo = false; } } catch (e) {} }
+  function simpanLokal(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){ toast('Gagal menyimpan, memori perangkat penuh?'); } }
+  function save(){ simpanLokal(); antreKirim(); }
+
+  // ================= Sinkron ke Supabase (pribadi) =================
+  // Pakai kode koneksi yang sama dengan Beranda/Kantong. Satu baris per hari + satu baris pengaturan.
+  // Perubahan masuk antrean dulu (jalan offline), dikirim saat online. Data contoh tidak pernah dikirim.
+  const RC_CONN = (() => { try { return JSON.parse(localStorage.getItem('k_conn')); } catch (e) { return null; } })();
+  const RC_USER = (() => { try { const b = JSON.parse(localStorage.getItem('k_boot')); return b && b.user ? b.user.id : ''; } catch (e) { return ''; } })();
+  const REMOTE = !!(RC_CONN && RC_CONN.mode === 'remote' && RC_USER);
+  const SYNC_KEY = 'ruang-catat-sync';
+  let sy = { snap: {}, outbox: [], at: 0 };
+  try { sy = Object.assign(sy, JSON.parse(localStorage.getItem(SYNC_KEY)) || {}); } catch (e) {}
+  function sySave(){ try { localStorage.setItem(SYNC_KEY, JSON.stringify(sy)); } catch (e) {} }
+  // keadaan lokal sebagai peta kunci -> JSON (yang dibandingkan dengan snapshot terakhir dari server)
+  function petaLokal(){
+    const m = {};
+    if (state.profile) m._pengaturan = JSON.stringify({ profile: state.profile, custom: state.custom || [], randomToo: state.randomToo !== false, lastBackup: state.lastBackup || '' });
+    if (!state.demo) Object.keys(state.entries || {}).forEach(k => { m[k] = JSON.stringify(state.entries[k]); });
+    return m;
+  }
+  function antreKirim(){
+    if (!REMOTE) return;
+    const lokal = petaLokal(), ops = {};
+    sy.outbox.forEach(o => { ops[o.k] = o; });
+    Object.keys(lokal).forEach(k => { if (lokal[k] !== sy.snap[k]) { ops[k] = { k, action: 'jurnal.save', isi: lokal[k] }; sy.snap[k] = lokal[k]; } });
+    Object.keys(sy.snap).forEach(k => {
+      if (lokal[k] !== undefined) return;
+      if (k === '_pengaturan' && !state.profile && !ops[k]) return;
+      if (state.demo && k !== '_pengaturan') return;     // entri asli disembunyikan sementara oleh data contoh? jangan hapus
+      ops[k] = { k, action: 'jurnal.delete' }; delete sy.snap[k];
+    });
+    sy.outbox = Object.keys(ops).map(k => ops[k]);
+    sySave();
+    kirim();
+  }
+  function rcRpc(action, payload){
+    return fetch(RC_CONN.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ token: RC_CONN.token, action, payload: payload || {} }) })
+      .then(r => { if (!r.ok) throw new Error('Server ' + r.status); return r.json(); })
+      .then(j => { if (!j.ok) { const e = new Error(j.error || 'Gagal'); e.server = true; throw e; } return j.data; });
+  }
+  let sedangKirim = false, ulang = false;
+  function kirim(tarik){
+    if (!REMOTE) return Promise.resolve();
+    if (sedangKirim) { ulang = true; return Promise.resolve(); }
+    sedangKirim = true;
+    const ops = sy.outbox.slice();
+    const batch = ops.map((o, i) => ({ opId: 'o' + i, action: o.action, payload: o.action === 'jurnal.save' ? { id: RC_USER + '|' + o.k, isi: o.isi } : { id: RC_USER + '|' + o.k } }));
+    if (tarik) batch.push({ opId: '_list', action: 'jurnal.list' });
+    if (!batch.length) { sedangKirim = false; return Promise.resolve(); }
+    return rcRpc('batch', { ops: batch }).then(d => {
+      const terkirim = {};
+      d.results.forEach(r => {
+        if (r.opId === '_list') { if (r.ok) gabung(r.data.jurnal || []); return; }
+        const o = ops[Number(r.opId.slice(1))];
+        if (r.ok) terkirim[o.k] = o; else toast('Gagal sinkron: ' + r.error);
+      });
+      sy.outbox = sy.outbox.filter(o => terkirim[o.k] !== o);
+      sy.at = Date.now(); sySave(); tandaSinkron();
+    }).catch(() => { tandaSinkron(true); }).then(() => {
+      sedangKirim = false;
+      if (ulang) { ulang = false; kirim(); }
+    });
+  }
+  // terapkan data server ke HP. Yang masih antre di HP menang (belum sempat terkirim).
+  function gabung(rows){
+    const antre = {}; sy.outbox.forEach(o => { antre[o.k] = 1; });
+    const server = {};
+    rows.forEach(r => { const k = String(r.id).slice(RC_USER.length + 1); server[k] = r.isi; });
+    let berubah = false;
+    Object.keys(server).forEach(k => {
+      if (antre[k] || server[k] === sy.snap[k]) return;
+      let v; try { v = JSON.parse(server[k]); } catch (e) { return; }
+      if (k === '_pengaturan') { state.profile = v.profile || state.profile; state.custom = v.custom || []; state.randomToo = v.randomToo !== false; state.lastBackup = v.lastBackup || ''; }
+      else { if (state.demo) { state.entries = {}; state.demo = false; } state.entries[k] = v; }
+      sy.snap[k] = server[k]; berubah = true;
+    });
+    Object.keys(sy.snap).forEach(k => {          // dihapus dari HP lain
+      if (server[k] !== undefined || antre[k] || k === '_pengaturan') return;
+      delete state.entries[k]; delete sy.snap[k]; berubah = true;
+    });
+    if (berubah) { simpanLokal(); render(); }
+  }
+  function tandaSinkron(gagal){
+    const el = document.querySelector('.lock'); if (!el) return;
+    const ic = el.querySelector('svg') ? el.querySelector('svg').outerHTML : '';
+    el.innerHTML = ic + (!REMOTE ? 'Hanya di perangkat ini' : gagal || sy.outbox.length ? 'Belum terkirim · ' + sy.outbox.length : 'Tersimpan · hanya kamu');
+  }
+
 
   // Minta browser tidak menghapus data otomatis (terutama Safari/iPhone)
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
@@ -344,7 +435,7 @@
   function renderSettings(){
     const p = state.profile;
     const list = state.custom.map((x,i) => '<div class="li"><span>'+(i+1)+'. '+esc(x)+'</span><span class="row" style="flex:none;gap:4px">'+(i>0?'<button type="button" class="iconbtn" style="width:30px;height:30px" data-up="'+i+'" aria-label="Naikkan">↑</button>':'')+'<button type="button" class="x" data-del="'+i+'">Hapus</button></span></div>').join('') || '<p class="muted small">Belum ada prompt custom. Hari ini akan memakai prompt acak.</p>';
-    view.innerHTML = '<div><h1>Setting</h1><p class="muted small">Semua tersimpan hanya di perangkat ini, tanpa akun.</p></div>' +
+    view.innerHTML = '<div><h1>Setting</h1><p class="muted small">'+(REMOTE ? 'Tersimpan di akunmu (Supabase). Hanya kamu yang bisa membaca, pasangan tidak.' : 'Semua tersimpan hanya di perangkat ini, tanpa akun.')+'</p></div>' +
       '<div class="card"><h3>Profil</h3><label for="nm" class="small muted">Nama panggilan</label><input type="text" id="nm" value="'+esc(p.name||'')+'" placeholder="Opsional"><span class="small muted">Usia</span><div class="age">'+AGES.map(a => '<button type="button" class="chip" data-age="'+a+'" aria-pressed="'+(p.age===a)+'">'+a+'</button>').join('')+'</div></div>' +
       '<div><h2>Kondisi yang sedang dijalani</h2><p class="small muted">Menentukan pilihan "apa yang memengaruhi" di catatan harian.</p></div>' + conditionPicker(p) + extraTagEditor(p) +
       '<div><h2>Prompt</h2><p class="small muted">Kalau ada lebih dari satu, semuanya muncul berurutan di halaman Hari ini.</p></div>' +
@@ -515,5 +606,13 @@
     setTimeout(() => toast('Mood dari Beranda: ' + MOODS[v-1].label), 300);
   })();
 
+
   render();
+  tandaSinkron();
+  if (REMOTE) {
+    antreKirim();                 // data lama di HP ikut terkirim sekali (kalau bukan data contoh)
+    kirim(true);
+    window.addEventListener('online', () => kirim(true));
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') kirim(true); });
+  }
 })();

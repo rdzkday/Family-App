@@ -26,14 +26,16 @@ var KantongCore = (function () {
       'berlaku_sejak', 'dibuat_oleh', 'dibuat_at'],
     Pengesahan: ['id', 'judul', 'jenis', 'evaluasi_id', 'ttd_riki', 'ttd_riki_at', 'ttd_febie', 'ttd_febie_at', 'isi_hash',
       'status', 'dibuat_at'],
-    Evaluasi: ['id', 'tanggal', 'catatan', 'dibuat_oleh', 'selesai_at']
+    Evaluasi: ['id', 'tanggal', 'catatan', 'dibuat_oleh', 'selesai_at'],
+    // Ruang Catat (pribadi): satu baris per hari + satu baris pengaturan per orang. isi = JSON dari app.
+    Jurnal: ['id', 'pemilik', 'jenis', 'tanggal', 'isi', 'diubah', 'dihapus']
   };
   var KAT_REIMBURSE = 'reimburse-masuk';   // kategori pemasukan otomatis, tidak dihitung sebagai pendapatan
   var KAT_SETORAN = 'setoran-rt';          // pengeluaran otomatis: topup dari kantong pribadi ke dompet bersama
   var KAT_SETORAN_MASUK = 'setoran-rt-in'; // pemasukan otomatis di sisi dompet bersama
   var TIPE_TX = ['Pengeluaran', 'Pemasukan', 'Transfer'];
   var JENIS_KANTONG = ['Cash', 'Debit', 'E-wallet', 'Kredit'];
-  var VERSION = '1.5.0';
+  var VERSION = '1.6.0';
   // ---------- to-do ----------
   var TODO_BERSAMA = 'bersama';          // pemilik to-do bersama (selain itu: id user)
   var TODO_DURASI = 30;                  // menit, dipakai kalau jam diisi tapi durasi kosong
@@ -649,6 +651,34 @@ var KantongCore = (function () {
     throw err('Aksi belum tersedia: ' + action);
   }
 
+  // ---------- Ruang Catat (jurnal pribadi) ----------
+  // id = '<user>|YYYY-MM-DD' (entri) atau '<user>|_pengaturan'. Hanya pemilik yang bisa baca & tulis.
+  function jurnalAksi(store, db, user, action, payload, nowIso) {
+    var milik = (db.Jurnal || []).filter(function (j) { return j.pemilik === user.id; });
+    if (action === 'jurnal.list') return { jurnal: milik.filter(function (j) { return !j.dihapus; }) };
+    var id = String(payload.id || ''), pre = user.id + '|', kunci = id.slice(pre.length);
+    if (id.indexOf(pre) !== 0) throw err('Catatan ini bukan milikmu');
+    var jenis = kunci === '_pengaturan' ? 'pengaturan' : 'entri';
+    if (jenis === 'entri' && !isDate(kunci)) throw err('ID catatan tidak valid');
+    var ex = byId(db.Jurnal || [])[id];
+    if (ex && ex.pemilik !== user.id) throw err('Catatan ini bukan milikmu');
+    if (action === 'jurnal.save') {
+      var isi = String(payload.isi || '');
+      if (isi.length > 60000) throw err('Catatan terlalu panjang');
+      try { JSON.parse(isi); } catch (e) { throw err('Isi catatan tidak valid'); }
+      var j = { id: id, pemilik: user.id, jenis: jenis, tanggal: jenis === 'entri' ? kunci : '', isi: isi, diubah: nowIso, dihapus: '' };
+      store.upsert('Jurnal', j);
+      return { jurnal: j };
+    }
+    if (action === 'jurnal.delete') {
+      if (!ex || ex.dihapus) return { id: id };
+      var h = clone(ex); h.dihapus = nowIso; h.diubah = nowIso; h.isi = '';   // isi dikosongkan: catatan pribadi tidak disimpan setelah dihapus
+      store.upsert('Jurnal', h);
+      return { id: id };
+    }
+    throw err('Aksi tidak dikenal: ' + action);
+  }
+
   // ---------- API handler (dipakai server & mode demo) ----------
   // store: { all(table) -> array, upsert(table, obj) -> obj, calendar?: { upsert, remove } }
   function handle(store, user, action, payload, nowIso) {
@@ -887,6 +917,7 @@ var KantongCore = (function () {
       default:
         if (String(action).indexOf('todo.') === 0) return todoAksi(store, db, user, action, payload, nowIso);
         if (String(action).indexOf('komitmen.') === 0) return komitmenAksi(store, db, user, action, payload);
+        if (String(action).indexOf('jurnal.') === 0) return jurnalAksi(store, db, user, action, payload, nowIso);
         throw err('Aksi tidak dikenal: ' + action);
     }
   }

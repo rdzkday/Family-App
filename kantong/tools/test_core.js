@@ -84,7 +84,7 @@ function utangAntara(store, bersama, pribadi) {
 }
 
 // ---------------------------------------------------------------- versi & salinan core
-eq('versi core naik ke 1.5.0', C.VERSION, '1.5.0');
+eq('versi core naik ke 1.6.0', C.VERSION, '1.6.0');
 (function () {
   // core.mjs (Edge Function Supabase) harus persis hasil build_core.js
   var fs = require('fs'), build = require(path.join(__dirname, 'build_core.js'));
@@ -734,6 +734,25 @@ function komCall(st, uid, action, payload) {
   eq('cari.ayatDari kosong', C.ayatDari('').length, 0);
   var t0 = Date.now(); for (var i = 0; i < 200; i++) cari('lawan jenis'); 
   ok('cari.cepat (200 kali < 1 detik)', Date.now() - t0 < 1000, (Date.now() - t0) + ' ms');
+})();
+
+// ================================================================ Ruang Catat (jurnal pribadi)
+(function () {
+  var st = todoStore();
+  var isi = JSON.stringify({ date: '2026-11-02', mood: 2, emotions: ['Lelah'], tags: [], answers: [] });
+  var r = todoCall(st, 'u-febie', 'jurnal.save', { id: 'u-febie|2026-11-02', isi: isi });
+  eq('jurnal: tanggal dari id', r.jurnal.tanggal, '2026-11-02');
+  eq('jurnal: jenis entri', r.jurnal.jenis, 'entri');
+  todoCall(st, 'u-febie', 'jurnal.save', { id: 'u-febie|_pengaturan', isi: '{"profile":{"name":"F"}}' });
+  eq('jurnal: Febie lihat 2 baris miliknya', todoCall(st, 'u-febie', 'jurnal.list', {}).jurnal.length, 2);
+  eq('jurnal: Riki tidak lihat jurnal Febie', todoCall(st, 'u-riki', 'jurnal.list', {}).jurnal.length, 0);
+  lempar('jurnal: Riki tidak bisa tulis id Febie', function () { todoCall(st, 'u-riki', 'jurnal.save', { id: 'u-febie|2026-11-03', isi: '{}' }); });
+  lempar('jurnal: Riki tidak bisa hapus id Febie', function () { todoCall(st, 'u-riki', 'jurnal.delete', { id: 'u-febie|2026-11-02' }); });
+  lempar('jurnal: tanggal ngawur ditolak', function () { todoCall(st, 'u-febie', 'jurnal.save', { id: 'u-febie|kemarin', isi: '{}' }); });
+  lempar('jurnal: isi bukan JSON ditolak', function () { todoCall(st, 'u-febie', 'jurnal.save', { id: 'u-febie|2026-11-04', isi: 'halo' }); });
+  todoCall(st, 'u-febie', 'jurnal.delete', { id: 'u-febie|2026-11-02' });
+  eq('jurnal: hapus menyembunyikan baris', todoCall(st, 'u-febie', 'jurnal.list', {}).jurnal.length, 1);
+  eq('jurnal: isi dikosongkan setelah dihapus', C.byId(st.all('Jurnal'))['u-febie|2026-11-02'].isi, '');
 })();
 
 console.log('\n' + lulus + ' cek lulus, ' + gagal + ' gagal.');

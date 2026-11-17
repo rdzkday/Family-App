@@ -13,13 +13,12 @@ var SettingsView = {
       '<button data-s="sync"><span class="main">Sinkron sekarang<div class="t2">' + (S.lastSync ? 'Terakhir ' + new Date(S.lastSync).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Belum sinkron di sesi ini') + (S.outbox.length ? ', ' + S.outbox.length + ' belum terkirim' : '') + '</div></span></button>' +
       (demo ? '<button data-s="switch"><span class="main">Masuk sebagai ' + esc((db().Users.filter(function (u) { return u.id !== me().id; })[0] || { nama: 'pengguna lain' }).nama) + '<div class="t2">Coba aturan baca/tulis antar buku</div></span></button>' : '') +
       '</div>' +
-      '<section class="section"><div class="section-h"><h2>Tampilan</h2></div><div class="menu" style="padding-top:16px"><div class="seg" role="group" aria-label="Tema">' + [['dark', 'Gelap'], ['light', 'Terang']].map(function (x) { return '<button data-theme-set="' + x[0] + '" aria-pressed="' + (themePref() === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div></div></section>' +
       '<section class="section"><div class="menu">' +
       '<button data-s="budget"><span class="main">Budget bulanan<div class="t2">Atur budget per kategori</div></span>' + ICON.right + '</button>' +
       '<button data-s="kategori"><span class="main">Kategori<div class="t2">' + db().Kategori.filter(function (k) { return C.bool(k.aktif) && k.id !== C.KAT_REIMBURSE; }).length + ' kategori aktif</div></span>' + ICON.right + '</button>' +
       '<button data-s="kantong"><span class="main">Kantong<div class="t2">Cash, debit, e-wallet, kartu kredit</div></span>' + ICON.right + '</button>' +
       '</div></section>' +
-      '<section class="section"><div class="menu"><button data-s="beranda"><span class="main">Beranda<div class="t2">Ringkasan keuangan, to-do, kesepakatan, dan mood</div></span>' + ICON.right + '</button></div></section>' +
+      '<section class="section"><div class="menu"><button data-s="beranda"><span class="main">Beranda<div class="t2">To-do, kesepakatan, mood, dan Setelan (tema)</div></span>' + ICON.right + '</button></div></section>' +
       '<section class="section"><div class="menu"><button data-s="out"><span class="main" style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Putuskan koneksi di HP ini') + '</span></button></div>' +
       '<p class="faint" style="font-size:12px;text-align:center;margin-top:20px">Kantong v' + (S.boot.version || C.VERSION) + '</p></section>';
     $$('[data-theme-set]', el).forEach(function (b) { b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme-set')); SettingsView.render(el); }); });

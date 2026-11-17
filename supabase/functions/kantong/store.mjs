@@ -10,7 +10,7 @@ import KantongCore from './core.mjs';
 export const TABEL = {
   Buku: 'buku', Users: 'users', Kategori: 'kategori', Kantong: 'kantong', Budget: 'budget', Transaksi: 'transaksi', Todo: 'todo',
   KomitmenBab: 'komitmen_bab', KomitmenPasal: 'komitmen_pasal', KomitmenVersi: 'komitmen_versi',
-  KomitmenKeterangan: 'komitmen_keterangan', Pengesahan: 'pengesahan', Evaluasi: 'evaluasi'
+  KomitmenKeterangan: 'komitmen_keterangan', Pengesahan: 'pengesahan', Evaluasi: 'evaluasi', Jurnal: 'jurnal'
 };
 const KOLOM_TANGGAL = { tanggal: 1, per_tanggal: 1 };
 const KOLOM_BOOL = { hitung: 1, aktif: 1, reimburse: 1, selesai: 1, terkunci: 1 };

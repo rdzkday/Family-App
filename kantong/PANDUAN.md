@@ -30,7 +30,7 @@ supabase db push
 
 Ini membuat tabel `buku, users, kategori, kantong, budget, transaksi, todo, akses` beserta fungsi `kantong_muat`, `kantong_simpan`, `kantong_buat_kode`. Semua tabel memakai RLS tanpa policy: hanya Edge Function (service role) yang bisa membaca/menulis.
 
-Alternatif tanpa CLI: buka **SQL Editor**, tempel isi tiap file di `supabase/migrations/` **berurutan** (`20261116000000_kantong.sql`, `20261117000000_komitmen.sql`, `20261117120000_beranda.sql`), **Run**.
+Alternatif tanpa CLI: buka **SQL Editor**, tempel isi tiap file di `supabase/migrations/` **berurutan** (`20261116000000_kantong.sql`, `20261117000000_komitmen.sql`, `20261117120000_beranda.sql`, `20261118000000_ruang_catat.sql`), **Run**.
 
 Migrasi Beranda (`20261117120000`) hanya menambah kolom `tipe` & `isi` di `todo` (catatan, agenda evaluasi). Data lama aman.
 
@@ -123,7 +123,10 @@ Aturan yang dijalankan server:
 | Beranda | `/` | Ringkasan Kantong, pengingat evaluasi, to-do & catatan, mood |
 | Kantong | `/kantong.html` (`#todo` = tab To-do) | App keuangan lengkap, sama seperti sebelumnya |
 | Komitmen | `/komitmen.html` | Lihat §8 |
-| Ruang Catat | `/ruang-catat/?mood=…` | Jurnal mood, data hanya di HP |
+| To-do | `/#todo` | To-do & catatan (bukan lagi tab Kantong) |
+| Agenda | `/#agenda` | To-do berwaktu & evaluasi per hari |
+| Setelan | `/#setelan` | Tema gelap/terang untuk semua halaman |
+| Ruang Catat | `/ruang-catat/?mood=…` | Jurnal mood, tersimpan di Supabase (tabel `jurnal`), hanya pemiliknya yang bisa baca |
 
 - **Catatan**: tidak punya centang, tidak pernah masuk kalender. Bisa pribadi atau Bersama.
 - **Evaluasi bulanan**: buat to-do → nyalakan **Agenda evaluasi bulanan** → atur tanggal & jam. Masuk Google Calendar sebagai `[B] Evaluasi bulanan`. Kartu pengingat muncul di Beranda mulai 6 jam sebelumnya; **Ingatkan nanti** = sembunyi 1 jam.

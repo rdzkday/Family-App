@@ -10,7 +10,7 @@ function renderShell() {
   if (PAGE === 'beranda') { renderBerandaShell(app); return; }
   app.innerHTML = (S.conn.mode === 'demo' ? '<div class="demo-bar">Ini versi demo dengan data contoh. <button data-act="leave-demo">Keluar dari demo</button></div>' : '') +
     '<main id="view" class="view"></main>' +
-    '<footer class="tabbar"><nav>' + [['home', 'Catat', ICON.home], ['todo', 'To-do', ICON.check], ['ringkasan', 'Ringkasan', ICON.chart], ['riwayat', 'Riwayat', ICON.list], ['pengaturan', 'Pengaturan', ICON.gear]].map(function (x) {
+    '<footer class="tabbar"><nav>' + [['home', 'Catat', ICON.home], ['ringkasan', 'Ringkasan', ICON.chart], ['riwayat', 'Riwayat', ICON.list], ['pengaturan', 'Pengaturan', ICON.gear]].map(function (x) {
       return '<button data-tab="' + x[0] + '" aria-current="' + (S.tab === x[0] ? 'page' : 'false') + '">' + x[2] + x[1] + '</button>';
     }).join('') + '</nav></footer>';
   $$('[data-tab]', app).forEach(function (b) { b.addEventListener('click', function () { goTab(b.getAttribute('data-tab')); }); });
@@ -25,7 +25,9 @@ function renderView() {
   if (PAGE === 'beranda' && !S.boot) { $('#view').innerHTML = '<div class="br-wrap"><div class="br-card br-skel"></div><div class="br-card br-skel"></div></div>'; return; }
   if (!S.boot) { $('#view').innerHTML = '<div class="topbar"><div><h1>Memuat data…</h1></div>' + syncPill() + '</div>' + skeleton(5); return; }
   if (!S.bukuView) S.bukuView = me().buku;
-  var v = { home: HomeView, todo: TodoView, ringkasan: RingkasanView, riwayat: RiwayatView, pengaturan: SettingsView, beranda: BerandaView }[S.tab];
+  var v = { home: HomeView, todo: TodoView, ringkasan: RingkasanView, riwayat: RiwayatView, pengaturan: SettingsView,
+    beranda: BerandaView, agenda: AgendaView, setelan: SetelanView }[S.tab] || (PAGE === 'beranda' ? BerandaView : HomeView);
+  if (PAGE === 'beranda') $('#view').classList.toggle('br-narrow', S.tab !== 'beranda');
   view = v; v.render($('#view'));
 }
 function refresh() {
@@ -39,17 +41,17 @@ document.addEventListener('click', function (e) {
   if (a === 'sync') sync();
   if (a === 'theme') { setTheme(isDark() ? 'light' : 'dark'); t.outerHTML = themeBtn(); }
   if (a === 'leave-demo') { if (confirm('Keluar dari mode demo?')) disconnect(); }
-  if (a === 'goto-todo') goTab('todo');
+  if (a === 'goto-todo') location.href = './#todo';
   if (a === 'beranda') location.href = './';
 });
 
 // ---------- Catat (home) ----------
 var HomeView = {
   render: function (el) {
-    el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Halo, ' + esc(me().nama) + '!</h1></div><div class="top-actions">' + berandaBtn() + themeBtn() + syncPill() + '</div></div>' +
+    el.innerHTML = '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Halo, ' + esc(me().nama) + '!</h1></div><div class="top-actions">' + berandaBtn() + syncPill() + '</div></div>' +
       '<div id="home-budget"></div>' +
       '<section class="section"><div class="entry" id="entry"></div></section>' +
-      '<div id="home-todo"></div><div id="home-utang"></div><div id="home-reim"></div>' +
+      '<div id="home-utang"></div><div id="home-reim"></div>' +
       '<section class="section"><div class="section-h"><h2>Catatan hari ini</h2><span class="aside" id="today-total"></span></div><div id="today"></div></section>';
     txForm($('#entry', el), null, { allowAdd: true });
     this.update(el);
@@ -76,7 +78,6 @@ var HomeView = {
     todayEl.innerHTML = list.length ? '<div class="list">' + list.sort(function (a, b) { return String(b.dibuat || '9').localeCompare(String(a.dibuat || '9')); })
       .map(function (x) { return txRow(x, null); }).join('') + '</div>' : '<div class="list"><div class="empty">Hari ini masih bersih. Catat jajan pertamamu di atas.</div></div>';
     bindTxRows(todayEl);
-    renderHomeTodo($('#home-todo', el));
     renderTalangan($('#home-utang', el), null);
     var waits = [];
     Object.keys(S.months).forEach(function (b) { (S.months[b].transaksi || []).forEach(function (x) { if (reimStatus(x) === 'wait' && canWrite(x.buku)) waits.push(x); }); });

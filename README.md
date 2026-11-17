@@ -21,7 +21,8 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | ⏳ Perlu setup sekali | Sync to-do ke Google Calendar "Rumah Kita" (secret belum diisi, PANDUAN §7) |
 | 🆕 Baru | Beranda (`/`): ringkasan Kantong, to-do & catatan, pengingat evaluasi (6 jam sebelum), shortcut Komitmen, mood → Ruang Catat |
 | 🧪 Fase 4a | Komitmen (`komitmen.html`): baca & cari pasal, modul Kesepakatan + Definisi A–Z. Usul/ubah/TTD menyusul. Brief: `claude/komitmen-brief.md` |
-| ✅ Live | Ruang Catat (`/ruang-catat/`): jurnal mood, data di HP saja. Terima `?mood=` dari Beranda |
+| 🆕 Baru | Ruang Catat (`/ruang-catat/`): jurnal mood, tersimpan di Supabase (pribadi, pasangan tidak bisa baca). Terima `?mood=` dari Beranda |
+| 🆕 Baru | To-do jadi fitur sendiri di Beranda (`/#todo`), Agenda (`/#agenda`), Setelan tema (`/#setelan`) |
 
 ---
 
@@ -87,7 +88,7 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | `public/js/` | Kode app, dipecah per bagian (base, ui, transaksi, todo, shell, laporan, pengaturan, beranda, connect, demo, start). Skrip biasa, urutan muat di HTML |
 | `public/tokens.css` | Design token bersama (warna, font). Gelap default, terang opsional |
 | `public/komitmen.html` | Komitmen: kamus kesepakatan berbentuk pasal (baca & cari) |
-| `public/ruang-catat/` | Ruang Catat: jurnal mood (localStorage, service worker sendiri) |
+| `public/ruang-catat/` | Ruang Catat: jurnal mood, sinkron ke tabel `jurnal` (service worker sendiri) |
 | `supabase/migrations/` | Skema database |
 | `supabase/functions/kantong/` | Edge Function: API + adapter Postgres + Google Calendar |
 | `kantong/PANDUAN.md` | Panduan pasang & update |

@@ -208,7 +208,10 @@ input.input:disabled { opacity: .5; }
 /* ---------- settings ---------- */
 .menu { background: var(--surface); border-radius: var(--r-card); overflow: hidden; box-shadow: var(--shadow); }
 .menu button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 0 18px; text-align: left; border-bottom: 1px dashed var(--line); font-weight: 800; }
-.menu button:last-child { border-bottom: 0; }
+.menu button:last-child, .menu a.menu-a:last-child { border-bottom: 0; }
+.menu a.menu-a { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 0 18px; border-bottom: 1px dashed var(--line); font-weight: 800; color: var(--text); text-decoration: none; }
+.menu a.menu-a .main { flex: 1; }
+.menu a.menu-a svg { width: 20px; height: 20px; color: var(--text-3); }
 .menu button .main { flex: 1; }
 .menu button .t2 { font-size: 12px; color: var(--text-3); font-weight: 600; }
 .menu svg { width: 18px; height: 18px; color: var(--text-3); }

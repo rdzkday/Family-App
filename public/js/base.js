@@ -74,7 +74,12 @@ var ICON = {
 var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
 var PAGE = window.KANTONG_PAGE === 'beranda' ? 'beranda' : 'kantong';
-function themePref() { return PAGE === 'beranda' ? 'dark' : (LS.get('k_theme', 'dark') === 'light' ? 'light' : 'dark'); }
+// To-do sekarang fitur sendiri di Beranda: link lama kantong.html#todo diarahkan ke sana
+if (PAGE === 'kantong' && location.hash === '#todo') location.replace('./#todo');
+if (PAGE === 'kantong') window.addEventListener('hashchange', function () { if (location.hash === '#todo') location.replace('./#todo'); });
+var BERANDA_RUTE = ['beranda', 'todo', 'agenda', 'setelan'];
+function berandaRute() { var h = location.hash.slice(1); return BERANDA_RUTE.indexOf(h) >= 0 ? h : 'beranda'; }
+function themePref() { return LS.get('k_theme', 'dark') === 'light' ? 'light' : 'dark'; }
 function isDark() { return themePref() === 'dark'; }
 function applyTheme() {
   var t = themePref(), r = document.documentElement;
@@ -82,7 +87,7 @@ function applyTheme() {
   var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', isDark() ? '#0E1014' : '#F7F5FC');
 }
 function setTheme(t) { LS.set('k_theme', t); applyTheme(); }
-function berandaBtn() { return '<button class="theme-btn" data-act="beranda" aria-label="Ke Beranda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v8a2 2 0 0 1-2 2h-3v-6h-6v6H6a2 2 0 0 1-2-2z"/></svg></button>'; }
+function berandaBtn() { if (PAGE === 'beranda') return ''; return '<button class="theme-btn" data-act="beranda" aria-label="Ke Beranda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v8a2 2 0 0 1-2 2h-3v-6h-6v6H6a2 2 0 0 1-2-2z"/></svg></button>'; }
 function themeBtn() { return '<button class="theme-btn" data-act="theme" aria-label="Ganti tema terang/gelap">' + (isDark() ? SUN : MOON) + '</button>'; }
 applyTheme();
 
@@ -94,7 +99,7 @@ var S = {
   outbox: LS.get('k_outbox', []),
   todos: LS.get('k_todos', null),        // null = belum pernah dimuat
   prefs: LS.get('k_prefs', { lastKantong: {}, demoUser: 'riki' }),
-  tab: PAGE === 'beranda' ? 'beranda' : (({ '#todo': 'todo', '#ringkasan': 'ringkasan', '#riwayat': 'riwayat', '#pengaturan': 'pengaturan' })[location.hash] || 'home'), sub: null, bukuView: null, bulan: thisMonth(),
+  tab: PAGE === 'beranda' ? berandaRute() : (({ '#ringkasan': 'ringkasan', '#riwayat': 'riwayat', '#pengaturan': 'pengaturan' })[location.hash] || 'home'), sub: null, bukuView: null, bulan: thisMonth(),
   syncing: false, again: false, lastError: null, catTab: 'Pengeluaran'
 };
 function persist() {
