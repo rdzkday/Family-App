@@ -270,7 +270,7 @@ function sync(extraMonths) {
     persist();
   }).catch(function (e) {
     S.lastError = e.message;
-    if (e.code === 'AUTH') { toast('Kode akses tidak berlaku. Hubungkan ulang.', true); }
+    if (e.code === 'AUTH') { toast('Sesi berakhir. Silakan masuk lagi.', true); disconnect(); }
   }).then(function () {
     S.syncing = false; renderSync(); refresh();
     if (S.again) { S.again = false; sync(); }

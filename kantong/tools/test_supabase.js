@@ -33,6 +33,7 @@ function mockDb() {
       ttd_febie_at: 'y', isi_hash: '', status: 'sah', dibuat_at: '' }, { id: 's-2', judul: 'Usulan', jenis: 'tunggal', evaluasi_id: '', ttd_riki: 'M0 0',
       ttd_riki_at: 'x', ttd_febie: '', ttd_febie_at: '', isi_hash: '', status: 'menunggu', dibuat_at: '' }],
     evaluasi: [],
+    sesi: [],
     akses: [{ user_id: 'riki', token_hash: sha('r'.repeat(40)) }, { user_id: 'istri', token_hash: sha('i'.repeat(40)) }]
   };
   const calls = [];
@@ -42,6 +43,21 @@ function mockDb() {
     assert.ok(m, 'url rpc tidak dikenal: ' + url);
     assert.strictEqual(opt.headers.Authorization, 'Bearer SERVICE', 'service key harus dikirim');
     if (m[1] === 'kantong_muat') return { ok: true, status: 200, text: async () => JSON.stringify(tabel) };
+    if (m[1] === 'kantong_login') {
+      const a = JSON.parse(opt.body);
+      const ok = a.p_username === 'febie' && a.p_password === 'rahasia123';
+      const r = ok ? { ok: true, token: 's'.repeat(64), user_id: 'istri' } : { ok: false, alasan: 'salah' };
+      if (ok) tabel.sesi.push({ token_hash: sha('s'.repeat(64)), user_id: 'istri' });
+      return { ok: true, status: 200, text: async () => JSON.stringify(r) };
+    }
+    if (m[1] === 'kantong_cek_sesi') {
+      const s = tabel.sesi.find((x) => x.token_hash === JSON.parse(opt.body).p_hash);
+      return { ok: true, status: 200, text: async () => JSON.stringify(s ? s.user_id : null) };
+    }
+    if (m[1] === 'kantong_logout') {
+      const h = JSON.parse(opt.body).p_hash; tabel.sesi = tabel.sesi.filter((x) => x.token_hash !== h);
+      return { ok: true, status: 200, text: async () => '' };
+    }
     if (m[1] === 'kantong_simpan') {
       const rows = JSON.parse(opt.body).rows;
       for (const r of rows) {
@@ -121,6 +137,15 @@ function mockGoogle() {
     const r = await call('x'.repeat(40), 'bootstrap');
     assert.strictEqual(r.code, 'AUTH');
     assert.strictEqual(db.tabel.transaksi.length, 0);
+  });
+  await t('login username+password -> token sesi, logout mencabutnya', async () => {
+    const salah = await call('', 'login', { username: 'febie', password: 'salah' });
+    assert.strictEqual(salah.code, 'LOGIN');
+    const d = ok(await call('', 'login', { username: 'febie', password: 'rahasia123' }));
+    assert.strictEqual(d.user_id, 'istri');
+    assert.strictEqual(ok(await call(d.token, 'bootstrap')).user.id, 'istri');
+    ok(await call(d.token, 'logout'));
+    assert.strictEqual((await call(d.token, 'bootstrap')).code, 'AUTH');
   });
   await t('bootstrap memakai data dari kantong_muat', async () => {
     const d = ok(await call(R, 'bootstrap'));

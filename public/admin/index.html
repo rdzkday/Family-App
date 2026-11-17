@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin Akun · Family App</title>
+<link rel="icon" href="../icons/icon-32.png">
+<style>
+@font-face { font-family: 'Plus Jakarta Sans'; src: url('../fonts/jakarta.woff2') format('woff2'); font-weight: 200 800; font-display: swap; }
+:root {
+  --bg: #0E1014; --surface: #161920; --inset: #0E1014; --border: #262B35; --text: #ECEEF2; --muted: #9AA3B2;
+  --accent: #7DD3A8; --accent-ink: #0E1014; --bad: #F87171; --warn: #FCD34D; --info: #93C5FD; --radius: 14px;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #F6F7F9; --surface: #FFFFFF; --inset: #F1F3F6; --border: #E2E5EA; --text: #14171C; --muted: #5B6472;
+    --accent: #1F9D63; --accent-ink: #FFFFFF; --bad: #D93636; --warn: #A86B00; --info: #2563EB; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 'Plus Jakarta Sans', system-ui, sans-serif; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 24px; font-weight: 800; margin: 0; }
+.muted { color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.login { max-width: 380px; margin: 10vh auto 0; }
+.login h1 { margin-bottom: 4px; }
+label { display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin: 14px 0 6px; }
+input[type=text], input[type=password] { width: 100%; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--inset); color: var(--text); font: inherit; }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border-radius: 10px;
+  border: 1px solid var(--border); background: transparent; color: var(--text); font: inherit; font-weight: 700; cursor: pointer; min-height: 40px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--bad); }
+.btn.sm { padding: 6px 10px; min-height: 32px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.full { width: 100%; margin-top: 18px; }
+.err { color: var(--bad); font-size: 14px; min-height: 20px; margin-top: 10px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.top .act { display: flex; gap: 8px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; padding: 0 10px 10px; }
+td { padding: 12px 10px; border-top: 1px solid var(--border); vertical-align: middle; }
+td.aksi { text-align: right; white-space: nowrap; }
+td.aksi .btn { margin-left: 4px; }
+.badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; border: 1px solid currentColor; margin-right: 4px; }
+.b-on { color: var(--accent); } .b-off { color: var(--muted); } .b-admin { color: var(--info); } .b-lock { color: var(--warn); }
+dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); padding: 24px; width: min(440px, calc(100% - 32px)); }
+dialog::backdrop { background: rgba(0,0,0,.55); }
+dialog h2 { margin: 0 0 4px; font-size: 18px; }
+.check { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text); font-size: 14px; margin-top: 14px; }
+.row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 22px; }
+.pw { font: 700 22px/1.2 ui-monospace, Menlo, monospace; letter-spacing: .06em; background: var(--inset); border: 1px dashed var(--border);
+  border-radius: 10px; padding: 14px; text-align: center; margin: 16px 0 8px; user-select: all; word-break: break-all; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px;
+  border-radius: 10px; font-weight: 600; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.on { opacity: 1; }
+@media (max-width: 700px) {
+  thead { display: none; }
+  tr { display: block; border-top: 1px solid var(--border); padding: 12px 0; }
+  td { display: block; border: 0; padding: 2px 0; }
+  td.aksi { text-align: left; padding-top: 10px; white-space: normal; }
+  td.aksi .btn { margin: 4px 4px 0 0; }
+  .card { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<main class="wrap" id="app"></main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="dlg-akun">
+  <form id="f-akun" method="dialog" novalidate>
+    <h2 id="f-judul">Tambah akun</h2>
+    <p class="muted" id="f-sub" style="margin:0">Password dibuat otomatis dan tampil sekali.</p>
+    <label for="f-uid">ID user</label>
+    <input type="text" id="f-uid" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="mis. febie">
+    <label for="f-nama">Nama tampilan</label>
+    <input type="text" id="f-nama" autocomplete="off" placeholder="mis. Febie">
+    <label for="f-uname">Username login</label>
+    <input type="text" id="f-uname" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="mis. febie">
+    <label class="check"><input type="checkbox" id="f-aktif" checked> Akun aktif (boleh login)</label>
+    <label class="check"><input type="checkbox" id="f-admin"> Admin (boleh buka panel ini)</label>
+    <div class="err" id="f-err" role="alert"></div>
+    <div class="row"><button type="button" class="btn" data-close>Batal</button><button type="submit" class="btn primary" id="f-simpan">Simpan</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-pw">
+  <h2>Password baru</h2>
+  <p class="muted" style="margin:0" id="pw-untuk"></p>
+  <div class="pw" id="pw-isi"></div>
+  <p class="muted" style="font-size:13px;margin:0">Kirim ke user lewat jalur pribadi. Password ini <b>tidak bisa dilihat lagi</b> setelah jendela ditutup.</p>
+  <div class="row"><button type="button" class="btn" id="pw-salin">Salin</button><button type="button" class="btn primary" data-close>Selesai</button></div>
+</dialog>
+
+<script>
+'use strict';
+var API = window.KANTONG_API || 'https://serskylzlevhjidqrvjm.supabase.co/functions/v1/kantong';
+var KEY = 'admin_token';
+var S = { token: get(), saya: '', akun: [] };
+function get() { try { return sessionStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
+function put(v) { try { v ? sessionStorage.setItem(KEY, v) : sessionStorage.removeItem(KEY); } catch (e) {} }
+function $(s) { return document.querySelector(s); }
+function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+function toast(m) { var t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function () { t.classList.remove('on'); }, 2400); }
+function waktu(iso) {
+  if (!iso) return '–';
+  var d = new Date(iso);
+  return d.toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function call(action, payload) {
+  return fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ token: S.token, action: action, payload: payload || {} }) })
+    .then(function (r) { if (!r.ok) throw new Error('Server membalas ' + r.status); return r.json(); },
+          function () { throw new Error('Tidak ada koneksi internet'); })
+    .then(function (j) {
+      if (!j.ok) {
+        if (j.code === 'AUTH') { put(''); S.token = ''; renderLogin('Sesi berakhir atau akun bukan admin.'); }
+        var e = new Error(j.error || 'Gagal'); e.code = j.code; throw e;
+      }
+      return j.data;
+    });
+}
+function admin(aksi, data) { return call('admin', { aksi: aksi, data: data || {} }); }
+
+// ---------- login ----------
+function renderLogin(pesan) {
+  $('#app').innerHTML = '<form class="card login" id="f-login" novalidate>' +
+    '<h1>Admin Akun</h1><p class="muted" style="margin:0">Family App · khusus admin</p>' +
+    '<label for="l-user">Username</label><input type="text" id="l-user" autocomplete="username" autocapitalize="none" spellcheck="false">' +
+    '<label for="l-pass">Password</label><input type="password" id="l-pass" autocomplete="current-password">' +
+    '<div class="err" id="l-err" role="alert">' + esc(pesan || '') + '</div>' +
+    '<button class="btn primary full" id="l-btn">Masuk</button></form>';
+  $('#l-user').focus();
+  $('#f-login').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var u = $('#l-user').value.trim().toLowerCase(), p = $('#l-pass').value, btn = $('#l-btn');
+    if (!u || !p) { $('#l-err').textContent = 'Isi username dan password.'; return; }
+    btn.disabled = true; btn.textContent = 'Masuk…'; $('#l-err').textContent = '';
+    S.token = '';
+    call('login', { username: u, password: p }).then(function (d) {
+      if (!d.admin) {
+        S.token = d.token; call('logout').catch(function () {}); S.token = '';
+        throw new Error('Akun ini bukan admin.');
+      }
+      S.token = d.token; put(d.token); muat();
+    }).catch(function (e) {
+      btn.disabled = false; btn.textContent = 'Masuk';
+      $('#l-err').textContent = e.message; $('#l-pass').value = ''; $('#l-pass').focus();
+    });
+  });
+}
+
+// ---------- daftar akun ----------
+function muat() {
+  return admin('list').then(function (d) { S.saya = d.saya; S.akun = d.akun; renderDaftar(); })
+    .catch(function (e) { if (e.code !== 'AUTH') toast(e.message); });
+}
+function renderDaftar() {
+  var baris = S.akun.map(function (a) {
+    var status = !a.punya_login ? '<span class="badge b-off">Belum ada login</span>'
+      : (a.aktif ? '<span class="badge b-on">Aktif</span>' : '<span class="badge b-off">Nonaktif</span>') +
+        (a.admin ? '<span class="badge b-admin">Admin</span>' : '') + (a.terkunci ? '<span class="badge b-lock">Terkunci</span>' : '');
+    var saya = a.user_id === S.saya;
+    var aksi = !a.punya_login
+      ? '<button class="btn sm" data-a="buat" data-id="' + esc(a.user_id) + '">Buat login</button>'
+      : '<button class="btn sm" data-a="ubah" data-id="' + esc(a.user_id) + '">Ubah</button>' +
+        '<button class="btn sm" data-a="reset" data-id="' + esc(a.user_id) + '">Reset password</button>' +
+        (a.sesi && !saya ? '<button class="btn sm" data-a="cabut" data-id="' + esc(a.user_id) + '">Keluarkan semua HP</button>' : '') +
+        (saya ? '' : '<button class="btn sm danger" data-a="hapus" data-id="' + esc(a.user_id) + '">Hapus</button>');
+    return '<tr><td><b>' + esc(a.nama || a.user_id) + '</b>' + (saya ? ' <span class="muted">(kamu)</span>' : '') +
+      '<div class="muted" style="font-size:13px">id: ' + esc(a.user_id) + '</div></td>' +
+      '<td>' + (a.username ? esc(a.username) : '<span class="muted">–</span>') + '</td>' +
+      '<td>' + status + '</td>' +
+      '<td><span class="muted" style="font-size:13px">' + a.sesi + ' perangkat · ' + waktu(a.terakhir) + '</span></td>' +
+      '<td class="aksi">' + aksi + '</td></tr>';
+  }).join('');
+  $('#app').innerHTML = '<div class="top"><div><h1>Akun</h1><p class="muted" style="margin:0">' + S.akun.length + ' user · ' +
+      S.akun.filter(function (a) { return a.aktif; }).length + ' aktif</p></div>' +
+    '<div class="act"><button class="btn primary" id="tambah">+ Tambah akun</button><button class="btn" id="keluar">Keluar</button></div></div>' +
+    '<div class="card"><table><thead><tr><th>User</th><th>Username</th><th>Status</th><th>Sesi · terakhir aktif</th><th></th></tr></thead>' +
+    '<tbody>' + baris + '</tbody></table></div>';
+  $('#tambah').onclick = function () { bukaForm(null); };
+  $('#keluar').onclick = function () { call('logout').catch(function () {}); put(''); S.token = ''; renderLogin(); };
+  $('#app').querySelector('tbody').addEventListener('click', aksiBaris);
+}
+function cari(id) { return S.akun.filter(function (a) { return a.user_id === id; })[0]; }
+
+function aksiBaris(ev) {
+  var b = ev.target.closest('[data-a]'); if (!b) return;
+  var a = cari(b.dataset.id), nama = a.nama || a.user_id;
+  if (b.dataset.a === 'buat' || b.dataset.a === 'ubah') return bukaForm(a);
+  if (b.dataset.a === 'reset') {
+    if (!confirm('Buat password baru untuk ' + nama + '? Password lama langsung tidak berlaku dan semua HP-nya keluar.')) return;
+    b.disabled = true;
+    admin('reset', { user_id: a.user_id }).then(function (d) { tampilPw(nama, a.username, d.password); muat(); })
+      .catch(function (e) { b.disabled = false; toast(e.message); });
+  }
+  if (b.dataset.a === 'cabut') {
+    if (!confirm('Keluarkan ' + nama + ' dari semua perangkat?')) return;
+    admin('cabut', { user_id: a.user_id }).then(function () { toast('Semua sesi ' + nama + ' dicabut'); muat(); }).catch(function (e) { toast(e.message); });
+  }
+  if (b.dataset.a === 'hapus') {
+    if (!confirm('Hapus login ' + nama + '? Data keuangan & catatannya tetap tersimpan; hanya akses login yang dihapus.')) return;
+    admin('hapus', { user_id: a.user_id }).then(function () { toast('Login ' + nama + ' dihapus'); muat(); }).catch(function (e) { toast(e.message); });
+  }
+}
+
+// ---------- form tambah/ubah ----------
+var edit = null;
+function bukaForm(a) {
+  edit = a;
+  var ada = !!(a && a.punya_login);
+  $('#f-judul').textContent = !a ? 'Tambah akun' : ada ? 'Ubah akun ' + (a.nama || a.user_id) : 'Buat login ' + (a.nama || a.user_id);
+  $('#f-sub').textContent = ada ? 'Untuk ganti password, pakai tombol Reset password.' : 'Password dibuat otomatis dan tampil sekali.';
+  $('#f-uid').value = a ? a.user_id : ''; $('#f-uid').disabled = !!a;
+  $('#f-nama').value = a ? a.nama : '';
+  $('#f-uname').value = a && a.username ? a.username : (a ? a.user_id : '');
+  $('#f-aktif').checked = ada ? a.aktif : true;
+  $('#f-admin').checked = ada ? a.admin : false;
+  var saya = a && a.user_id === S.saya;
+  $('#f-aktif').disabled = saya; $('#f-admin').disabled = saya;
+  $('#f-err').textContent = '';
+  $('#dlg-akun').showModal();
+  (a ? $('#f-nama') : $('#f-uid')).focus();
+}
+$('#f-akun').addEventListener('submit', function (ev) {
+  ev.preventDefault();
+  var data = { user_id: $('#f-uid').value.trim().toLowerCase(), nama: $('#f-nama').value.trim(),
+    username: $('#f-uname').value.trim().toLowerCase(), aktif: $('#f-aktif').checked, admin: $('#f-admin').checked };
+  if (!data.user_id || !data.username) { $('#f-err').textContent = 'ID user dan username wajib diisi.'; return; }
+  var btn = $('#f-simpan'); btn.disabled = true;
+  admin('simpan', data).then(function (d) {
+    btn.disabled = false; $('#dlg-akun').close();
+    if (d.password) tampilPw(data.nama || data.user_id, data.username, d.password); else toast('Tersimpan');
+    muat();
+  }).catch(function (e) { btn.disabled = false; $('#f-err').textContent = e.message; });
+});
+
+// ---------- password sekali tampil ----------
+function tampilPw(nama, username, pw) {
+  $('#pw-untuk').textContent = nama + ' · username: ' + username;
+  $('#pw-isi').textContent = pw;
+  $('#dlg-pw').showModal();
+}
+$('#pw-salin').onclick = function () {
+  var t = $('#pw-isi').textContent;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('Password disalin'); },
+    function () { toast('Salin manual: tekan lama teksnya'); });
+};
+$('#dlg-pw').addEventListener('close', function () { $('#pw-isi').textContent = ''; });
+document.querySelectorAll('[data-close]').forEach(function (b) { b.onclick = function () { b.closest('dialog').close(); }; });
+
+if (S.token) muat(); else renderLogin();
+</script>
+</body>
+</html>

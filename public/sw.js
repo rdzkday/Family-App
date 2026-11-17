@@ -1,6 +1,6 @@
 // Service worker Beranda/Kantong/Agenda/Komitmen: network-first untuk app shell (update selalu masuk saat online),
 // fallback ke cache saat offline. Request API (POST ke Supabase) tidak disentuh. Daily Mood punya SW sendiri.
-const CACHE = 'kantong-v17-komitmen-ttd';
+const CACHE = 'kantong-v19-login-admin';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest',
   'shared/core.js', 'shared/base.js', 'shared/ui.js', 'shared/shell.js', 'shared/connect.js', 'shared/demo.js', 'shared/start.js',
   'shared/tokens.css', 'shared/styles.css',
@@ -21,7 +21,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   const url = new URL(req.url);
-  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (req.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/admin')) return;   // admin panel tidak di-cache
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {

@@ -20,7 +20,7 @@ if [ -z "${PGURL:-}" ]; then
     if not exists (select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
     if not exists (select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
     if not exists (select 1 from pg_roles where rolname='service_role') then create role service_role nologin bypassrls; end if;
-  end \$\$;"
+  end \$\$; create schema if not exists extensions;"
 fi
 
 for f in "${MIGRASI[@]}"; do psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$f"; done
@@ -103,6 +103,40 @@ BAD='[{"tabel":"komitmen_pasal","baris":{"id":"p-3","nomor":3,"bab_id":"","tipe"
 if q "select kantong_simpan('$BAD'::jsonb)" 2>/dev/null; then echo "tipe pasal tak dikenal harus ditolak"; exit 1; fi
 [ "$(psql -qtA "$PGURL" -c "set role anon; select count(*) from komitmen_pasal" 2>&1 | tr -d '\n' | grep -c 'permission denied\|^0$')" = "1" ] || { echo "anon tidak boleh membaca komitmen"; exit 1; }
 echo "✓ komitmen: 6 tabel di snapshot, nomor pasal unik, enum dijaga, anon ditolak"
+
+# Login: password bcrypt, sesi per perangkat, kunci setelah 5x salah
+q "select kantong_atur_login('riki','Riki','rahasia123')" >/dev/null
+[ "$(q "select kantong_login('riki','salah')->>'ok'")" = "false" ] || { echo "password salah harus ditolak"; exit 1; }
+TOK="$(q "select kantong_login('riki','rahasia123')->>'token'")"
+[ "${#TOK}" = "64" ] || { echo "token sesi harus 64 hex"; exit 1; }
+H="$(q "select encode(extensions.digest('$TOK','sha256'),'hex')")"
+[ "$(q "select kantong_cek_sesi('$H')")" = "riki" ] || { echo "sesi harus dikenali"; exit 1; }
+q "select kantong_logout('$H')" >/dev/null
+[ -z "$(q "select kantong_cek_sesi('$H')")" ] || { echo "logout harus mencabut sesi"; exit 1; }
+for i in 1 2 3 4 5; do q "select kantong_login('riki','x$i')" >/dev/null; done
+[ "$(q "select kantong_login('riki','rahasia123')->>'alasan'")" = "terkunci" ] || { echo "5x salah harus terkunci"; exit 1; }
+if psql -qtA -v ON_ERROR_STOP=1 "$PGURL" -c "set role anon; select kantong_login('riki','rahasia123')" >/dev/null 2>&1; then echo "anon tidak boleh login langsung"; exit 1; fi
+# Admin panel
+q "update login set admin = true, gagal = 0, kunci_sampai = null where user_id = 'riki'" >/dev/null
+q "select kantong_atur_login('riki','riki','rahasia123')" >/dev/null
+q "update login set admin = true where user_id = 'riki'" >/dev/null
+AT="$(q "select kantong_login('riki','rahasia123')->>'token'")"
+AH="$(q "select encode(extensions.digest('$AT','sha256'),'hex')")"
+[ "$(q "select kantong_admin('$AH','list','{}')->>'ok'")" = "true" ] || { echo "admin list gagal"; exit 1; }
+PW="$(q "select kantong_admin('$AH','simpan','{\"user_id\":\"tamu\",\"username\":\"tamu\",\"nama\":\"Tamu\"}')->>'password'")"
+[ "${#PW}" = "12" ] || { echo "akun baru harus dapat password 12 karakter"; exit 1; }
+[ "$(q "select kantong_login('tamu','$PW')->>'ok'")" = "true" ] || { echo "password hasil generate harus bisa login"; exit 1; }
+TH="$(q "select encode(extensions.digest(kantong_login('tamu','$PW')->>'token','sha256'),'hex')")"
+[ "$(q "select kantong_admin('$TH','list','{}')->>'code'")" = "AUTH" ] || { echo "non-admin harus ditolak"; exit 1; }
+PW2="$(q "select kantong_admin('$AH','reset','{\"user_id\":\"tamu\"}')->>'password'")"
+[ "$(q "select kantong_login('tamu','$PW')->>'ok'")" = "false" ] || { echo "password lama harus mati setelah reset"; exit 1; }
+[ -z "$(q "select kantong_cek_sesi('$TH')")" ] || { echo "reset harus mencabut sesi"; exit 1; }
+q "select kantong_admin('$AH','simpan','{\"user_id\":\"tamu\",\"username\":\"tamu\",\"aktif\":false}')" >/dev/null
+[ "$(q "select kantong_login('tamu','$PW2')->>'alasan'")" = "nonaktif" ] || { echo "akun nonaktif harus ditolak"; exit 1; }
+[ "$(q "select kantong_admin('$AH','hapus','{\"user_id\":\"riki\"}')->>'ok'")" = "false" ] || { echo "admin tidak boleh hapus diri sendiri"; exit 1; }
+[ "$(q "select kantong_admin('$AH','hapus','{\"user_id\":\"tamu\"}')->>'ok'")" = "true" ] || { echo "hapus gagal"; exit 1; }
+echo "✓ admin: list, buat+generate password, reset, nonaktif, hapus, non-admin ditolak"
+echo "✓ login: bcrypt, sesi, logout, kunci 5x salah, anon ditolak"
 
 # RLS: anon tidak bisa baca apa pun, tidak bisa memanggil RPC
 [ "$(psql -qtA "$PGURL" -c "set role anon; select count(*) from transaksi" 2>&1 | tr -d '\n' | grep -c 'permission denied\|^0$')" = "1" ] || { echo "anon harus ditolak/kosong"; exit 1; }

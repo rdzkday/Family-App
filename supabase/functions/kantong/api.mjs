@@ -4,7 +4,7 @@
  * Dipisah dari index.ts supaya bisa dites di Node dengan fetch tiruan.
  */
 import KantongCore from './core.mjs';
-import { createStore } from './store.mjs';
+import { createStore, rpc } from './store.mjs';
 
 const TZ_OFFSET_MIN = 7 * 60;   // Asia/Jakarta, tanpa DST
 
@@ -66,17 +66,53 @@ export async function handleRequest(rawBody, deps) {
   let body;
   try { body = JSON.parse(rawBody || ''); } catch (e) { return { ok: false, error: 'Request tidak valid' }; }
   if (!body || typeof body !== 'object') return { ok: false, error: 'Request tidak valid' };
+  const cfg = { url: deps.url, serviceKey: deps.serviceKey, fetch: deps.fetch };
+
+  // Login: tanpa token. Username + password dicek di Postgres (bcrypt), hasilnya token sesi baru.
+  if (body.action === 'login') {
+    const p = body.payload || {};
+    const username = typeof p.username === 'string' ? p.username.slice(0, 64) : '';
+    const password = typeof p.password === 'string' ? p.password.slice(0, 200) : '';
+    if (!username || !password) return { ok: false, error: 'Isi username dan password', code: 'LOGIN' };
+    let r;
+    try { r = await rpc(cfg, 'kantong_login', { p_username: username, p_password: password }); }
+    catch (e) { return { ok: false, error: 'Kesalahan server: ' + e.message }; }
+    if (!r || !r.ok) {
+      const pesan = { terkunci: 'Terlalu banyak percobaan. Coba lagi 15 menit lagi.', nonaktif: 'Akun dinonaktifkan. Hubungi admin.' };
+      return { ok: false, code: 'LOGIN', error: (r && pesan[r.alasan]) || 'Username atau password salah' };
+    }
+    return { ok: true, data: { token: r.token, user_id: r.user_id, admin: !!r.admin } };
+  }
+
   const token = typeof body.token === 'string' ? body.token : '';
-  if (token.length < 20) return { ok: false, error: 'Kode akses salah', code: 'AUTH' };
-
-  let store;
-  try { store = await createStore({ url: deps.url, serviceKey: deps.serviceKey, fetch: deps.fetch }); }
-  catch (e) { return { ok: false, error: 'Kesalahan server: ' + e.message }; }
-
+  if (token.length < 20) return { ok: false, error: 'Sesi tidak valid', code: 'AUTH' };
   const hash = await sha256Hex(token, deps.crypto);
-  const ak = store.akses.find((a) => a.token_hash === hash);
-  const u = ak && store.all('Users').find((x) => x.id === ak.user_id);
-  if (!u) return { ok: false, error: 'Kode akses salah', code: 'AUTH' };
+
+  if (body.action === 'logout') {
+    try { await rpc(cfg, 'kantong_logout', { p_hash: hash }); } catch (e) { /* abaikan */ }
+    return { ok: true, data: {} };
+  }
+
+  // Admin panel: semua cek hak & aksi ada di Postgres (kantong_admin).
+  if (body.action === 'admin') {
+    const p = body.payload || {};
+    let r;
+    try { r = await rpc(cfg, 'kantong_admin', { p_hash: hash, p_aksi: String(p.aksi || ''), p_data: p.data || {} }); }
+    catch (e) { return { ok: false, error: 'Kesalahan server: ' + e.message }; }
+    if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'Gagal', code: r && r.code };
+    delete r.ok;
+    return { ok: true, data: r };
+  }
+
+  let store, sesiUser;
+  try {
+    [store, sesiUser] = await Promise.all([createStore(cfg), rpc(cfg, 'kantong_cek_sesi', { p_hash: hash })]);
+  } catch (e) { return { ok: false, error: 'Kesalahan server: ' + e.message }; }
+
+  const ak = store.akses.find((a) => a.token_hash === hash);   // kode koneksi lama (transisi)
+  const uid = sesiUser || (ak && ak.user_id);
+  const u = uid && store.all('Users').find((x) => x.id === uid);
+  if (!u) return { ok: false, error: 'Sesi berakhir, silakan masuk lagi', code: 'AUTH' };
   const user = { id: u.id, nama: u.nama, buku: u.buku };
 
   const planner = calendarPlanner();
