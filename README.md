@@ -20,7 +20,8 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | ✅ Live | Offline: catatan tersimpan di HP, dikirim saat online |
 | ⏳ Perlu setup sekali | Sync to-do ke Google Calendar "Rumah Kita" (secret belum diisi, PANDUAN §7) |
 | ⏳ Perlu dilakukan | Impor data lama dari Google Sheets (PANDUAN §5) |
-| 🧪 Dalam pengembangan | Beranda desktop (`beranda.html`): Agenda & Komitmen masih tersimpan di browser saja |
+| 🧪 Dalam pengembangan | Beranda desktop (`beranda.html`): Agenda & pengingat evaluasi masih tersimpan di browser saja |
+| 🧪 Fase 4a | Komitmen (`komitmen.html`): baca & cari pasal, modul Kesepakatan + Definisi A–Z. Usul/ubah/TTD menyusul. Brief: `claude/komitmen-brief.md` |
 
 ---
 
@@ -83,6 +84,7 @@ Data keuangan pribadi tidak disertakan di repo ini.
 |---|---|
 | `public/` | PWA yang di-deploy. `core.js` = logika bersama (aturan, hitungan, to-do) |
 | `public/beranda.html` | Beranda desktop (ringkasan + agenda/komitmen, sebagian masih di browser) |
+| `public/komitmen.html` | Komitmen: kamus kesepakatan berbentuk pasal (baca & cari) |
 | `supabase/migrations/` | Skema database |
 | `supabase/functions/kantong/` | Edge Function: API + adapter Postgres + Google Calendar |
 | `kantong/PANDUAN.md` | Panduan pasang & update |
