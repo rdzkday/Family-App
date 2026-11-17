@@ -8,7 +8,7 @@ function renderShell() {
   var app = $('#app');
   if (!S.conn) { renderConnect(); return; }
   if (PAGE !== 'kantong') { renderBerandaShell(app); return; }
-  app.innerHTML = (S.conn.mode === 'demo' ? '<div class="demo-bar">Ini versi demo dengan data contoh. <button data-act="leave-demo">Keluar dari demo</button></div>' : '') +
+  app.innerHTML = (S.conn.mode === 'demo' ? '<div class="demo-bar">Mode demo, data contoh. <button data-act="leave-demo">Keluar</button></div>' : '') +
     '<main id="view" class="view"></main>' +
     '<footer class="tabbar"><nav>' + [['home', 'Catat', ICON.home], ['ringkasan', 'Ringkasan', ICON.chart], ['riwayat', 'Riwayat', ICON.list]].map(function (x) {
       return '<button data-tab="' + x[0] + '" aria-current="' + (S.tab === x[0] ? 'page' : 'false') + '">' + x[2] + x[1] + '</button>';

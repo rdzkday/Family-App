@@ -15,6 +15,7 @@ function toast(msg, bad) {
   clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.className = 'toast' + (bad ? ' bad' : ''); }, bad ? 4200 : 2200);
 }
 function syncPill() {
+  if (S.conn && S.conn.mode === 'demo') return '';   // sudah ada bar demo di atas
   var n = S.outbox.length, cls = 'sync', label;
   if (S.syncing) { cls += ' busy'; label = 'Sinkron…'; }
   else if (n) { cls += S.lastError ? ' offline' : ' pending'; label = n + ' belum terkirim'; }

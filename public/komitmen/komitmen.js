@@ -306,8 +306,8 @@
   }
   function listHtml() {
     var d = S.data, FIL = [['semua', 'Semua'], ['pranikah', 'Pranikah'], ['usulan', 'Usulan'], ['dicabut', 'Dicabut']];
-    return '<header class="km-head"><a class="back" href="../" aria-label="Kembali ke Beranda">' + ICON.back + '</a>' +
-      '<div><h1>Komitmen</h1><p class="sub">' + (d ? jumlahLabel(d) : '&nbsp;') + '</p></div>' +
+    return '<header class="ph"><a class="ph-back" href="../" aria-label="Kembali ke Beranda">' + ICON.back + '</a>' +
+      '<div class="ph-text"><h1>Komitmen</h1><p class="ph-sub">' + (d ? jumlahLabel(d) : '&nbsp;') + '</p></div>' +
       (S.status ? '<span class="km-status" role="status">' + esc(S.status) + '</span>' : '') + '</header>' +
       (demo ? '<div class="km-demo">Data contoh, bukan isi kesepakatan asli.' + (conn ? '' : ' Hubungkan dulu di Family App untuk melihat data kalian.') +
         (adaSimulasi() ? ' <button type="button" id="demo-reset">Kembalikan data contoh</button>' : '') + '</div>' : '') +

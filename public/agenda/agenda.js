@@ -4,7 +4,7 @@
 
 // judul + tab di atas setiap view Agenda
 function agendaHead(aktif) {
-  return '<div class="topbar"><div><div class="date">' + longToday() + '</div><h1>Agenda</h1></div><div class="top-actions">' + berandaBtn() + syncPill() + '</div></div>' +
+  return pageHead('Agenda', longToday(), syncPill()) +
     '<div class="seg ag-tabs" role="tablist" aria-label="Bagian Agenda">' + [['todo', 'To-do'], ['catatan', 'Catatan'], ['jadwal', 'Jadwal']].map(function (x) {
       return '<button type="button" role="tab" data-brgo="' + x[0] + '" aria-selected="' + (aktif === x[0]) + '" aria-pressed="' + (aktif === x[0]) + '">' + x[1] + '</button>';
     }).join('') + '</div>';

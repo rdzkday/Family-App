@@ -58,8 +58,7 @@ var Pengaturan = {
 // Halaman Pengaturan (/pengaturan/): diakses dari ikon gear di Beranda. Kembali (kanan atas) → Beranda.
 var PengaturanView = {
   render: function (el) {
-    el.innerHTML = '<div class="topbar"><div><div class="date">Family App</div><h1>Pengaturan</h1></div>' +
-      '<div class="top-actions"><a class="atur-back" href="' + (ROOT || './') + '" aria-label="Kembali ke Beranda">' + ICON.left + 'Beranda</a></div></div>' +
+    el.innerHTML = pageHead('Pengaturan', 'Semua fitur') +
       '<section id="pengaturan" aria-label="Pengaturan semua fitur"></section>';
     Pengaturan.render($('#pengaturan', el));
     bukaPengaturanDariHash();

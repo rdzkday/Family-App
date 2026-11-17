@@ -48,7 +48,7 @@ var RingkasanView = {
   render: function (el) {
     if (S.sub && S.sub.type === 'cat') return CatDetail.render(el);
     var self = this;
-    el.innerHTML = '<div class="topbar"><div><h1>Ringkasan</h1></div>' + berandaBtn() + '</div>' + bukuTabs(true) + monthBar() + '<div id="rk"></div>';
+    el.innerHTML = pageHead('Ringkasan', 'Kantong') + bukuTabs(true) + monthBar() + '<div id="rk"></div>';
     bindNav(el, function () { self.render(el); });
     this.update(el);
   },
@@ -111,10 +111,9 @@ var RingkasanView = {
 var CatDetail = {
   render: function (el) {
     var id = S.sub.id, k = kategoriOf(id) || { nama: 'Tanpa kategori', warna: '#94A3B8', tipe: 'Pengeluaran' };
-    el.innerHTML = '<button class="back" data-back>' + ICON.left + 'Ringkasan</button>' +
-      '<div class="topbar"><div><h1 style="display:flex;align-items:center;gap:10px"><span style="width:12px;height:12px;border-radius:4px;background:' + k.warna + '"></span>' + esc(k.nama) + '</h1>' +
-      '<div class="date">' + monthName(S.bulan) + ', buku ' + esc(S.bukuView === 'all' ? 'semua' : (bukuById(S.bukuView) || {}).nama) + '</div></div>' + berandaBtn() + '</div><div id="cd"></div>';
-    $('[data-back]', el).addEventListener('click', backSub);
+    el.innerHTML = pageHead('<span style="display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:10px;vertical-align:middle;background:' + k.warna + '"></span>' + esc(k.nama),
+      monthName(S.bulan) + ', buku ' + esc(S.bukuView === 'all' ? 'semua' : (bukuById(S.bukuView) || {}).nama), '', 'href="#" data-back aria-label="Kembali ke Ringkasan"') + '<div id="cd"></div>';
+    $('[data-back]', el).addEventListener('click', function (e) { e.preventDefault(); backSub(); });
     var m = ensureMonth(S.bulan), box = $('#cd', el);
     if (!m) { box.innerHTML = skeleton(4); return; }
     var d = db();
@@ -157,7 +156,7 @@ var RiwayatView = {
   q: '', onlyWait: false,
   render: function (el) {
     var self = this;
-    el.innerHTML = '<div class="topbar"><div><h1>Riwayat</h1></div>' + berandaBtn() + '</div>' + bukuTabs(true) + monthBar() +
+    el.innerHTML = pageHead('Riwayat', 'Kantong') + bukuTabs(true) + monthBar() +
       '<input class="input" id="q" type="search" placeholder="Cari keterangan atau kategori" value="' + esc(this.q) + '" aria-label="Cari">' +
       '<div class="chips wrap" style="margin-top:10px"><button type="button" class="chip" id="rw-wait" aria-pressed="' + this.onlyWait + '">Menunggu reimburse</button></div>' +
       '<div id="rw"></div>';

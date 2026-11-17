@@ -33,7 +33,7 @@ function brSyncLine() {
   var timed = todos().filter(function (t) { return C.todoPerluEvent(t); });
   var gagal = timed.filter(function (t) { return !t._pending && t.gcal_status === 'gagal'; });
   var ic = '<span class="br-sync-ic">' + ICON.cal + '</span>', cls = '', txt;
-  if (S.conn && S.conn.mode === 'demo') txt = 'Mode demo · data contoh di HP ini';
+  if (S.conn && S.conn.mode === 'demo') return '';   // sudah ada bar demo di atas
   else if (S.outbox.length) { txt = S.syncing || !S.lastError ? 'Menyinkronkan ' + S.outbox.length + ' perubahan…' : 'Offline · ' + S.outbox.length + ' perubahan menunggu koneksi'; cls = ' wait'; }
   else if (gagal.length && /belum disiapkan/i.test(gagal[0].gcal_error || '')) { txt = 'Google Calendar belum disiapkan'; cls = ' bad'; }
   else if (gagal.length) { txt = gagal.length + ' to-do gagal masuk Google Calendar'; cls = ' bad'; }
