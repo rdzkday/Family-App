@@ -331,4 +331,4 @@ Tiap fase: demo dulu (`KANTONG_PREVIEW`), cek Playwright 390×844 (termasuk meng
 - **Warna:** ikut tema pastel app (keputusan v4), token butter `--b-rt`.
 - **Bab otomatis (asumsi v4):** Claude menyusun nama Bab dari isi saat import pranikah & saat evaluasi. Di app, usulan pasal baru akan menyarankan Bab yang ada atau Bab baru (Fase 4b). Definisi tidak punya Bab (`bab_id` kosong).
 
-**Status Fase 4a (17 Nov, diperbarui v4):** modul Kesepakatan | Definisi A–Z, keterangan tampil di semua pasal. dikerjakan dengan data contoh. Halaman `public/komitmen.html`. Belum di-deploy; migrasi `supabase/migrations/20261117000000_komitmen.sql` perlu dijalankan di Supabase sebelum rilis.
+**Status Fase 4a (17 Nov, diperbarui v4):** modul Kesepakatan | Definisi A–Z, keterangan tampil di semua pasal. dikerjakan dengan data contoh. Halaman `public/komitmen.html`. **Rilis 17 Nov:** merge ke `main` (Vercel), migrasi `20261117000000_komitmen.sql` sudah dijalankan di Supabase, Edge Function `kantong` versi 5. Tabel Komitmen masih kosong sampai Fase 4b (usul + TTD) atau 4c (import pranikah).
