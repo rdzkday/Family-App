@@ -42,12 +42,12 @@ function renderConnect() {
     });
   });
   $('#demo').addEventListener('click', function () {
-    S.conn = { mode: 'demo' }; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
+    S.conn = { mode: 'demo' }; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.siklus = null; S.bukuView = null; persist(); renderShell(); sync();
   });
 }
 function masukDengan(conn) {
   return rpc('bootstrap', {}, conn).then(function (boot) {
-    S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.bukuView = null; persist(); renderShell(); sync();
+    S.conn = conn; S.boot = boot; S.months = {}; S.outbox = []; S.todos = null; S.siklus = null; S.bukuView = null; persist(); renderShell(); sync();
   });
 }
 
@@ -96,8 +96,8 @@ function bukaUbahPassword() {
 
 function disconnect() {
   if (S.conn && S.conn.mode === 'remote') rpc('logout', {}).catch(function () {});   // cabut sesi perangkat ini
-  ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_komitmen'].forEach(LS.del);
+  ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_komitmen', 'k_siklus', 'k_sk_tawar'].forEach(LS.del);
   demoStore = null;
-  S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.sub = null; S.tab = PAGE === 'beranda' ? 'beranda' : PAGE === 'agenda' ? 'todo' : 'home'; S.bukuView = null;
+  S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.siklus = null; S.sub = null; S.tab = PAGE === 'beranda' ? 'beranda' : PAGE === 'agenda' ? 'todo' : 'home'; S.bukuView = null;
   renderConnect();
 }

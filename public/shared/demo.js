@@ -70,9 +70,15 @@ function makeDemoSeed() {
   tdAdd(6, 'Evaluasi bulanan', 'bersama', ev.getFullYear() + '-' + pad(ev.getMonth() + 1) + '-' + pad(ev.getDate()), pad(ev.getHours()) + ':00', false, 'evaluasi');
   tdAdd(7, 'Ide kado ulang tahun Ibu', 'bersama', '', '', false, 'catatan', 'Ide kado ulang tahun Ibu\nSyal rajut atau voucher pijat');
   tdAdd(8, 'Ukuran gorden kamar', 'riki', '', '', false, 'catatan', 'Ukuran gorden kamar\n2 x 140 cm, tinggi 240 cm');
+  // Siklus contoh (sintetis): 4 catatan, jarak ±28–30 hari, aktif & jadwal dibagikan
+  var sk = [[-117, 5, ''], [-88, 5, 'kram hari pertama'], [-59, 6, ''], [-30, 5, '']].map(function (z, i) {
+    var m = C.addDays(t0, z[0]);
+    return { id: 'demo-sk-' + i, pemilik: 'istri', mulai: m, akhir: C.addDays(m, z[1] - 1), abaikan_jarak: false, catatan: z[2], dibuat: m, diubah: m, dihapus: '' };
+  });
+  var skAtur = [{ id: 'istri', aktif: true, bagikan_jadwal: true, bagikan_catatan: false, tampil: true, setuju_at: t0, versi_teks: C.SIKLUS_VERSI_TEKS, diubah: t0 }];
   return {
     buku: [{ id: 'riki', nama: 'Riki', tipe: 'Pribadi', pemilik: 'riki', urutan: 1 }, { id: 'istri', nama: 'Febie', tipe: 'Pribadi', pemilik: 'istri', urutan: 2 }, { id: 'rt', nama: 'Rumah Tangga', tipe: 'Bersama', pemilik: '', urutan: 3 }],
     users: [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'istri', nama: 'Febie', buku: 'istri' }],
-    kategori: kat, kantong: kan, budget: bud, transaksi: tx, todo: td
+    kategori: kat, kantong: kan, budget: bud, transaksi: tx, todo: td, siklus: sk, siklus_atur: skAtur
   };
 }

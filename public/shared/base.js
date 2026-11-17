@@ -67,6 +67,7 @@ var ICON = {
   house: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a2 2 0 0 1-2 2h-3v-6h-6v6H6a2 2 0 0 1-2-2z"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
   ext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>',
+  drop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5c3 3.6 6 7.2 6 10.5a6 6 0 0 1-12 0c0-3.3 3-6.9 6-10.5z"/></svg>',
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'
 };
 
@@ -77,7 +78,11 @@ var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wi
 var PAGE = ['beranda', 'kantong', 'agenda', 'pengaturan'].indexOf(window.KANTONG_PAGE) >= 0 ? window.KANTONG_PAGE : 'kantong';
 var ROOT = window.KANTONG_ROOT || '';
 var AGENDA_RUTE = ['todo', 'catatan', 'jadwal'];
-function agendaRute() { var h = location.hash.slice(1); return AGENDA_RUTE.indexOf(h) >= 0 ? h : 'todo'; }
+function agendaRute() {
+  var h = location.hash.slice(1);
+  if (h === 'kalender' || h === 'siklus') return 'jadwal';   // tab Jadwal sekarang bernama Kalender (berisi agenda + Siklus)
+  return AGENDA_RUTE.indexOf(h) >= 0 ? h : 'todo';
+}
 // link lama: kantong#todo, kantong#pengaturan, beranda#todo/#agenda/#setelan
 function alihkanLinkLama() {
   var h = location.hash;
@@ -110,12 +115,13 @@ var S = {
   months: LS.get('k_months', {}),
   outbox: LS.get('k_outbox', []),
   todos: LS.get('k_todos', null),        // null = belum pernah dimuat
+  siklus: LS.get('k_siklus', null),      // tampilan Siklus dari server (hanya yang boleh dilihat user ini)
   prefs: LS.get('k_prefs', { lastKantong: {}, demoUser: 'riki' }),
   tab: PAGE === 'beranda' ? 'beranda' : PAGE === 'agenda' ? agendaRute() : (({ '#ringkasan': 'ringkasan', '#riwayat': 'riwayat' })[location.hash] || 'home'), sub: null, bukuView: null, bulan: thisMonth(),
   syncing: false, again: false, lastError: null, catTab: 'Pengeluaran'
 };
 function persist() {
-  LS.set('k_conn', S.conn); LS.set('k_boot', S.boot); LS.set('k_outbox', S.outbox); LS.set('k_prefs', S.prefs); LS.set('k_todos', S.todos);
+  LS.set('k_conn', S.conn); LS.set('k_boot', S.boot); LS.set('k_outbox', S.outbox); LS.set('k_prefs', S.prefs); LS.set('k_todos', S.todos); LS.set('k_siklus', S.siklus);
   var keys = Object.keys(S.months).sort().reverse();
   var keep = {}; keys.slice(0, 8).forEach(function (k) { keep[k] = S.months[k]; });
   S.months = keep; LS.set('k_months', keep);
@@ -140,7 +146,8 @@ function demoTables() {
   var saved = LS.get('k_demo', null);
   if (saved) return saved;
   var seed = window.KANTONG_DEMO_SEED || makeDemoSeed();
-  return { Buku: seed.buku, Users: seed.users, Kategori: seed.kategori, Kantong: seed.kantong, Budget: seed.budget, Transaksi: seed.transaksi, Todo: seed.todo || [] };
+  return { Buku: seed.buku, Users: seed.users, Kategori: seed.kategori, Kantong: seed.kantong, Budget: seed.budget, Transaksi: seed.transaksi, Todo: seed.todo || [],
+    Siklus: seed.siklus || [], SiklusAtur: seed.siklus_atur || [] };
 }
 var demoStore = null;
 function demoRpc(action, payload) {
@@ -246,6 +253,8 @@ function applyLocal(op) {
   } else if (op.action === 'todo.sync') {
     var tsy = findTodo(op.payload.id);
     if (tsy) tsy._pending = true;
+  } else if (String(op.action).indexOf('siklus.') === 0 && typeof siklusApplyLocal === 'function') {
+    siklusApplyLocal(op);
   }
 }
 function sync(extraMonths) {
@@ -257,13 +266,14 @@ function sync(extraMonths) {
   (extraMonths || []).concat(S.wantMonths || []).forEach(function (b) { want[b] = 1; });
   S.wantMonths = [];
   var batch = ops.map(function (o) { return { opId: o.opId, action: o.action, payload: o.payload }; })
-    .concat([{ opId: '_boot', action: 'bootstrap' }, { opId: '_todo', action: 'todo.list' }, { opId: '_komit', action: 'komitmen.list' }])
+    .concat([{ opId: '_boot', action: 'bootstrap' }, { opId: '_todo', action: 'todo.list' }, { opId: '_komit', action: 'komitmen.list' }, { opId: '_siklus', action: 'siklus.list' }])
     .concat(Object.keys(want).map(function (b) { return { opId: '_m_' + b, action: 'month', payload: { bulan: b } }; }));
   return rpc('batch', { ops: batch }).then(function (d) {
     var sent = {}; ops.forEach(function (o) { sent[o.opId] = 1; });
     d.results.forEach(function (r) {
       if (r.opId === '_boot') { if (r.ok) S.boot = r.data; }
       else if (r.opId === '_todo') { if (r.ok) S.todos = r.data.todos || []; }
+      else if (r.opId === '_siklus') { if (r.ok) S.siklus = r.data; }
       else if (r.opId === '_komit') { if (r.ok) LS.set('k_komitmen', { data: r.data, at: Date.now() }); }   // cache yang sama dengan komitmen/
       else if (String(r.opId).indexOf('_m_') === 0) { if (r.ok) S.months[r.data.bulan] = r.data; }
       else if (!r.ok) toast('Tidak tersimpan: ' + r.error, true);

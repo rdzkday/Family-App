@@ -1,5 +1,5 @@
 /* Pengaturan semua fitur (halaman /pengaturan/, akses dari gear Beranda), expand-collapse per fitur:
-   Umum · Kantong · Agenda · Komitmen · Daily Mood. Menggantikan tab Pengaturan Kantong & halaman Setelan.
+   Umum · Kantong · Agenda · Siklus · Komitmen · Daily Mood. Menggantikan tab Pengaturan Kantong & halaman Setelan.
    Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
 
@@ -9,11 +9,12 @@ var ATUR_FITUR = [
   ['umum', 'Umum', 'gear', '--br-muted', 'Tema, akun, sinkron', function (b) { AturUmum.render(b); }],
   ['kantong', 'Kantong', 'wallet', '--br-kantong', 'Kantong, kategori, budget bulanan', function (b) { AturKantongFitur.render(b); }],
   ['agenda', 'Agenda', 'check', '--br-agenda', 'Filter default, Google Calendar, evaluasi', function (b) { AturAgenda.render(b); }],
+  ['siklus', 'Siklus', 'drop', '--br-siklus', 'Kalender haid: tampil/sembunyi, berbagi, riwayat', function (b) { AturSiklus.render(b); }],
   ['komitmen', 'Komitmen', 'heart', '--br-komit', 'Kesepakatan & tanda tangan', function (b) { AturKomitmen.render(b); }],
   ['mood', 'Daily Mood', 'book', '--br-catat', 'Profil, kondisi, prompt, cadangan', function (b) { AturMood.render(b); }]
 ];
 // bagian yang aman digambar ulang saat data sinkron (tidak ada kolom isian yang sedang diketik)
-var ATUR_SEGAR = { umum: 1, kantong: 1, agenda: 1, komitmen: 1 };
+var ATUR_SEGAR = { umum: 1, kantong: 1, agenda: 1, siklus: 1, komitmen: 1 };
 
 function aturBuka() { S.prefs.aturBuka = S.prefs.aturBuka || {}; return S.prefs.aturBuka; }
 
@@ -145,12 +146,12 @@ var AturAgenda = {
       : gagal.length && /belum disiapkan/i.test(gagal[0].gcal_error || '') ? 'Belum disiapkan. Masukkan email Google'
       : gagal.length ? gagal.length + ' to-do mendatang gagal masuk kalender' : 'Tersinkron ke kalender "Rumah Kita"';
     var subEmail = !kal ? 'Memuat…' : nEmail ? kal.akses.map(function (a) { return a.email; }).join(', ') : 'Belum ada email';
-    el.innerHTML = '<div class="atur-lbl">Filter awal To-do & Catatan</div><div class="seg" role="group" aria-label="Filter awal">' +
+    el.innerHTML = '<div class="atur-lbl">Filter awal To-do, Catatan & Kalender</div><div class="seg" role="group" aria-label="Filter awal">' +
         [['untukku', 'Untukku'], ['bersama', 'Bersama'], ['semua', 'Semua']].map(function (x) { return '<button type="button" data-ag-f="' + x[0] + '" aria-pressed="' + (f === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>' +
       aturBaris('Google Calendar', esc(status), gagal.length && kal && kal.siap ? '<span class="atur-badge bad">Coba lagi</span>' : '', ' data-ag="gcal"') +
       (S.conn.mode === 'demo' ? '' : aturBaris('Email penerima kalender', esc(subEmail), '', ' data-ag="email"')) +
       aturBaris('Jadwalkan evaluasi bulanan', 'Pengingat muncul di Beranda ' + C.EVALUASI_PENGINGAT_JAM + ' jam sebelumnya', '', ' data-ag="eval"') +
-      aturBaris('Buka Agenda', 'To-do, catatan, jadwal', '', ' data-ag="buka"');
+      aturBaris('Buka Agenda', 'To-do, catatan, kalender', '', ' data-ag="buka"');
     $$('[data-ag-f]', el).forEach(function (b) { b.addEventListener('click', function () { S.prefs.todoFilter = b.getAttribute('data-ag-f'); persist(); refresh(); AturAgenda.render(el); }); });
     $$('[data-ag]', el).forEach(function (b) { b.addEventListener('click', function () {
       var a = b.getAttribute('data-ag');

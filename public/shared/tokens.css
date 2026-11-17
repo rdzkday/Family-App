@@ -93,3 +93,7 @@
   --br-on-accent: #FFFFFF; --br-chk-line: #B6BDC9; --br-placeholder: #7A8394; --br-nav-text: #6B7380;
   --br-skel-1: #EEF0F3; --br-skel-2: #E3E6EB;
 }
+
+/* Siklus (lapisan haid di kalender): pink lembut, teks/ikon tetap kontras di kedua tema */
+:root { --br-siklus: #F9A8D4; --br-siklus-bg: #2A1C25; --br-siklus-line: #5A3550; }
+:root[data-theme="light"] { --br-siklus: #B0306F; --br-siklus-bg: #FCE7F3; --br-siklus-line: #F3B8D6; }

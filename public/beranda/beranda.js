@@ -103,15 +103,17 @@ var BerandaView = {
       '<div class="br-grid"><div class="br-col main">' +
         '<section class="br-card br-kantong" id="br-kantong" aria-labelledby="br-kantong-h"></section>' +
         '<div id="br-eval-m" class="br-eval-slot m"></div>' +
+        '<section class="br-card" id="br-agenda" aria-labelledby="br-agenda-h"></section>' +
         '<section class="br-card" id="br-todo" aria-labelledby="br-todo-h"></section>' +
         '<section class="br-card br-add" id="br-add" aria-label="Tambah cepat"></section>' +
       '</div><div class="br-col side">' +
         '<div id="br-eval-d" class="br-eval-slot d"></div>' +
         '<section class="br-card br-mood" id="br-mood" aria-labelledby="br-mood-h"></section>' +
+        '<section class="br-card br-siklus" id="br-siklus" aria-labelledby="br-siklus-h" hidden></section>' +
       '</div></div></div>';
     $$('[data-who]', el).forEach(function (b) { b.addEventListener('click', function () {
       if (b.getAttribute('data-who') === user.id) return;
-      S.prefs.demoUser = b.getAttribute('data-who'); self.add.pemilik = ''; persist(); S.boot = null; S.todos = null; renderView(); sync();
+      S.prefs.demoUser = b.getAttribute('data-who'); self.add.pemilik = ''; persist(); S.boot = null; S.todos = null; S.siklus = null; renderView(); sync();
     }); });
     this.renderAdd(cari('br-add'));
     this.renderMood(cari('br-mood'));
@@ -125,7 +127,9 @@ var BerandaView = {
     $('#br-eval-m', el).innerHTML = slot === 'm' ? ev : '';
     $('#br-eval-d', el).innerHTML = slot === 'd' ? ev : '';
     this.bindEval(el);
+    this.renderAgenda($('#br-agenda', el));
     this.renderTodo($('#br-todo', el));
+    if (typeof siklusBerandaRender === 'function') siklusBerandaRender($('#br-siklus', el));
   },
   renderKantong: function (box) {
     var user = me(), rt = bukuRT(), m = ensureMonth(thisMonth());
@@ -183,7 +187,7 @@ var BerandaView = {
     var head = '<div class="br-card-h"><h2 id="br-todo-h"><span class="br-ic" style="--c:var(--br-agenda);--cb:var(--br-agenda-bg)">' + ICON.check + '</span>To-do</h2>';
     if (S.todos === null) { box.innerHTML = head + '</div><div class="br-skel-line"></div><div class="br-skel-line"></div>'; return; }
     var semua = todos().filter(function (t) { return todoMatch(t, f); });
-    var tugas = semua.filter(function (t) { return C.todoTipe(t) !== 'catatan'; });
+    var tugas = semua.filter(isTugas);
     var buka = todoSorted(tugas.filter(function (t) { return !C.bool(t.selesai); }));
     var beres = tugas.filter(function (t) { return C.bool(t.selesai) && String(t.diubah || '').slice(0, 10) === today; });
     var notes = semua.filter(function (t) { return C.todoTipe(t) === 'catatan'; })
@@ -203,6 +207,21 @@ var BerandaView = {
     $$('[data-tdone]', box).forEach(function (b) { b.addEventListener('click', function () { toggleTodoDone(findTodo(b.getAttribute('data-tdone'))); }); });
     $$('[data-todo]', box).forEach(function (b) { b.addEventListener('click', function () { var t = findTodo(b.getAttribute('data-todo')); if (t) openTodoSheet(t); }); });
   },
+  // agenda terdekat: hari ini & mendatang (plus yang terlewat 7 hari terakhir), maksimal 4
+  renderAgenda: function (box) {
+    var today = todayISO(), f = todoFilter();
+    var head = '<div class="br-card-h"><h2 id="br-agenda-h"><span class="br-ic" style="--c:var(--br-agenda);--cb:var(--br-agenda-bg)">' + ICON.cal + '</span>Agenda terdekat</h2><a class="br-lnk" href="' + FITUR_URL.agenda + '#jadwal">Kalender</a></div>';
+    if (S.todos === null) { box.innerHTML = head + '<div class="br-skel-line"></div>'; return; }
+    var list = todoSorted(todos().filter(function (t) { return isAgenda(t) && todoMatch(t, f) && !C.bool(t.selesai) && t.tanggal >= C.addDays(today, -7); }));
+    var tampil = list.filter(function (t) { return t.tanggal < today; }).concat(list.filter(function (t) { return t.tanggal >= today; })).slice(0, 4);
+    box.innerHTML = head + (tampil.length ? '<div class="br-todos">' + tampil.map(brTodoRow).join('') + '</div>'
+      : '<div class="br-empty">Belum ada agenda mendatang.</div>') +
+      (list.length > 4 ? '<a class="br-more" href="' + FITUR_URL.agenda + '#jadwal">+' + (list.length - 4) + ' agenda lainnya</a>' : '') +
+      '<button type="button" class="br-btn" id="br-agenda-add">' + ICON.plus + 'Tambah agenda</button>';
+    $$('[data-tdone]', box).forEach(function (b) { b.addEventListener('click', function () { toggleTodoDone(findTodo(b.getAttribute('data-tdone'))); }); });
+    $$('[data-todo]', box).forEach(function (b) { b.addEventListener('click', function () { var t = findTodo(b.getAttribute('data-todo')); if (t) openTodoSheet(t); }); });
+    $('#br-agenda-add', box).addEventListener('click', function () { openTodoSheet(null, { agenda: true }); });
+  },
   renderAdd: function (box) {
     var self = this, a = this.add, user = me();
     if (!a.pemilik) a.pemilik = user.id;
@@ -214,10 +233,10 @@ var BerandaView = {
         ? '<input id="br-add-in" class="br-input" type="text" maxlength="120" autocomplete="off" enterkeyhint="done" placeholder="Tambah to-do…" aria-label="To-do baru">'
         : '<textarea id="br-add-in" class="br-input" rows="3" maxlength="2000" placeholder="Tulis catatan…" aria-label="Catatan baru"></textarea>') +
       '</div><div class="br-add-opts">' +
-        (isTodo ? '<button type="button" class="br-pill blue" id="br-add-time">' + ICON.cal + 'Atur waktu</button>' : '') +
+        (isTodo ? '<button type="button" class="br-pill blue" id="br-add-time" aria-label="Jadikan agenda (dengan tanggal & jam)">' + ICON.cal + 'Agenda</button>' : '') +
         '<button type="button" class="br-pill" id="br-add-who" aria-label="Untuk ' + esc(p.nama) + '. Ketuk untuk ganti">' + ICON.user + 'Untuk: ' + esc(p.id === user.id ? user.nama : p.nama) + '</button>' +
         '<button type="button" class="br-btn primary small" id="br-add-save">Simpan</button>' +
-      '</div><p class="br-help">' + (isTodo ? 'Tanpa waktu: disimpan di app saja. Atur waktu → masuk Google Calendar.' : 'Catatan tidak masuk kalender. Pilih "Bersama" supaya bisa dibaca berdua.') + '</p>';
+      '</div><p class="br-help">' + (isTodo ? 'To-do tanpa waktu, tercatat tanggal dibuatnya. Butuh tanggal & jam? Pakai Agenda → masuk Google Calendar.' : 'Catatan tidak masuk kalender. Pilih "Bersama" supaya bisa dibaca berdua.') + '</p>';
     var inp = $('#br-add-in', box);
     function simpan() {
       var v = inp.value.trim(); if (!v) { inp.focus(); return; }
@@ -234,7 +253,7 @@ var BerandaView = {
       var v = inp.value; self.renderAdd(box); var ni = $('#br-add-in', box); ni.value = v;
     });
     var tm = $('#br-add-time', box);
-    if (tm) tm.addEventListener('click', function () { openTodoSheet(null, { tipe: 'todo', judul: inp.value.trim(), pemilik: a.pemilik, aturWaktu: true }); inp.value = ''; });
+    if (tm) tm.addEventListener('click', function () { openTodoSheet(null, { tipe: 'todo', judul: inp.value.trim(), pemilik: a.pemilik, agenda: true }); inp.value = ''; });
   },
   renderMood: function (box) {
     var self = this, cur = this.mood;
@@ -258,7 +277,7 @@ function brTodoRow(t) {
     var gagal = !t._pending && t.gcal_status === 'gagal';
     meta = '<span class="br-when' + (gagal || todoTerlewat(t) ? ' bad' : '') + '">' + (gagal ? ICON.calx : ICON.cal) + esc(todoWaktuLabel(t)) + '</span>' +
       (t.pemilik !== me().id ? '<span class="br-owner">' + esc(p.nama) + '</span>' : '');
-  } else meta = '<span class="br-owner">' + esc(p.id === me().id ? me().nama : p.nama) + '</span>';
+  } else meta = '<span class="br-owner">' + esc(p.id === me().id ? me().nama : p.nama) + '</span>' + (todoDibuatLabel(t) ? '<span class="br-when">' + esc(todoDibuatLabel(t)) + '</span>' : '');
   if (ev) meta = '<span class="br-owner amber">' + ICON.heart + 'Evaluasi</span>' + meta;
   return '<div class="br-todo' + (selesai ? ' done' : '') + '">' +
     '<button type="button" class="br-chk" role="checkbox" aria-checked="' + selesai + '" data-tdone="' + esc(t.id) + '" aria-label="' + (selesai ? 'Batalkan selesai' : 'Tandai selesai') + ': ' + esc(t.judul) + '"' + (bisa ? '' : ' disabled') + '><i>' + ICON_CHECK + '</i></button>' +

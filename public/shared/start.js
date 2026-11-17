@@ -8,13 +8,13 @@ if (PAGE === 'beranda' && window.matchMedia) matchMedia('(min-width: 900px)').ad
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') sync(); });
 setInterval(function () { if (document.visibilityState === 'visible' && (S.outbox.length || !S.lastSync || Date.now() - S.lastSync > 120000)) sync(); }, 30000);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register(ROOT + 'sw.js').catch(function () {});
-// data demo versi lama (sebelum to-do) dibuang sekali supaya contoh to-do ikut muncul
-if (LS.get('k_ver', null) !== 'v6') {
+// data demo versi lama dibuang sekali supaya contoh baru (to-do, Siklus) ikut muncul
+if (LS.get('k_ver', null) !== 'v7') {
   if (S.conn && S.conn.mode === 'demo') {
-    ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_komitmen'].forEach(LS.del);
-    S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null;
+    ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_komitmen', 'k_siklus'].forEach(LS.del);
+    S.conn = null; S.boot = null; S.months = {}; S.outbox = []; S.todos = null; S.siklus = null;
   }
-  LS.set('k_ver', 'v6');
+  LS.set('k_ver', 'v7');
 }
 if (!S.conn && window.KANTONG_PREVIEW) S.conn = { mode: 'demo' };   // file preview
 renderShell();

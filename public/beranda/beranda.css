@@ -263,3 +263,66 @@ body.br-page :focus-visible { outline: 2px solid var(--br-agenda); outline-offse
 .atur-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 14px 0 10px; border-radius: 999px;
   background: var(--surface); box-shadow: var(--shadow); color: var(--text); font-weight: 800; font-size: 14px; text-decoration: none; }
 .atur-back svg { width: 18px; height: 18px; }
+
+/* ================= Kalender Agenda ================= */
+.kal { background: var(--br-surface); border: 1px solid var(--br-border); border-radius: var(--br-r); padding: 10px 10px 12px; margin: 12px 0 0; }
+.kal-nav { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.kal-nav strong { flex: 1; text-align: center; font-size: 16px; font-weight: 800; }
+.kal-today { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--br-border); color: var(--br-agenda); font-size: 13px; font-weight: 700; }
+.kal-w, .kal-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.kal-w span { text-align: center; font-size: 11.5px; font-weight: 700; color: var(--br-muted); padding: 4px 0; }
+.kal-d { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 46px; border-radius: 12px;
+  border: 1.5px solid transparent; color: var(--br-text); font-variant-numeric: tabular-nums; }
+.kal-d .n { font-size: 14px; font-weight: 700; line-height: 1; }
+.kal-d .dots { display: flex; gap: 3px; height: 6px; }
+.kal-d .dots i, .kal-leg i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--br-agenda); }
+.kal-d .dots i.beres { background: var(--br-chk-line); }
+.kal-d.hari-ini .n { color: var(--br-agenda); font-weight: 800; }
+.kal-d.hari-ini::after { content: ''; position: absolute; top: 4px; right: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--br-agenda); }
+.kal-d.sk-catat { background: var(--br-siklus-bg); color: var(--br-siklus); }
+.kal-d.sk-kira { border: 1.5px dashed var(--br-siklus-line); }
+.kal-d.pilih { border: 2px solid var(--br-agenda); }
+.kal-d.kosong { min-height: 0; }
+.kal-d:not(.kosong):active { transform: scale(.95); }
+.kal-leg { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 10px 4px 0; font-size: 12.5px; color: var(--br-muted); font-weight: 600; }
+.kal-leg span { display: inline-flex; align-items: center; gap: 6px; }
+.kal-leg i.skc { width: 10px; height: 10px; border-radius: 3px; background: var(--br-siklus); }
+.kal-leg i.skk { width: 10px; height: 10px; border-radius: 3px; background: transparent; border: 1.5px dashed var(--br-siklus); }
+.kal-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--br-siklus-line);
+  color: var(--br-siklus); background: var(--br-siklus-bg); font-size: 12.5px; font-weight: 700; }
+.kal-chip[aria-checked="false"] { background: transparent; color: var(--br-muted); border-color: var(--br-border); text-decoration: line-through; }
+.kal-chip[aria-checked="false"] i.skc { background: var(--br-chk-line); }
+.kal-hari { background: var(--br-surface); border: 1px solid var(--br-border); border-radius: var(--br-r); padding: 14px; margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.kal-hari:empty { display: none; }
+.kal-hari-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.kal-hari-h h2 { font-size: 15px; font-weight: 800; margin: 0; }
+.td-ubah-jenis { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin: 4px 0 0; padding: 0 4px; color: var(--br-agenda); font-size: 13.5px; font-weight: 700; }
+.td-ubah-jenis svg { width: 16px; height: 16px; }
+
+/* ================= Siklus ================= */
+.sk-card, .sk-hari { display: flex; flex-direction: column; gap: 10px; }
+.sk-card { background: var(--br-siklus-bg); border: 1px solid var(--br-siklus-line); border-radius: var(--br-r); padding: 14px; margin-top: 12px; }
+.br-siklus .sk-card { margin: 0; }
+.sk-top { display: flex; gap: 12px; align-items: flex-start; }
+.sk-top b { display: block; font-size: 15px; color: var(--br-text); }
+.sk-ic { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: var(--br-surface); color: var(--br-siklus); }
+.sk-ic svg, .sk-pill svg { width: 18px; height: 18px; }
+.sk-sub { display: block; font-size: 13px; color: var(--br-muted); font-weight: 600; margin-top: 2px; line-height: 1.45; }
+.sk-note { display: block; font-size: 12px; color: var(--br-muted); margin-top: 6px; line-height: 1.45; }
+.sk-cat { display: block; font-size: 13.5px; margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: var(--br-inset); color: var(--br-text); }
+.sk-act { display: flex; flex-wrap: wrap; gap: 8px; }
+.br-btn.sk-solid { background: var(--br-siklus); border-color: var(--br-siklus); color: var(--br-on-accent); }
+.sk-dot { flex: none; width: 12px; height: 12px; margin-top: 4px; border-radius: 4px; background: var(--br-siklus); }
+.sk-dot.kira { background: transparent; border: 1.5px dashed var(--br-siklus); }
+.br-pill.sk-pill { background: var(--br-siklus-bg); border-color: var(--br-siklus-line); color: var(--br-siklus); }
+.br-pill.sk-pill svg { color: var(--br-siklus); }
+.sk-p { margin: 0 0 8px; font-size: 14.5px; line-height: 1.55; }
+.sk-list { margin: 0 0 12px; padding-left: 18px; font-size: 13.5px; line-height: 1.55; color: var(--br-text); }
+.sk-list li { margin-bottom: 6px; }
+.sk-warn { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--br-komit-bg); color: var(--br-komit-text); font-size: 13px; font-weight: 600; }
+.sk-cek { display: flex; align-items: center; gap: 10px; min-height: 48px; margin: 8px 0; font-weight: 700; }
+.sk-cek input { width: 22px; height: 22px; accent-color: var(--br-siklus); }
+.sk-row .sk-dot { margin-top: 0; }
+.sk-row:disabled { opacity: 1; cursor: default; }
+.section-h .lnk { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; }
+.section-h .lnk svg { width: 16px; height: 16px; }

@@ -29,14 +29,18 @@ var KantongCore = (function () {
       'status', 'dibuat_at'],
     Evaluasi: ['id', 'tanggal', 'catatan', 'dibuat_oleh', 'selesai_at'],
     // Ruang Catat (pribadi): satu baris per hari + satu baris pengaturan per orang. isi = JSON dari app.
-    Jurnal: ['id', 'pemilik', 'jenis', 'tanggal', 'isi', 'diubah', 'dihapus']
+    Jurnal: ['id', 'pemilik', 'jenis', 'tanggal', 'isi', 'diubah', 'dihapus'],
+    // Siklus (catatan haid istri). Baris dihapus = tombstone: tanggal & catatan dikosongkan.
+    Siklus: ['id', 'pemilik', 'mulai', 'akhir', 'abaikan_jarak', 'catatan', 'dibuat', 'diubah', 'dihapus'],
+    // pengaturan Siklus per user (id = id user). tampil = pilihan masing-masing; sisanya hanya berarti untuk pemilik.
+    SiklusAtur: ['id', 'aktif', 'bagikan_jadwal', 'bagikan_catatan', 'tampil', 'setuju_at', 'versi_teks', 'diubah']
   };
   var KAT_REIMBURSE = 'reimburse-masuk';   // kategori pemasukan otomatis, tidak dihitung sebagai pendapatan
   var KAT_SETORAN = 'setoran-rt';          // pengeluaran otomatis: topup dari kantong pribadi ke dompet bersama
   var KAT_SETORAN_MASUK = 'setoran-rt-in'; // pemasukan otomatis di sisi dompet bersama
   var TIPE_TX = ['Pengeluaran', 'Pemasukan', 'Transfer'];
   var JENIS_KANTONG = ['Cash', 'Debit', 'E-wallet', 'Kredit'];
-  var VERSION = '1.6.0';
+  var VERSION = '1.7.0';
   // ---------- to-do ----------
   var TODO_BERSAMA = 'bersama';          // pemilik to-do bersama (selain itu: id user)
   var TODO_DURASI = 30;                  // menit, dipakai kalau jam diisi tapi durasi kosong
@@ -912,6 +916,198 @@ var KantongCore = (function () {
     throw err('Aksi tidak dikenal: ' + action);
   }
 
+  // ---------- Siklus (catatan haid) ----------
+  // Pemilik = user istri. Aturan baca/tulis dijalankan di sini (server), bukan hanya di tampilan:
+  //  * pemilik : baca + tulis semua catatannya.
+  //  * pasangan: baca JADWAL hanya kalau Siklus aktif & jadwal dibagikan; catatan hanya kalau catatan juga dibagikan.
+  //  * tiap user memilih sendiri Siklus ditampilkan atau tidak di app-nya (tampil).
+  var SIKLUS_PEMILIK = 'istri';
+  var SIKLUS_VERSI_TEKS = 1;        // naikkan kalau teks privasi berubah -> pemilik diminta setuju ulang
+  var SK = { NORMAL_MIN: 21, NORMAL_MAX: 35, BAKU_SIKLUS: 28, BAKU_DURASI: 5, JUMLAH: 6, RENTANG: 2, MAKS_DURASI: 15, CATATAN_MAKS: 300 };
+  // rentang siklus dewasa yang umum 21–35 hari (ACOG; Cleveland Clinic)
+  function skSelisih(a, b) {   // jumlah hari dari a ke b
+    var pa = a.split('-'), pb = b.split('-');
+    return Math.round((Date.UTC(+pb[0], +pb[1] - 1, +pb[2]) - Date.UTC(+pa[0], +pa[1] - 1, +pa[2])) / 86400000);
+  }
+  function skUrut(rows) {
+    return (rows || []).filter(function (r) { return r && r.mulai && !r.dihapus; }).slice()
+      .sort(function (a, b) { return a.mulai < b.mulai ? -1 : (a.mulai > b.mulai ? 1 : 0); });
+  }
+  function skRata(arr) { return Math.round(arr.reduce(function (s, x) { return s + x; }, 0) / arr.length); }
+  // jarak antar hari pertama berturut-turut; abaikan = pemilik bilang ada catatan terlewat sebelum siklus itu
+  function skJarak(rows) {
+    var s = skUrut(rows), out = [];
+    for (var i = 1; i < s.length; i++) out.push({ dari: s[i - 1].mulai, ke: s[i].mulai, hari: skSelisih(s[i - 1].mulai, s[i].mulai), abaikan: bool(s[i].abaikan_jarak) });
+    return out;
+  }
+  // panjang siklus = rata-rata 6 jarak terakhir yang dipakai; belum ada jarak = 28 hari ("perkiraan kasar")
+  function skRingkas(rows) {
+    var s = skUrut(rows);
+    var j = skJarak(s).filter(function (x) { return !x.abaikan && x.hari > 0; }).slice(-SK.JUMLAH);
+    var d = s.filter(function (r) { return r.akhir; }).map(function (r) { return skSelisih(r.mulai, r.akhir) + 1; }).slice(-SK.JUMLAH);
+    return { jumlah: s.length, dipakai: j.length, kasar: j.length === 0, panjang: j.length ? skRata(j.map(function (x) { return x.hari; })) : SK.BAKU_SIKLUS,
+      durasi: d.length ? Math.min(SK.MAKS_DURASI, skRata(d)) : SK.BAKU_DURASI };
+  }
+  function skAkhir(r, durasi) { return r.akhir || addDays(r.mulai, durasi - 1); }
+  function skPerkiraan(rows, today) {
+    var s = skUrut(rows); if (!s.length) return null;
+    var r = skRingkas(s), berikut = addDays(s[s.length - 1].mulai, r.panjang);
+    // terlambat <= 1 siklus: tampilkan apa adanya + "sudah lewat N hari".
+    // terlambat > 1 siklus (kemungkinan lupa mencatat): geser ke perkiraan berikutnya yang belum lewat.
+    var telat = skSelisih(berikut, today), geser = 0;
+    if (telat > r.panjang) {
+      while (skSelisih(berikut, today) > SK.RENTANG && geser < 60) { berikut = addDays(berikut, r.panjang); geser++; }
+      telat = 0;
+    }
+    return { berikut: berikut, dari: addDays(berikut, -SK.RENTANG), sampai: addDays(berikut, SK.RENTANG), kasar: r.kasar,
+      panjang: r.panjang, durasi: r.durasi, jumlah: r.jumlah, dipakai: r.dipakai, telat: telat > SK.RENTANG ? telat : 0 };
+  }
+  // tanda per tanggal di [awal, akhir]: 'catat' (tercatat) atau 'kira' (rentang perkiraan, 3 siklus ke depan)
+  function skTanda(rows, today, awal, akhir) {
+    var s = skUrut(rows), r = skRingkas(s), out = {}, akhirTerakhir = '';
+    s.forEach(function (row) {
+      var z = skAkhir(row, r.durasi);
+      if (z > akhirTerakhir) akhirTerakhir = z;
+      if (z < awal || row.mulai > akhir) return;
+      for (var d = row.mulai; d <= z; d = addDays(d, 1)) if (d >= awal && d <= akhir) out[d] = 'catat';
+    });
+    var p = skPerkiraan(s, today);
+    if (p) for (var k = 0; k < 3; k++) {
+      var m = addDays(p.berikut, k * r.panjang);
+      for (var i = -SK.RENTANG; i <= SK.RENTANG; i++) {
+        var d2 = addDays(m, i);
+        if (d2 >= awal && d2 <= akhir && !out[d2] && d2 > akhirTerakhir) out[d2] = 'kira';
+      }
+    }
+    return out;
+  }
+  function skCatatanDi(rows, d, durasi) {
+    var hit = null;
+    skUrut(rows).forEach(function (row) { if (d >= row.mulai && d <= skAkhir(row, durasi)) hit = row; });
+    return hit;
+  }
+  // catatan yang masih berjalan (belum dicatat selesai, belum lewat batas) pada tanggal d
+  function skBerjalan(rows, d) {
+    var s = skUrut(rows), last = s[s.length - 1];
+    if (!last || last.akhir || d < last.mulai || skSelisih(last.mulai, d) >= SK.MAKS_DURASI) return null;
+    return last;
+  }
+  // jarak tidak biasa ke hari pertama sebelumnya (di luar 21–35 hari) -> jumlah hari; 0 kalau wajar / tidak ada pembanding
+  function skJarakAneh(rows, mulaiBaru, kecualiId) {
+    var prev = null;
+    skUrut(rows).forEach(function (r) { if (r.id !== kecualiId && r.mulai < mulaiBaru) prev = r; });
+    if (!prev) return 0;
+    var h = skSelisih(prev.mulai, mulaiBaru);
+    return h < SK.NORMAL_MIN || h > SK.NORMAL_MAX ? h : 0;
+  }
+  var Siklus = { K: SK, selisih: skSelisih, urut: skUrut, jarak: skJarak, ringkas: skRingkas, akhir: skAkhir, perkiraan: skPerkiraan,
+    tanda: skTanda, catatanDi: skCatatanDi, berjalan: skBerjalan, jarakAneh: skJarakAneh };
+
+  function siklusAturDari(db, uid) {
+    var a = byId(db.SiklusAtur || [])[uid];
+    if (!a) return { aktif: false, bagikan_jadwal: true, bagikan_catatan: false, tampil: true, setuju_at: '', versi_teks: 0 };
+    return { aktif: bool(a.aktif), bagikan_jadwal: bool(a.bagikan_jadwal), bagikan_catatan: bool(a.bagikan_catatan), tampil: bool(a.tampil),
+      setuju_at: a.setuju_at || '', versi_teks: num(a.versi_teks) };
+  }
+  // tampilan Siklus untuk user tertentu (hanya data yang boleh ia lihat)
+  function siklusView(db, user) {
+    var pemilik = SIKLUS_PEMILIK, milikku = user.id === pemilik;
+    var ap = siklusAturDari(db, pemilik), aku = siklusAturDari(db, user.id);
+    var u = (db.Users || []).filter(function (x) { return x.id === pemilik; })[0];
+    var aktif = ap.aktif && ap.versi_teks >= SIKLUS_VERSI_TEKS;
+    var jadwal = milikku || (aktif && ap.bagikan_jadwal), catatan = milikku || (jadwal && ap.bagikan_catatan);
+    var rows = !jadwal ? [] : skUrut((db.Siklus || []).filter(function (r) { return r.pemilik === pemilik; })).map(function (r) {
+      return { id: r.id, mulai: r.mulai, akhir: r.akhir || '', abaikan_jarak: bool(r.abaikan_jarak), catatan: catatan ? (r.catatan || '') : '' };
+    });
+    var v = { peran: milikku ? 'pemilik' : 'pembaca', pemilik: { id: pemilik, nama: u ? u.nama : 'Istri', ada: !!u }, tampil: aku.tampil, versi_wajib: SIKLUS_VERSI_TEKS, siklus: rows };
+    if (milikku) {
+      v.aktif = aktif; v.bagikan_jadwal = ap.bagikan_jadwal; v.bagikan_catatan = ap.bagikan_catatan; v.setuju_at = ap.setuju_at; v.versi_teks = ap.versi_teks;
+    } else { v.dibagikan = !!jadwal; v.catatan_dibagikan = !!(jadwal && ap.bagikan_catatan); }
+    return v;
+  }
+  function siklusSimpanAtur(store, db, uid, ubah, nowIso) {
+    var lama = byId(db.SiklusAtur || [])[uid], a = siklusAturDari(db, uid);
+    Object.keys(ubah).forEach(function (k) { a[k] = ubah[k]; });
+    var row = { id: uid, aktif: !!a.aktif, bagikan_jadwal: !!a.bagikan_jadwal, bagikan_catatan: !!a.bagikan_catatan, tampil: a.tampil !== false,
+      setuju_at: a.setuju_at || '', versi_teks: num(a.versi_teks), diubah: nowIso };
+    store.upsert('SiklusAtur', row);
+    db.SiklusAtur = (db.SiklusAtur || []).filter(function (x) { return x.id !== uid; }).concat([row]);
+    return lama;
+  }
+  function siklusAksi(store, db, user, action, payload, nowIso) {
+    var pemilik = SIKLUS_PEMILIK, milikku = user.id === pemilik, today = nowIso.slice(0, 10);
+    var namaPemilik = siklusView(db, user).pemilik.nama;
+    function hanyaPemilik() { if (!milikku) throw err('Hanya ' + namaPemilik + ' yang bisa mengubah catatan Siklus'); }
+    var hidup = (db.Siklus || []).filter(function (r) { return r.pemilik === pemilik && !r.dihapus && r.mulai; });
+    if (action === 'siklus.list') return siklusView(db, user);
+    if (action === 'siklus.atur') {
+      var ubah = {};
+      if ('tampil' in payload) ubah.tampil = bool(payload.tampil);
+      ['aktif', 'bagikan_jadwal', 'bagikan_catatan', 'setuju'].forEach(function (k) { if (k in payload) hanyaPemilik(); });
+      if ('bagikan_jadwal' in payload) ubah.bagikan_jadwal = bool(payload.bagikan_jadwal);
+      if ('bagikan_catatan' in payload) ubah.bagikan_catatan = bool(payload.bagikan_catatan);
+      if (payload.setuju) {
+        if (num(payload.setuju) < SIKLUS_VERSI_TEKS) throw err('Teks privasi sudah diperbarui. Baca dan setujui lagi.');
+        ubah.setuju_at = nowIso; ubah.versi_teks = num(payload.setuju);
+      }
+      if ('aktif' in payload) {
+        ubah.aktif = bool(payload.aktif);
+        var versi = 'versi_teks' in ubah ? ubah.versi_teks : siklusAturDari(db, pemilik).versi_teks;
+        if (ubah.aktif && versi < SIKLUS_VERSI_TEKS) throw err('Setujui teks privasi dulu untuk mengaktifkan Siklus');
+      }
+      siklusSimpanAtur(store, db, user.id, ubah, nowIso);
+      return siklusView(db, user);
+    }
+    if (action === 'siklus.save') {
+      hanyaPemilik();
+      if (!siklusView(db, user).aktif) throw err('Aktifkan Siklus dulu di Pengaturan');
+      var id = String(payload.id || '');
+      if (!id || id.length > 64) throw err('ID catatan tidak valid');
+      var ex = byId(db.Siklus || [])[id];
+      if (ex && ex.pemilik !== pemilik) throw err('Catatan ini bukan milikmu');
+      if (ex && ex.dihapus) throw err('Catatan sudah dihapus');
+      var mulai = String(payload.mulai || ''), akhir = String(payload.akhir || '');
+      if (!isDate(mulai)) throw err('Isi tanggal mulai');
+      if (mulai > today) throw err('Tanggal mulai tidak boleh di masa depan');
+      if (akhir) {
+        if (!isDate(akhir)) throw err('Tanggal selesai tidak valid');
+        if (akhir < mulai || skSelisih(mulai, akhir) >= SK.MAKS_DURASI) throw err('Tanggal selesai harus 1–' + SK.MAKS_DURASI + ' hari sejak mulai');
+        if (akhir > today) throw err('Tanggal selesai tidak boleh di masa depan');
+      }
+      var cat = String(payload.catatan == null ? (ex ? ex.catatan : '') : payload.catatan).trim();
+      if (cat.length > SK.CATATAN_MAKS) throw err('Catatan maksimal ' + SK.CATATAN_MAKS + ' karakter');
+      var ujung = akhir || mulai;
+      hidup.forEach(function (o) {
+        if (o.id === id) return;
+        if (o.mulai === mulai) throw err('Sudah ada catatan yang mulai di tanggal itu');
+        if (mulai <= (o.akhir || o.mulai) && ujung >= o.mulai) throw err('Tanggalnya bertabrakan dengan catatan lain');
+      });
+      store.upsert('Siklus', { id: id, pemilik: pemilik, mulai: mulai, akhir: akhir, abaikan_jarak: bool(payload.abaikan_jarak), catatan: cat,
+        dibuat: ex ? ex.dibuat : nowIso, diubah: nowIso, dihapus: '' });
+      db.Siklus = store.all('Siklus');
+      return siklusView(db, user);
+    }
+    if (action === 'siklus.delete') {
+      hanyaPemilik();
+      var h = byId(db.Siklus || [])[String(payload.id || '')];
+      if (h && h.pemilik === pemilik && !h.dihapus) {
+        store.upsert('Siklus', { id: h.id, pemilik: pemilik, mulai: '', akhir: '', abaikan_jarak: false, catatan: '', dibuat: h.dibuat, diubah: nowIso, dihapus: nowIso });
+        db.Siklus = store.all('Siklus');
+      }
+      return siklusView(db, user);
+    }
+    if (action === 'siklus.hapus_semua') {
+      hanyaPemilik();
+      hidup.forEach(function (r) {
+        store.upsert('Siklus', { id: r.id, pemilik: pemilik, mulai: '', akhir: '', abaikan_jarak: false, catatan: '', dibuat: r.dibuat, diubah: nowIso, dihapus: nowIso });
+      });
+      db.Siklus = store.all('Siklus');
+      siklusSimpanAtur(store, db, pemilik, { aktif: false, bagikan_jadwal: true, bagikan_catatan: false, setuju_at: '', versi_teks: 0 }, nowIso);
+      return siklusView(db, user);
+    }
+    throw err('Aksi tidak dikenal: ' + action);
+  }
+
   // ---------- API handler (dipakai server & mode demo) ----------
   // store: { all(table) -> array, upsert(table, obj) -> obj, calendar?: { upsert, remove } }
   function handle(store, user, action, payload, nowIso) {
@@ -1152,6 +1348,7 @@ var KantongCore = (function () {
         if (String(action).indexOf('komitmen.') === 0) return komitmenAksi(store, db, user, action, payload, nowIso);
         if (String(action).indexOf('pengesahan.') === 0) return pengesahanAksi(store, db, user, action, payload || {}, nowIso);
         if (String(action).indexOf('jurnal.') === 0) return jurnalAksi(store, db, user, action, payload, nowIso);
+        if (String(action).indexOf('siklus.') === 0) return siklusAksi(store, db, user, action, payload, nowIso);
         throw err('Aksi tidak dikenal: ' + action);
     }
   }
@@ -1195,7 +1392,8 @@ var KantongCore = (function () {
     ayatDari: ayatDari, slotTtd: slotTtd,
     isTime: isTime, TODO_BERSAMA: TODO_BERSAMA, TODO_DURASI: TODO_DURASI, TODO_SELESAI_EVENT: TODO_SELESAI_EVENT,
     TODO_TIPE: TODO_TIPE, todoTipe: todoTipe, evaluasiPengingat: evaluasiPengingat, EVALUASI_JUDUL: EVALUASI_JUDUL,
-    EVALUASI_PENGINGAT_JAM: EVALUASI_PENGINGAT_JAM
+    EVALUASI_PENGINGAT_JAM: EVALUASI_PENGINGAT_JAM,
+    Siklus: Siklus, siklusView: siklusView, SIKLUS_PEMILIK: SIKLUS_PEMILIK, SIKLUS_VERSI_TEKS: SIKLUS_VERSI_TEKS
   };
 })();
 export default KantongCore;
