@@ -43,6 +43,12 @@ supabase functions deploy kantong --no-verify-jwt
 
 `--no-verify-jwt` wajib: autentikasi memakai **kode akses** di body request, bukan JWT Supabase. Tanpa kode akses yang cocok, server menolak.
 
+Tanpa Supabase CLI: buat token di supabase.com → Account → **Access Tokens**, lalu
+
+```bash
+SUPABASE_ACCESS_TOKEN=sbp_xxx node kantong/tools/deploy_supabase.js <PROJECT_ID>
+```
+
 URL API: `https://<PROJECT_ID>.supabase.co/functions/v1/kantong`. Buka di browser, harus muncul `{"ok":true,"app":"Kantong API","backend":"supabase"}`.
 
 ## 4. Buat kode koneksi (2 menit)
