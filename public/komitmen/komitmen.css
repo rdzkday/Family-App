@@ -112,3 +112,16 @@ mark { background: var(--km); color: var(--ink); border-radius: 4px; padding: 0 
 .pasal-acts .cap { flex-basis: 100%; font-size: 12px; color: var(--text-2); font-weight: 700; }
 .km-detail .km-empty { margin-top: 0; }
 .km .toast { bottom: calc(var(--safe-b) + 20px); }
+
+/* form pasal baru (simulasi Fase 4b) */
+.km .btn.baru { margin-bottom: 16px; background: var(--km); color: var(--ink); }
+.km-demo button, .km-empty .link { font: inherit; font-weight: 900; text-decoration: underline; color: inherit; background: none; padding: 0; }
+.km-form .fb-sub { margin: 0 0 4px; font-size: 14px; color: var(--text-2); }
+.km-form .seg button[aria-pressed="true"] { background: var(--km); color: var(--ink); }
+.km-form .opt { font-weight: 600; color: var(--text-3); }
+.km-form #fb-bab-baru { margin-top: 8px; }
+.km-form .fb-ayat { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+.km-form .fb-ayat .n { flex: none; width: 28px; padding-top: 14px; font-weight: 900; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.km-form .fb-ayat textarea { min-height: 64px; }
+.km-form .fb-err { color: var(--over); font-weight: 800; font-size: 14px; min-height: 1em; margin: 12px 0 8px; }
+.km-form .btn[type="submit"] { background: var(--km); color: var(--ink); }

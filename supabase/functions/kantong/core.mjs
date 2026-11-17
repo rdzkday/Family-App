@@ -628,7 +628,7 @@ var KantongCore = (function () {
     return out.sort(function (a, b) { return (a.tingkat - b.tingkat) || (b.frasa - a.frasa) || (a.pasal.nomor - b.pasal.nomor); });
   }
 
-  function komitmenAksi(store, db, user, action, payload) {
+  function komitmenAksi(store, db, user, action, payload, nowIso) {
     if (action === 'komitmen.list') return komitmenView(db, user);
     if (action === 'komitmen.history') {
       var id = String(payload.pasal_id || '');
@@ -648,6 +648,56 @@ var KantongCore = (function () {
       var kunci = function (r) { return (r.status === 'usulan' ? '9' : '0') + String(r.berlaku_sejak || r.dibuat_at); };
       item.sort(function (a, b) { return kunci(b).localeCompare(kunci(a)) || (num(b.versi) - num(a.versi)); });
       return { pasal_id: id, riwayat: item };
+    }
+    // Fase 4b (awal): usul pasal baru di luar evaluasi → status Usulan + Lembar Pengesahan tunggal (brief §6, §8E).
+    if (action === 'komitmen.usul_baru') {
+      var nowU = String(nowIso || new Date().toISOString());
+      var tipe = payload.tipe === 'definisi' ? 'definisi' : 'kesepakatan';
+      var judul = String(payload.judul || '').trim();
+      var ayat = ayatDari(payload.ayat).map(function (a) { return a.trim(); }).filter(Boolean);
+      if (!judul) throw err('Judul wajib diisi');
+      if (judul.length > 120) throw err('Judul maksimal 120 huruf');
+      if (!ayat.length) throw err('Isi minimal satu ayat');
+      var babId = '';
+      if (tipe === 'kesepakatan') {
+        var babs = (db.KomitmenBab || []).filter(function (b) { return !b.dihapus; });
+        var babBaru = String(payload.bab_baru || '').trim();
+        if (babBaru) {
+          var sama = babs.filter(function (b) { return normCari(b.judul) === normCari(babBaru); })[0];
+          if (sama) babId = sama.id;
+          else {
+            var ROM = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
+            var urut = babs.reduce(function (m, b) { return Math.max(m, num(b.urutan)); }, 0) + 1;
+            babId = 'b-' + Math.random().toString(36).slice(2, 8);
+            store.upsert('KomitmenBab', { id: babId, nomor: ROM[urut - 1] || String(urut), judul: babBaru, urutan: urut, dibuat_at: nowU, dihapus: '' });
+          }
+        } else {
+          babId = String(payload.bab_id || '');
+          if (!babs.some(function (b) { return b.id === babId; })) throw err('Pilih bab atau tulis bab baru');
+        }
+      }
+      var nomor = (db.KomitmenPasal || []).reduce(function (m, x) { return Math.max(m, num(x.nomor)); }, 0) + 1;   // nomor tidak dipakai ulang
+      var rnd = Math.random().toString(36).slice(2, 8);
+      var pid2 = 'p-' + rnd, sid = 'sah-' + rnd;
+      store.upsert('Pengesahan', { id: sid, judul: 'Usulan Pasal ' + nomor, jenis: 'tunggal', evaluasi_id: '', isi_hash: '', status: 'menunggu', dibuat_at: nowU });
+      store.upsert('KomitmenVersi', { id: pid2 + '-v1', pasal_id: pid2, versi: 1, isi_ayat: JSON.stringify(ayat), alasan: String(payload.alasan || '').trim(),
+        jenis: 'baru', sumber: 'luar_evaluasi', evaluasi_id: '', pengesahan_id: sid, status: 'usulan', berlaku_sejak: '', dibuat_oleh: user.id, dibuat_at: nowU });
+      store.upsert('KomitmenPasal', { id: pid2, nomor: nomor, bab_id: babId, tipe: tipe, judul: judul, kata_kunci: listDari(payload.kata_kunci).join(', '),
+        sumber_asal: 'app', rujukan_asli: '', terkunci: false, status: 'usulan', versi_berlaku_id: '', dibuat_oleh: user.id, dibuat_at: nowU, diubah_at: nowU, dihapus: '' });
+      return { pasal_id: pid2, nomor: nomor, pengesahan_id: sid };
+    }
+    // Tarik usulan pasal baru yang belum disahkan (belum pernah berlaku → boleh dihapus dari daftar).
+    if (action === 'komitmen.tarik_usulan') {
+      var pu = byId(db.KomitmenPasal || [])[String(payload.pasal_id || '')];
+      if (!pu || pu.dihapus) throw err('Pasal tidak ditemukan');
+      if (pu.status !== 'usulan') throw err('Hanya usulan yang belum disahkan yang bisa ditarik');
+      var nowT = String(nowIso || new Date().toISOString());
+      pu.dihapus = nowT; pu.diubah_at = nowT; store.upsert('KomitmenPasal', pu);
+      (db.KomitmenVersi || []).filter(function (v) { return v.pasal_id === pu.id && v.status === 'usulan'; }).forEach(function (v) {
+        var s = byId(db.Pengesahan || [])[v.pengesahan_id];
+        if (s && s.status === 'menunggu') { s.status = 'batal'; store.upsert('Pengesahan', s); }
+      });
+      return { pasal_id: pu.id };
     }
     throw err('Aksi belum tersedia: ' + action);
   }
@@ -917,7 +967,7 @@ var KantongCore = (function () {
       }
       default:
         if (String(action).indexOf('todo.') === 0) return todoAksi(store, db, user, action, payload, nowIso);
-        if (String(action).indexOf('komitmen.') === 0) return komitmenAksi(store, db, user, action, payload);
+        if (String(action).indexOf('komitmen.') === 0) return komitmenAksi(store, db, user, action, payload, nowIso);
         if (String(action).indexOf('jurnal.') === 0) return jurnalAksi(store, db, user, action, payload, nowIso);
         throw err('Aksi tidak dikenal: ' + action);
     }
