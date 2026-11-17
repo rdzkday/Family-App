@@ -18,14 +18,15 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | ✅ Live | **Pengaturan terpusat** (di Beranda) | Satu kartu, expand-collapse per fitur: Umum (tema, akun, sinkron, putuskan koneksi) · Kantong (budget, kantong, kategori, setoran di grafik) · Agenda (filter awal, status Google Calendar, jadwalkan evaluasi) · Komitmen · Daily Mood (profil, kondisi, prompt, cadangan) |
 | ✅ Live | **Kantong** (`/kantong/`) | Catat pengeluaran/pemasukan/transfer, 3 buku (Riki, Febie, Rumah Tangga), budget bulanan, talangan, reimburse, Ringkasan (donut per kategori), Riwayat + pencarian |
 | ✅ Live | **Agenda** (`/agenda/`) | Tab To-do, Catatan, Jadwal. Pemilik Riki/Febie/Bersama, filter Untukku/Bersama/Semua, atur tanggal-jam-durasi |
-| ✅ Live | **Komitmen** (`/komitmen/`) | Baca & cari pasal kesepakatan (Kesepakatan + Definisi A–Z), filter (pranikah, usulan, dicabut), riwayat versi & tanda tangan. **Baru:** usul pasal baru & tarik usulan, tersambung ke server |
+| ✅ Live | **Komitmen** (`/komitmen/`) | Baca & cari pasal (Kesepakatan + Definisi A–Z), filter (pranikah, usulan, dicabut). Usul **pasal baru, ubah, cabut, keterangan** (baru/ganti/cabut) → **Lembar Pengesahan** (sebelum vs sesudah + alasan) → **tanda tangan dengan jari** berdua → berlaku. "Diskusikan dulu" menunda item; isi lembar berubah = TTD batal. Riwayat versi per pasal. Pasal pranikah hanya bisa diberi keterangan |
 | ✅ Live | **Daily Mood** (`/daily-mood/`, dulu Ruang Catat) | Jurnal mood harian + prompt (acak/custom), kalender mood, ringkasan periode → unduh/bagikan PDF, cadangan & pulihkan. Data pribadi di Supabase (pasangan tidak bisa baca) |
 | ✅ Live | **Offline & sinkron** | Input masuk antrean di HP, terkirim otomatis saat online, tanpa data dobel |
 | ✅ Live | **Tema & mode demo** | Gelap/terang berlaku di semua fitur. Mode demo pakai data contoh tanpa server |
 | ⏳ Perlu setup sekali | **Google Calendar "Rumah Kita"** | Sync to-do berwaktu ke kalender. Secret Google belum diisi di Supabase (PANDUAN §7) |
-| 🔜 Menyusul | Komitmen | Ubah pasal & tanda tangan dari app |
+| 🔜 Menyusul | Komitmen | Sesi evaluasi bulanan (Fase 4d) & import perjanjian pranikah (Fase 4c, menunggu file) |
 
 ### Yang baru di rilis ini
+- **Komitmen Fase 4b:** ubah & cabut pasal, keterangan, Lembar Pengesahan, tanda tangan berdua, Diskusikan dulu, Riwayat.
 - Nama app jadi **Family App** (fitur keuangan tetap bernama Kantong).
 - Pengaturan semua fitur pindah ke Beranda (expand-collapse); tab Pengaturan Kantong & halaman Setelan dihapus.
 - Agenda jadi halaman sendiri; Ruang Catat jadi **Daily Mood** dan sinkron ke Supabase.
@@ -106,7 +107,7 @@ Data keuangan pribadi tidak disertakan di repo ini.
 ## Update & tes
 
 ```bash
-node kantong/tools/test_core.js        # 259 cek logika bersama
+node kantong/tools/test_core.js        # 295 cek logika bersama
 node kantong/tools/test_supabase.js    # 19 tes Edge Function (DB & Google tiruan)
 bash kantong/tools/test_sql.sh         # skema SQL di Postgres lokal
 ```

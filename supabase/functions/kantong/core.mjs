@@ -547,7 +547,7 @@ var KantongCore = (function () {
       var vs = (versiBy[p.id] || []).slice().sort(function (a, b) { return num(a.versi) - num(b.versi); });
       var sahV = function (v) { return v.status === 'berlaku' || v.status === 'digantikan'; };
       var cur = byId(vs)[p.versi_berlaku_id] || terakhir(vs, function (v) { return v.status === 'berlaku'; });
-      if (!cur && p.status === 'usulan') cur = terakhir(vs, function (v) { return v.status === 'usulan'; });
+      if (!cur && p.status === 'usulan') cur = terakhir(vs, function (v) { return v.status === 'usulan'; }) || terakhir(vs, function (v) { return v.status === 'ditunda'; });
       var isi = cur && cur.jenis === 'cabut' ? terakhir(vs, function (v) { return v.jenis !== 'cabut' && sahV(v); }) : cur;
       var cabut = p.status === 'dicabut' ? terakhir(vs, function (v) { return v.jenis === 'cabut' && v.status === 'berlaku'; }) : null;
       var kets = ketBy[p.id] || [];
@@ -568,7 +568,12 @@ var KantongCore = (function () {
         pengesahan_id: cur && cur.status === 'berlaku' ? pid : '',
         dicabut: cabut ? { tanggal: String(cabut.berlaku_sejak || ''), alasan: String(cabut.alasan || '') } : null,
         keterangan: ket,
-        ada_usulan: vs.some(function (v) { return v.status === 'usulan'; }) || kets.some(function (k) { return k.status === 'usulan'; })
+        ada_usulan: vs.some(function (v) { return v.status === 'usulan'; }) || kets.some(function (k) { return k.status === 'usulan'; }),
+        // lembar yang sedang menunggu TTD untuk pasal ini, dan usulan yang ditunda ("Diskusikan dulu")
+        lembar_usulan: vs.concat(kets).filter(function (r) { return r.status === 'usulan' && r.pengesahan_id; }).map(function (r) { return String(r.pengesahan_id); })
+          .filter(function (id, i, a) { return a.indexOf(id) === i; }),
+        ditunda: vs.filter(function (v) { return v.status === 'ditunda'; }).map(function (v) { return { id: v.id, jenis: v.jenis, alasan: String(v.alasan || '') }; })
+          .concat(kets.filter(function (k) { return k.status === 'ditunda'; }).map(function (k) { return { id: k.id, jenis: 'keterangan', alasan: String(k.isi || '') }; }))
       };
     }).sort(function (a, b) { return a.nomor - b.nomor; });
     // "Lihat juga": pasal lain yang memakai istilah sebuah definisi
@@ -590,10 +595,13 @@ var KantongCore = (function () {
         ttd_riki: String(s.ttd_riki || ''), ttd_riki_at: String(s.ttd_riki_at || ''),
         ttd_febie: String(s.ttd_febie || ''), ttd_febie_at: String(s.ttd_febie_at || '') };
     });
+    var menunggu = (db.Pengesahan || []).filter(function (s) { return s.status === 'menunggu'; })
+      .map(function (s) { return lembarView(db, s, user); }).filter(function (l) { return l.items.length; })
+      .sort(function (a, b) { return String(a.dibuat_at).localeCompare(String(b.dibuat_at)); });
     return {
-      bab: bab, pasal: pasal, pengesahan: lembar,
+      bab: bab, pasal: pasal, pengesahan: lembar, menunggu: menunggu, slot_saya: slot,
       berlaku: pasal.filter(function (p) { return p.status === 'berlaku'; }).length,
-      menunggu_ttd: (db.Pengesahan || []).filter(function (s) { return s.status === 'menunggu' && !s['ttd_' + slot]; }).length
+      menunggu_ttd: menunggu.filter(function (l) { return !l['ttd_' + slot]; }).length
     };
   }
 
@@ -699,7 +707,172 @@ var KantongCore = (function () {
       });
       return { pasal_id: pu.id };
     }
+    // ---------- Fase 4b: usul ubah / cabut / keterangan (brief §5, §6, §7, §8C-D) ----------
+    var now = String(nowIso || new Date().toISOString());
+    var pasalMap = byId(db.KomitmenPasal || []);
+    function ambilPasal(id) {
+      var p = pasalMap[String(id || '')];
+      if (!p || p.dihapus) throw err('Pasal tidak ditemukan');
+      return p;
+    }
+    function cekBelumAdaUsulan(p) {
+      var ada = (db.KomitmenVersi || []).some(function (v) { return v.pasal_id === p.id && v.status === 'usulan'; });
+      if (ada) throw err('Pasal ' + p.nomor + ' masih punya usulan yang menunggu tanda tangan');
+    }
+    function lembarBaru(judul) {
+      var sid = 'sah-' + Math.random().toString(36).slice(2, 8);
+      store.upsert('Pengesahan', { id: sid, judul: judul, jenis: 'tunggal', evaluasi_id: '', isi_hash: '', status: 'menunggu', dibuat_at: now });
+      return sid;
+    }
+    function versiBerlaku(p) {
+      var vs = (db.KomitmenVersi || []).filter(function (v) { return v.pasal_id === p.id; });
+      return byId(vs)[p.versi_berlaku_id] || terakhir(sortBy(vs, 'versi'), function (v) { return v.status === 'berlaku'; });
+    }
+    function versiBerikut(p) { return (db.KomitmenVersi || []).filter(function (v) { return v.pasal_id === p.id; }).reduce(function (m, v) { return Math.max(m, num(v.versi)); }, 0) + 1; }
+    function wajibAlasan(a) { a = String(a || '').trim(); if (!a) throw err('Alasan wajib diisi (1 kalimat cukup)'); return a; }
+
+    if (action === 'komitmen.usul_ubah' || action === 'komitmen.usul_cabut') {
+      var cabutkah = action === 'komitmen.usul_cabut';
+      var pp = ambilPasal(payload.pasal_id);
+      if (bool(pp.terkunci)) throw err('Pasal pranikah hanya bisa diberi keterangan');
+      if (pp.status !== 'berlaku') throw err(cabutkah ? 'Hanya pasal yang berlaku yang bisa dicabut' : 'Hanya pasal yang berlaku yang bisa diubah');
+      cekBelumAdaUsulan(pp);
+      var alasan = wajibAlasan(payload.alasan), lama = versiBerlaku(pp);
+      var ayatU = cabutkah ? ayatDari(lama && lama.isi_ayat) : ayatDari(payload.ayat).map(function (a) { return a.trim(); }).filter(Boolean);
+      if (!cabutkah) {
+        if (!ayatU.length) throw err('Isi minimal satu ayat');
+        if (lama && JSON.stringify(ayatU) === JSON.stringify(ayatDari(lama.isi_ayat))) throw err('Isi ayat belum diubah');
+      }
+      var sidU = lembarBaru((cabutkah ? 'Pencabutan Pasal ' : 'Perubahan Pasal ') + pp.nomor);
+      var vno = versiBerikut(pp);
+      store.upsert('KomitmenVersi', { id: pp.id + '-v' + vno, pasal_id: pp.id, versi: vno, isi_ayat: JSON.stringify(ayatU), alasan: alasan,
+        jenis: cabutkah ? 'cabut' : 'ubah', sumber: 'luar_evaluasi', evaluasi_id: '', pengesahan_id: sidU, status: 'usulan', berlaku_sejak: '', dibuat_oleh: user.id, dibuat_at: now });
+      pp.diubah_at = now; store.upsert('KomitmenPasal', pp);
+      return { pasal_id: pp.id, nomor: num(pp.nomor), pengesahan_id: sidU };
+    }
+    if (action === 'komitmen.usul_keterangan') {
+      var pk = ambilPasal(payload.pasal_id);
+      if (pk.status !== 'berlaku') throw err('Keterangan hanya untuk pasal yang berlaku');
+      var jenisK = ['baru', 'ganti', 'cabut'].indexOf(payload.jenis) >= 0 ? payload.jenis : 'baru';
+      var isiK = String(payload.isi || '').trim(), lamaK = null;
+      if (jenisK !== 'baru') {
+        lamaK = (db.KomitmenKeterangan || []).filter(function (k) { return k.id === String(payload.menggantikan_id || '') && k.pasal_id === pk.id && k.status === 'berlaku'; })[0];
+        if (!lamaK) throw err('Keterangan yang dimaksud tidak ditemukan');
+        if ((db.KomitmenKeterangan || []).some(function (k) { return k.menggantikan_id === lamaK.id && k.status === 'usulan'; })) throw err('Keterangan ini sudah punya usulan yang menunggu');
+      }
+      if (jenisK === 'cabut') isiK = String(lamaK.isi || '');
+      else if (!isiK) throw err('Isi keterangan wajib diisi');
+      if (isiK.length > 2000) throw err('Keterangan maksimal 2.000 huruf');
+      var sidK = lembarBaru((jenisK === 'cabut' ? 'Pencabutan keterangan' : 'Keterangan') + ' Pasal ' + pk.nomor);
+      var kid = 'k-' + Math.random().toString(36).slice(2, 8);
+      store.upsert('KomitmenKeterangan', { id: kid, pasal_id: pk.id, isi: isiK, menggantikan_id: lamaK ? lamaK.id : '', jenis: jenisK, evaluasi_id: '',
+        pengesahan_id: sidK, status: 'usulan', berlaku_sejak: '', dibuat_oleh: user.id, dibuat_at: now });
+      return { pasal_id: pk.id, nomor: num(pk.nomor), keterangan_id: kid, pengesahan_id: sidK };
+    }
+    // usulan yang ditunda ("Diskusikan dulu") diajukan lagi → lembar tunggal baru
+    if (action === 'komitmen.ajukan_ulang') {
+      var iid = String(payload.item_id || '');
+      var vi = (db.KomitmenVersi || []).filter(function (v) { return v.id === iid && v.status === 'ditunda'; })[0];
+      var ki = vi ? null : (db.KomitmenKeterangan || []).filter(function (k) { return k.id === iid && k.status === 'ditunda'; })[0];
+      if (!vi && !ki) throw err('Usulan yang ditunda tidak ditemukan');
+      var pa = ambilPasal((vi || ki).pasal_id);
+      if (vi) cekBelumAdaUsulan(pa);
+      var sidA = lembarBaru('Usulan ulang Pasal ' + pa.nomor);
+      var row = vi || ki; row.status = 'usulan'; row.pengesahan_id = sidA;
+      store.upsert(vi ? 'KomitmenVersi' : 'KomitmenKeterangan', row);
+      return { pasal_id: pa.id, nomor: num(pa.nomor), pengesahan_id: sidA };
+    }
     throw err('Aksi belum tersedia: ' + action);
+  }
+
+  // ---------- Lembar Pengesahan & tanda tangan (brief §6) ----------
+  // Item lembar = versi & keterangan berstatus usulan yang menunjuk lembar itu.
+  function lembarItems(db, sid) {
+    var pmap = byId(db.KomitmenPasal || []), kmap = byId(db.KomitmenKeterangan || []);
+    var vs = (db.KomitmenVersi || []).filter(function (v) { return v.pengesahan_id === sid && v.status === 'usulan'; }).map(function (v) {
+      var p = pmap[v.pasal_id] || {};
+      var lama = v.jenis === 'baru' ? null : (db.KomitmenVersi || []).filter(function (x) { return x.pasal_id === v.pasal_id && x.status === 'berlaku'; })[0];
+      return { id: v.id, jenis_item: 'versi', jenis: v.jenis, pasal_id: v.pasal_id, nomor: num(p.nomor), judul: String(p.judul || ''), tipe: String(p.tipe || ''),
+        sesudah: v.jenis === 'cabut' ? [] : ayatDari(v.isi_ayat), sebelum: lama ? ayatDari(lama.isi_ayat) : [], alasan: String(v.alasan || ''), dibuat_oleh: String(v.dibuat_oleh || '') };
+    });
+    var ks = (db.KomitmenKeterangan || []).filter(function (k) { return k.pengesahan_id === sid && k.status === 'usulan'; }).map(function (k) {
+      var p = pmap[k.pasal_id] || {}, lama = kmap[k.menggantikan_id];
+      return { id: k.id, jenis_item: 'keterangan', jenis: k.jenis, pasal_id: k.pasal_id, nomor: num(p.nomor), judul: String(p.judul || ''), tipe: String(p.tipe || ''),
+        sesudah: k.jenis === 'cabut' ? [] : [String(k.isi || '')], sebelum: lama ? [String(lama.isi || '')] : [], alasan: '', dibuat_oleh: String(k.dibuat_oleh || '') };
+    });
+    return vs.concat(ks).sort(function (a, b) { return a.nomor - b.nomor; });
+  }
+  // "sidik jari" isi lembar (FNV-1a 32-bit): isi berubah → hash beda → TTD lama batal
+  function hashLembar(items) {
+    var s = JSON.stringify(items.map(function (i) { return [i.id, i.jenis, i.sesudah, i.alasan]; })), h = 0x811c9dc5;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul ? Math.imul(h, 0x01000193) : (h * 0x01000193) | 0; }
+    return ('0000000' + (h >>> 0).toString(16)).slice(-8);
+  }
+  function lembarView(db, s, user) {
+    var items = lembarItems(db, s.id), hash = hashLembar(items);
+    var basi = !!s.isi_hash && s.isi_hash !== hash;   // isi berubah setelah ada TTD
+    return { id: s.id, judul: String(s.judul || ''), jenis: String(s.jenis || ''), status: String(s.status || ''), dibuat_at: String(s.dibuat_at || ''),
+      isi_hash: hash, items: items, slot_saya: slotTtd(user),
+      ttd_riki: basi ? '' : String(s.ttd_riki || ''), ttd_riki_at: basi ? '' : String(s.ttd_riki_at || ''),
+      ttd_febie: basi ? '' : String(s.ttd_febie || ''), ttd_febie_at: basi ? '' : String(s.ttd_febie_at || '') };
+  }
+  function cekTtdPath(d) {
+    d = String(d || '').trim();
+    if (!d) throw err('Gambar tanda tanganmu dulu');
+    if (d.length > 60000) throw err('Tanda tangan terlalu panjang, ulangi lebih sederhana');
+    if (!/^[MLQCZmlqcz0-9.,\s-]+$/.test(d) || !/^M/.test(d)) throw err('Format tanda tangan tidak valid');
+    return d;
+  }
+  function pengesahanAksi(store, db, user, action, payload, nowIso) {
+    var now = String(nowIso || new Date().toISOString());
+    var s = byId(db.Pengesahan || [])[String(payload.id || '')];
+    if (!s) throw err('Lembar pengesahan tidak ditemukan');
+    if (action === 'pengesahan.get') return lembarView(db, s, user);
+    if (s.status !== 'menunggu') throw err(s.status === 'sah' ? 'Lembar ini sudah sah' : 'Lembar ini sudah dibatalkan');
+    var items = lembarItems(db, s.id), hash = hashLembar(items);
+    if (action === 'pengesahan.defer') {   // "Diskusikan dulu": item keluar dari lembar, TTD yang ada batal
+      var iid = String(payload.item_id || '');
+      var v = (db.KomitmenVersi || []).filter(function (x) { return x.id === iid && x.pengesahan_id === s.id && x.status === 'usulan'; })[0];
+      var k = v ? null : (db.KomitmenKeterangan || []).filter(function (x) { return x.id === iid && x.pengesahan_id === s.id && x.status === 'usulan'; })[0];
+      if (!v && !k) throw err('Item tidak ada di lembar ini');
+      var row = v || k; row.status = 'ditunda'; row.pengesahan_id = '';
+      store.upsert(v ? 'KomitmenVersi' : 'KomitmenKeterangan', row);
+      s.ttd_riki = s.ttd_riki_at = s.ttd_febie = s.ttd_febie_at = s.isi_hash = '';
+      if (items.length <= 1) s.status = 'batal';
+      store.upsert('Pengesahan', s);
+      return { id: s.id, status: s.status, item_id: iid };
+    }
+    if (action === 'pengesahan.sign') {
+      if (!items.length) throw err('Lembar ini kosong');
+      if (String(payload.isi_hash || '') !== hash) throw err('Isi lembar berubah. Muat ulang lalu baca lagi sebelum tanda tangan.');
+      var slot = slotTtd(user), lain = slot === 'riki' ? 'febie' : 'riki';
+      if (payload.slot && payload.slot !== slot) throw err('Kamu hanya bisa mengisi kotak tanda tanganmu sendiri');
+      if (s.isi_hash && s.isi_hash !== hash) { s['ttd_' + lain] = ''; s['ttd_' + lain + '_at'] = ''; }   // TTD pasangan untuk isi lama → batal
+      s['ttd_' + slot] = cekTtdPath(payload.ttd); s['ttd_' + slot + '_at'] = now; s.isi_hash = hash;
+      var sah = !!(s.ttd_riki && s.ttd_febie);
+      if (sah) { s.status = 'sah'; terapkanLembar(store, db, s.id, now); }
+      store.upsert('Pengesahan', s);
+      return { id: s.id, status: s.status, sah: sah };
+    }
+    throw err('Aksi tidak dikenal: ' + action);
+  }
+  // TTD kedua: semua item berlaku dengan tanggal hari itu; versi/keterangan lama → digantikan (brief §6.5, §10)
+  function terapkanLembar(store, db, sid, at) {
+    var pmap = byId(db.KomitmenPasal || []), kmap = byId(db.KomitmenKeterangan || []);
+    (db.KomitmenVersi || []).filter(function (v) { return v.pengesahan_id === sid && v.status === 'usulan'; }).forEach(function (v) {
+      var p = pmap[v.pasal_id]; if (!p) return;
+      (db.KomitmenVersi || []).forEach(function (x) {
+        if (x.pasal_id === p.id && x.id !== v.id && x.status === 'berlaku') { x.status = 'digantikan'; store.upsert('KomitmenVersi', x); }
+      });
+      v.status = 'berlaku'; v.berlaku_sejak = at; store.upsert('KomitmenVersi', v);
+      p.status = v.jenis === 'cabut' ? 'dicabut' : 'berlaku'; p.versi_berlaku_id = v.id; p.diubah_at = at;
+      store.upsert('KomitmenPasal', p);
+    });
+    (db.KomitmenKeterangan || []).filter(function (k) { return k.pengesahan_id === sid && k.status === 'usulan'; }).forEach(function (k) {
+      var lama = kmap[k.menggantikan_id];
+      if (lama && lama.status === 'berlaku') { lama.status = k.jenis === 'cabut' ? 'dicabut' : 'digantikan'; store.upsert('KomitmenKeterangan', lama); }
+      k.status = 'berlaku'; k.berlaku_sejak = at; store.upsert('KomitmenKeterangan', k);
+    });
   }
 
   // ---------- Ruang Catat (jurnal pribadi) ----------
@@ -968,6 +1141,7 @@ var KantongCore = (function () {
       default:
         if (String(action).indexOf('todo.') === 0) return todoAksi(store, db, user, action, payload, nowIso);
         if (String(action).indexOf('komitmen.') === 0) return komitmenAksi(store, db, user, action, payload, nowIso);
+        if (String(action).indexOf('pengesahan.') === 0) return pengesahanAksi(store, db, user, action, payload || {}, nowIso);
         if (String(action).indexOf('jurnal.') === 0) return jurnalAksi(store, db, user, action, payload, nowIso);
         throw err('Aksi tidak dikenal: ' + action);
     }
@@ -1007,7 +1181,7 @@ var KantongCore = (function () {
     computeUtang: computeUtang, computeTalangan: computeTalangan, arahTransfer: arahTransfer,
     KAT_REIMBURSE: KAT_REIMBURSE, KAT_SETORAN: KAT_SETORAN, KAT_SETORAN_MASUK: KAT_SETORAN_MASUK,
     cleanTodo: cleanTodo, canWriteTodo: canWriteTodo, todoEventSpec: todoEventSpec, todoPerluEvent: todoPerluEvent,
-    komitmenView: komitmenView, cariKomitmen: cariKomitmen, nomorDariKueri: nomorDariKueri, normCari: normCari,
+    komitmenView: komitmenView, cariKomitmen: cariKomitmen, hashLembar: hashLembar, lembarItems: lembarItems, nomorDariKueri: nomorDariKueri, normCari: normCari,
     ayatDari: ayatDari, slotTtd: slotTtd,
     isTime: isTime, TODO_BERSAMA: TODO_BERSAMA, TODO_DURASI: TODO_DURASI, TODO_SELESAI_EVENT: TODO_SELESAI_EVENT,
     TODO_TIPE: TODO_TIPE, todoTipe: todoTipe, evaluasiPengingat: evaluasiPengingat, EVALUASI_JUDUL: EVALUASI_JUDUL,

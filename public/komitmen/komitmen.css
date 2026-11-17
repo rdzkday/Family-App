@@ -125,3 +125,50 @@ mark { background: var(--km); color: var(--ink); border-radius: 4px; padding: 0 
 .km-form .fb-ayat textarea { min-height: 64px; }
 .km-form .fb-err { color: var(--over); font-weight: 800; font-size: 14px; min-height: 1em; margin: 12px 0 8px; }
 .km-form .btn[type="submit"] { background: var(--km); color: var(--ink); }
+
+/* ---------- Fase 4b: lembar pengesahan, TTD, riwayat ---------- */
+.km .btn.kuning, .km-form .btn.kuning { background: var(--km); color: var(--ink); }
+.btn.small.kuning { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; min-height: 44px; }
+.btn.small.kuning svg { width: 16px; height: 16px; }
+.pasal-acts a.btn.small.kuning { flex-basis: 100%; justify-content: center; }
+.lembar-list { margin-bottom: 16px; }
+.lembar-list .bab-h { display: flex; align-items: center; gap: 6px; color: var(--text); }
+.lembar-list .bab-h svg { width: 14px; height: 14px; }
+.ket-acts { display: flex; gap: 14px; margin-top: 6px; }
+.ket-acts .link, .km .link { font: inherit; font-size: 13px; font-weight: 800; color: var(--text-2); text-decoration: underline; background: none; padding: 0; min-height: 32px; }
+.tunda { margin-top: 14px; padding: 12px 14px; border-radius: 14px; box-shadow: inset 0 0 0 1.5px var(--line); }
+.tunda .lbl { font-size: 12px; font-weight: 900; color: var(--text-2); margin-bottom: 6px; }
+.tunda-i { display: flex; gap: 10px; align-items: center; justify-content: space-between; font-size: 14px; padding: 4px 0; }
+.lembar h2 { font-size: 22px; }
+.li-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.li-item { padding: 14px; border-radius: 16px; background: var(--surface-2); }
+.li-h { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.li-no { font-weight: 800; color: var(--text); text-decoration: none; font-size: 15px; }
+.bv { margin-top: 6px; }
+.bv-l { font-size: 11px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; color: var(--text-2); margin-bottom: 2px; }
+.ayat.lama p { color: var(--text-2); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--text-2) 60%, transparent); }
+.ayat.lama li, .ayat.baru li { padding: 4px 10px; }
+.ayat.baru p, .ayat.lama p { font-size: 15px; }
+.li-alasan { font-size: 13px; color: var(--text-2); margin: 8px 0; }
+.li-item .btn.small { min-height: 40px; margin-top: 4px; }
+.pernyataan { margin: 0 0 16px; padding: 14px 16px; border-left: 4px solid var(--km); background: var(--surface-2); border-radius: 4px 14px 14px 4px; font-size: 15px; line-height: 1.6; font-style: italic; }
+.ttd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ttd-box { min-height: 128px; border-radius: 16px; box-shadow: inset 0 0 0 1.5px var(--line); padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
+.ttd-box.isi { background: var(--surface-2); box-shadow: none; }
+.ttd-box svg { width: 100%; max-width: 180px; height: auto; aspect-ratio: 5 / 2; color: var(--text); }
+.ttd-nm { font-size: 13px; font-weight: 900; }
+.ttd-at, .ttd-wait { font-size: 12px; font-weight: 700; color: var(--text-2); }
+.ttd-box .btn.small { min-height: 44px; font-size: 13px; padding: 0 12px; }
+.lembar .cap { font-size: 12px; color: var(--text-2); font-weight: 600; margin: 12px 0 0; }
+.pad-w { position: relative; margin: 12px 0 4px; }
+.pad { display: block; width: 100%; aspect-ratio: 5 / 2; height: auto; border-radius: 16px; background: var(--surface-2); touch-action: none; cursor: crosshair; box-shadow: inset 0 0 0 1.5px var(--line); }
+.pad-ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-3); font-weight: 700; pointer-events: none; font-size: 14px; }
+.pad-acts { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+.pad-acts .btn { margin: 0; }
+.rw { display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
+.rw-i { padding: 12px 14px; border-radius: 14px; background: var(--surface-2); }
+.rw-i.digantikan, .rw-i.ditunda { opacity: .75; }
+.rw-h { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.rw-m { font-size: 12px; color: var(--text-2); font-weight: 700; margin: 2px 0 6px; }
+.rw-i p { margin: 0; font-size: 14px; line-height: 1.5; }
+.rw-i .ayat li { padding: 2px 0; margin: 0; }

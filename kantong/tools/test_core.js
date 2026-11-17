@@ -631,7 +631,7 @@ function komitmenSeed() {
   s.Pengesahan = [
     { id: 'sah-pra', judul: 'Perjanjian Pranikah', jenis: 'pranikah', evaluasi_id: '', ttd_riki: 'M0 0L10 10', ttd_riki_at: T1, ttd_febie: 'M0 10L10 0', ttd_febie_at: T1, isi_hash: 'x', status: 'sah', dibuat_at: T1 },
     { id: 'sah-okt', judul: 'Evaluasi Okt 2026', jenis: 'evaluasi', evaluasi_id: '', ttd_riki: 'M1 1', ttd_riki_at: T2, ttd_febie: 'M2 2', ttd_febie_at: T2, isi_hash: 'y', status: 'sah', dibuat_at: T2 },
-    { id: 'sah-nov', judul: 'Evaluasi Nov 2026', jenis: 'evaluasi', evaluasi_id: '', ttd_riki: 'M3 3', ttd_riki_at: T2, ttd_febie: '', ttd_febie_at: '', isi_hash: 'z', status: 'menunggu', dibuat_at: T2 },
+    { id: 'sah-nov', judul: 'Evaluasi Nov 2026', jenis: 'evaluasi', evaluasi_id: '', ttd_riki: 'M3 3', ttd_riki_at: T2, ttd_febie: '', ttd_febie_at: '', isi_hash: '', status: 'menunggu', dibuat_at: T2 },
     { id: 'sah-batal', judul: 'Batal', jenis: 'tunggal', evaluasi_id: '', ttd_riki: '', ttd_riki_at: '', ttd_febie: '', ttd_febie_at: '', isi_hash: '', status: 'batal', dibuat_at: T2 }
   ];
   return s;
@@ -753,6 +753,84 @@ function komCall(st, uid, action, payload) {
   todoCall(st, 'u-febie', 'jurnal.delete', { id: 'u-febie|2026-11-02' });
   eq('jurnal: hapus menyembunyikan baris', todoCall(st, 'u-febie', 'jurnal.list', {}).jurnal.length, 1);
   eq('jurnal: isi dikosongkan setelah dihapus', C.byId(st.all('Jurnal'))['u-febie|2026-11-02'].isi, '');
+})();
+
+// ---------- Komitmen Fase 4b: ubah, cabut, keterangan, lembar & TTD ----------
+(function () {
+  var st = C.memoryStore(komitmenSeed());
+  var R = 'u-riki', F = 'u-febie', SIG = 'M10 10 L 50 40 L 90 20';
+  var L = function (u) { return komCall(st, u || R, 'komitmen.list'); };
+  var P = function (n, u) { return L(u).pasal.filter(function (p) { return p.nomor === n; })[0]; };
+  var lembar = function (id, u) { return komCall(st, u || R, 'pengesahan.get', { id: id }); };
+  var tt = function (u, id, extra) { var l = lembar(id, u); var p = { id: id, ttd: SIG, isi_hash: l.isi_hash }; Object.keys(extra || {}).forEach(function (k) { p[k] = extra[k]; }); return komCall(st, u, 'pengesahan.sign', p); };
+  // pranikah dikunci
+  lempar('4b: ubah pasal pranikah ditolak', function () { komCall(st, R, 'komitmen.usul_ubah', { pasal_id: 'p3', ayat: ['x'], alasan: 'a' }); });
+  lempar('4b: cabut pasal pranikah ditolak', function () { komCall(st, R, 'komitmen.usul_cabut', { pasal_id: 'p3', alasan: 'a' }); });
+  lempar('4b: ubah tanpa alasan ditolak', function () { komCall(st, R, 'komitmen.usul_ubah', { pasal_id: 'p12', ayat: ['Dua malam'] }); });
+  lempar('4b: ubah tanpa perubahan ditolak', function () { komCall(st, R, 'komitmen.usul_ubah', { pasal_id: 'p12', ayat: ['Satu malam per minggu tanpa HP.'], alasan: 'a' }); });
+  lempar('4b: pasal yang masih punya usulan ditolak', function () { komCall(st, R, 'komitmen.usul_ubah', { pasal_id: 'p4', ayat: ['baru'], alasan: 'a' }); });
+  // ubah p12
+  var u = komCall(st, R, 'komitmen.usul_ubah', { pasal_id: 'p12', ayat: ['Dua malam per minggu tanpa HP.', ''], alasan: 'Lebih sering' });
+  eq('4b: ubah → nomor tetap', u.nomor, 12);
+  eq('4b: ubah → isi lama masih berlaku sebelum TTD', P(12).ayat[0], 'Satu malam per minggu tanpa HP.');
+  eq('4b: ubah → ditandai ada usulan', P(12).ada_usulan, true);
+  var l = lembar(u.pengesahan_id);
+  eq('4b: lembar berisi 1 item sebelum vs sesudah', l.items.length + '|' + l.items[0].sebelum[0] + '|' + l.items[0].sesudah.join('/'), '1|Satu malam per minggu tanpa HP.|Dua malam per minggu tanpa HP.');
+  lempar('4b: TTD kosong ditolak', function () { komCall(st, R, 'pengesahan.sign', { id: u.pengesahan_id, ttd: '', isi_hash: l.isi_hash }); });
+  lempar('4b: TTD hash beda ditolak', function () { komCall(st, R, 'pengesahan.sign', { id: u.pengesahan_id, ttd: SIG, isi_hash: 'salah' }); });
+  lempar('4b: tidak bisa isi kotak pasangan', function () { tt(R, u.pengesahan_id, { slot: 'febie' }); });
+  lempar('4b: path TTD berisi kode ditolak', function () { komCall(st, R, 'pengesahan.sign', { id: u.pengesahan_id, ttd: 'M0 0"/><script>', isi_hash: l.isi_hash }); });
+  var r1 = tt(R, u.pengesahan_id);
+  eq('4b: TTD pertama belum sah', r1.sah, false);
+  eq('4b: TTD pertama → isi lama masih berlaku', P(12).versi, 1);
+  eq('4b: Febie lihat lembar menunggu', L(F).menunggu_ttd >= 1, true);
+  var r2 = tt(F, u.pengesahan_id);
+  eq('4b: TTD kedua → sah', r2.sah, true);
+  eq('4b: TTD kedua → versi 2 berlaku', P(12).versi + '|' + P(12).ayat.join('/'), '2|Dua malam per minggu tanpa HP.');
+  eq('4b: tanggal berlaku = waktu TTD kedua', P(12).berlaku_sejak, NOW);
+  eq('4b: versi lama → digantikan', C.byId(st.all('KomitmenVersi'))['p12-v1'] ? C.byId(st.all('KomitmenVersi'))['p12-v1'].status : C.byId(st.all('KomitmenVersi'))['v12-1'].status, 'digantikan');
+  eq('4b: lembar sah tampil di pasal', L().pengesahan[u.pengesahan_id].status, 'sah');
+  lempar('4b: lembar sah tidak bisa ditandatangani lagi', function () { tt(R, u.pengesahan_id); });
+  // cabut p13
+  var c = komCall(st, F, 'komitmen.usul_cabut', { pasal_id: 'p17', alasan: 'Sudah lunas' });
+  tt(F, c.pengesahan_id); tt(R, c.pengesahan_id);
+  eq('4b: cabut → status dicabut', P(17).status, 'dicabut');
+  eq('4b: cabut → isi terakhir tetap terbaca + alasan', P(17).ayat[0] + '|' + P(17).dicabut.alasan, 'Lawan jenis adalah [placeholder].|Sudah lunas');
+  // keterangan pada pasal pranikah: baru, ganti
+  var k = komCall(st, R, 'komitmen.usul_keterangan', { pasal_id: 'p3', isi: 'Keterangan baru dari Riki.' });
+  tt(R, k.pengesahan_id); tt(F, k.pengesahan_id);
+  eq('4b: keterangan baru berlaku di pasal pranikah', P(3).keterangan.some(function (x) { return x.isi === 'Keterangan baru dari Riki.'; }), true);
+  var g = komCall(st, F, 'komitmen.usul_keterangan', { pasal_id: 'p3', jenis: 'ganti', menggantikan_id: 'k1', isi: 'Keterangan pertama, versi baru.' });
+  tt(F, g.pengesahan_id); tt(R, g.pengesahan_id);
+  var isiK = P(3).keterangan.map(function (x) { return x.isi; });
+  eq('4b: ganti keterangan → lama hilang, baru tampil', isiK.indexOf('Keterangan pertama.') < 0 && isiK.indexOf('Keterangan pertama, versi baru.') >= 0, true);
+  var kc = komCall(st, R, 'komitmen.usul_keterangan', { pasal_id: 'p3', jenis: 'cabut', menggantikan_id: 'k2' });
+  tt(R, kc.pengesahan_id); tt(F, kc.pengesahan_id);
+  eq('4b: cabut keterangan', P(3).keterangan.some(function (x) { return x.id === 'k2'; }), false);
+  // TTD batal saat isi berubah: lembar dengan 2 item, satu didiskusikan dulu
+  var a = komCall(st, R, 'komitmen.usul_keterangan', { pasal_id: 'p16', isi: 'Ket A' });
+  var la = lembar(a.pengesahan_id);
+  tt(R, a.pengesahan_id);
+  // tambahkan item kedua ke lembar yang sama (simulasi evaluasi) → isi berubah
+  var rows = st.all('KomitmenKeterangan'); var extra = JSON.parse(JSON.stringify(rows.filter(function (x) { return x.id === a.keterangan_id; })[0]));
+  extra.id = 'k-extra'; extra.isi = 'Ket B'; st.upsert('KomitmenKeterangan', extra);
+  var lb = lembar(a.pengesahan_id, F);
+  eq('4b: isi berubah setelah TTD → TTD Riki batal', lb.ttd_riki, '');
+  ok('4b: hash berubah', lb.isi_hash !== la.isi_hash);
+  komCall(st, F, 'pengesahan.defer', { id: a.pengesahan_id, item_id: 'k-extra' });
+  var ld = lembar(a.pengesahan_id);
+  eq('4b: diskusikan dulu → item keluar dari lembar', ld.items.length, 1);
+  eq('4b: diskusikan dulu → item jadi ditunda', C.byId(st.all('KomitmenKeterangan'))['k-extra'].status, 'ditunda');
+  eq('4b: ditunda tampil di pasal', P(16).ditunda.length, 1);
+  komCall(st, R, 'pengesahan.defer', { id: a.pengesahan_id, item_id: a.keterangan_id });
+  eq('4b: lembar kosong → batal', C.byId(st.all('Pengesahan'))[a.pengesahan_id].status, 'batal');
+  var au = komCall(st, R, 'komitmen.ajukan_ulang', { item_id: 'k-extra' });
+  eq('4b: ajukan ulang → lembar baru berisi item', lembar(au.pengesahan_id).items.length, 1);
+  // usulan pasal baru disahkan
+  var b = komCall(st, R, 'komitmen.usul_baru', { tipe: 'definisi', judul: 'Waktu pribadi', ayat: ['Waktu sendiri tanpa diganggu.'] });
+  tt(R, b.pengesahan_id); tt(F, b.pengesahan_id);
+  eq('4b: pasal baru sah → berlaku', P(b.nomor).status + '|' + P(b.nomor).versi, 'berlaku|1');
+  eq('4b: tidak ada lembar tersisa untuk pasal baru', P(b.nomor).lembar_usulan.length, 0);
 })();
 
 console.log('\n' + lulus + ' cek lulus, ' + gagal + ' gagal.');

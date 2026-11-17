@@ -1,5 +1,5 @@
 /*
- * Komitmen — Fase 4a: baca & cari (claude/komitmen-brief.md §8A, §9).
+ * Komitmen — Fase 4a baca & cari + Fase 4b usul (baru/ubah/cabut/keterangan), Lembar Pengesahan & TTD (claude/komitmen-brief.md §6, §8, §9).
  * Data dari aksi `komitmen.list`, disimpan di cache HP (localStorage) supaya baca & cari jalan offline.
  * Mode demo / belum terhubung: data contoh di bawah (placeholder, BUKAN isi kesepakatan asli).
  */
@@ -94,7 +94,7 @@
     var S2 = 'M16 70 C 40 20, 60 110, 86 60 C 100 34, 118 34, 124 62 C 130 92, 160 88, 176 56 C 188 34, 206 44, 210 66 C 214 86, 250 80, 284 52';
     var sah = function (id, judul, jenis, at, riki, febie) {
       return { id: id, judul: judul, jenis: jenis, evaluasi_id: '', ttd_riki: riki ? S1 : '', ttd_riki_at: riki ? at : '', ttd_febie: febie ? S2 : '', ttd_febie_at: febie ? at : '',
-        isi_hash: 'contoh', status: riki && febie ? 'sah' : 'menunggu', dibuat_at: at };
+        isi_hash: riki && febie ? 'contoh' : '', status: riki && febie ? 'sah' : 'menunggu', dibuat_at: at };
     };
     return {
       Buku: [{ id: 'riki', nama: 'Riki', tipe: 'Pribadi', pemilik: 'riki', urutan: 1 }, { id: 'istri', nama: 'Febie', tipe: 'Pribadi', pemilik: 'istri', urutan: 2 }],
@@ -120,10 +120,10 @@
   var DEMO_KEY = 'k_km_demo';
   function demoStore() { return C.memoryStore(LS.get(DEMO_KEY, null) || demoSeed()); }
   function demoData() { return C.handle(demoStore(), ME, 'komitmen.list', {}, new Date().toISOString()); }
-  function aksi(action, payload) { // Promise. Mode contoh: di HP; mode terhubung: kirim ke server lalu muat ulang daftar
+  function aksi(action, payload, sebagai) { // Promise. Mode contoh: di HP; mode terhubung: kirim ke server lalu muat ulang daftar
     if (demo) {
       try {
-        var st = demoStore(), res = C.handle(st, ME, action, payload, new Date().toISOString());
+        var st = demoStore(), res = C.handle(st, sebagai || ME, action, payload, new Date().toISOString());
         LS.set(DEMO_KEY, st.data); S.data = demoData();
         return Promise.resolve(res);
       } catch (e) { return Promise.reject(e); }
@@ -131,7 +131,11 @@
     return post(action, payload).then(function (res) {
       return fetchList().then(function (d) { S.data = d; cache = { data: d, at: Date.now() }; LS.set('k_komitmen', cache); S.status = ''; return res; },
         function () { return res; });
-    }, function (e) { if (e.offline) e.message = 'Tidak ada koneksi. Usulan belum terkirim.'; throw e; });
+    }, function (e) { if (e.offline) e.message = /^pengesahan\.sign/.test(action) ? 'Butuh koneksi internet untuk menandatangani.' : 'Tidak ada koneksi. Usulan belum terkirim.'; throw e; });
+  }
+  function baca(action, payload) { // aksi baca tanpa mengubah data (riwayat)
+    if (demo) { try { return Promise.resolve(C.handle(demoStore(), ME, action, payload, new Date().toISOString())); } catch (e) { return Promise.reject(e); } }
+    return post(action, payload);
   }
   function resetDemo() { try { localStorage.removeItem(DEMO_KEY); } catch (e) { /* abaikan */ } S.data = demoData(); location.hash = ''; render(); toast('Data contoh dikembalikan'); }
   function adaSimulasi() { return !!LS.get(DEMO_KEY, null); }
@@ -307,7 +311,7 @@
       (S.status ? '<span class="km-status" role="status">' + esc(S.status) + '</span>' : '') + '</header>' +
       (demo ? '<div class="km-demo">Data contoh, bukan isi kesepakatan asli.' + (conn ? '' : ' Hubungkan dulu di Family App untuk melihat data kalian.') +
         (adaSimulasi() ? ' <button type="button" id="demo-reset">Kembalikan data contoh</button>' : '') + '</div>' : '') +
-      (d && d.menunggu_ttd ? '<div class="km-banner" role="status">' + ICON.pen + '<span>' + d.menunggu_ttd + ' lembar menunggu tanda tanganmu</span></div>' : '') +
+      lembarDaftarHtml(d) +
       '<form class="km-search" role="search" id="cari-form"><label for="cari" class="hidden">Cari pasal</label>' + ICON.search +
       '<input class="input" id="cari" type="search" placeholder="Cari kata atau nomor pasal" autocomplete="off" enterkeyhint="search" value="' + esc(S.q) + '">' +
       '<button type="button" class="clear' + (S.q ? '' : ' hidden') + '" id="cari-x" aria-label="Hapus pencarian">' + ICON.x + '</button></form>' +
@@ -339,8 +343,19 @@
     var ttd = sah && sah.status === 'sah' ? '<div class="ttd" aria-label="' + esc('Disahkan ' + tgl(p.berlaku_sejak) + ' oleh ' + namaPasangan()) + '">' +
       '<figure>' + ttdSvg(sah.ttd_riki) + '<figcaption>' + esc(namaSlot('riki')) + '</figcaption></figure>' +
       '<figure>' + ttdSvg(sah.ttd_febie) + '<figcaption>' + esc(namaSlot('febie')) + '</figcaption></figure></div>' : '';
-    var acts = p.terkunci ? ['+ Keterangan', 'Riwayat'] : p.status === 'usulan' ? ['Riwayat'] : ['Ubah', 'Cabut', '+ Keterangan', 'Riwayat'];
+    var bisaUsul = p.status === 'berlaku' && !p.ada_usulan;
+    var acts = [];
+    if (bisaUsul && !p.terkunci) acts.push(['ubah', 'Ubah'], ['cabut', 'Cabut']);
+    if (bisaUsul) acts.push(['ket', '+ Keterangan']);
+    acts.push(['riwayat', 'Riwayat']);
     var tarik = p.status === 'usulan' && p.sumber_asal === 'app' ? '<button type="button" class="btn small ghost" id="tarik" data-id="' + esc(p.id) + '">Tarik usulan</button>' : '';
+    var lembarLink = (p.lembar_usulan || []).map(function (id) {
+      var l = lembarById(id); return l ? '<a class="btn small kuning" href="#s/' + esc(id) + '">' + ICON.pen + 'Buka lembar: ' + esc(l.judul) + '</a>' : '';
+    }).join('');
+    var tunda = (p.ditunda || []).length ? '<div class="tunda"><div class="lbl">Ditunda ke evaluasi berikutnya</div>' + p.ditunda.map(function (t) {
+      return '<div class="tunda-i"><span>' + esc({ ubah: 'Perubahan', cabut: 'Pencabutan', baru: 'Pasal baru', keterangan: 'Keterangan' }[t.jenis] || 'Usulan') +
+        (t.alasan ? ': ' + esc(t.alasan) : '') + '</span><button type="button" class="btn small ghost" data-ulang="' + esc(t.id) + '">Ajukan lagi</button></div>';
+    }).join('') + '</div>' : '';
     return '<article class="pasal' + (p.status === 'dicabut' ? ' dicabut' : '') + '" aria-labelledby="pasal-judul">' +
       '<div class="pasal-top"><a class="back" href="#" aria-label="Kembali ke daftar">' + ICON.back + '</a><span class="no">Pasal ' + p.nomor +
       (p.tipe === 'definisi' ? ' · Definisi' : babOf(p.bab_id) ? ' · Bab ' + esc(babOf(p.bab_id).nomor) : '') + '</span></div>' +
@@ -350,12 +365,13 @@
         return '<li id="ayat-' + i + '"><span class="n">(' + (i + 1) + ')</span><p>' + hl(a, q) + '</p></li>';
       }).join('') + '</ol>' +
       p.keterangan.map(function (k, i) {
-        return '<div class="ket" id="ket-' + i + '"><div class="lbl">Keterangan · disahkan ' + esc(tgl(k.berlaku_sejak)) + '</div><p>' + hl(k.isi, q) + '</p></div>';
-      }).join('') + lihat +
+        return '<div class="ket" id="ket-' + i + '"><div class="lbl">Keterangan · disahkan ' + esc(tgl(k.berlaku_sejak)) + '</div><p>' + hl(k.isi, q) + '</p>' +
+          (bisaUsul ? '<div class="ket-acts"><button type="button" class="link" data-ket-ganti="' + esc(k.id) + '">Ganti</button><button type="button" class="link" data-ket-cabut="' + esc(k.id) + '">Cabut</button></div>' : '') + '</div>';
+      }).join('') + lihat + tunda +
       '<div class="pasal-foot"><div class="m">' + (w ? '<b>' + esc(w) + '</b>' : '') + (p.versi ? ' · Versi ' + p.versi : '') + ' · ' + esc(sumberLabel(p)) +
       (sah && sah.status === 'sah' ? '<br>Disahkan ' + esc(tgl(p.berlaku_sejak)) + ' · ' + esc(namaPasangan()) : '') + '</div>' + ttd + '</div>' +
-      '<div class="pasal-acts">' + tarik + acts.map(function (a) { return '<button type="button" class="btn small" disabled>' + a + '</button>'; }).join('') +
-      '<span class="cap">' + (p.status === 'usulan' ? 'Tanda tangan berdua hadir di tahap berikutnya.' : 'Ubah, cabut, keterangan & riwayat hadir di fase berikutnya.') + '</span></div></article>';
+      '<div class="pasal-acts">' + lembarLink + tarik + acts.map(function (a) { return '<button type="button" class="btn small" data-pact="' + a[0] + '" data-id="' + esc(p.id) + '">' + a[1] + '</button>'; }).join('') +
+      (p.ada_usulan && p.status === 'berlaku' ? '<span class="cap">Selesaikan usulan yang ada dulu sebelum mengusulkan perubahan lain.</span>' : '') + '</div></article>';
   }
   function users() { return (boot && boot.users) || [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'istri', nama: 'Febie', buku: 'istri' }]; }
   function namaSlot(slot) { var u = users().filter(function (x) { return C.slotTtd(x) === slot; })[0]; return u ? u.nama : (slot === 'riki' ? 'Riki' : 'Febie'); }
@@ -439,16 +455,191 @@
     setTimeout(function () { $('#fb-judul', sh).focus(); }, 300);
   }
 
+  // ================= lembar pengesahan & TTD (Fase 4b) =================
+  function lembarById(id) { return S.data && (S.data.menunggu || []).filter(function (l) { return l.id === id; })[0]; }
+  function currentLembar() { var m = /^#s\/([\w-]+)/.exec(location.hash); return m ? m[1] : ''; }
+  function slotUser(slot) { return users().filter(function (u) { return C.slotTtd(u) === slot; })[0] || { id: slot === 'riki' ? 'riki' : 'istri', nama: namaSlot(slot), buku: slot === 'riki' ? 'riki' : 'istri' }; }
+  function lembarDaftarHtml(d) {
+    if (!d || !(d.menunggu || []).length) return '';
+    var slot = d.slot_saya || C.slotTtd(ME), lain = slot === 'riki' ? 'febie' : 'riki';
+    return '<section class="lembar-list" aria-labelledby="ll-h"><h2 class="bab-h" id="ll-h">' + ICON.pen + (d.menunggu_ttd ? d.menunggu_ttd + ' lembar menunggu tanda tanganmu' : 'Lembar pengesahan') + '</h2>' +
+      '<div class="rows">' + d.menunggu.map(function (l) {
+        var st = l['ttd_' + slot] ? 'Menunggu tanda tangan ' + namaSlot(lain) : l['ttd_' + lain] ? namaSlot(lain) + ' sudah menandatangani. Giliranmu.' : 'Belum ada tanda tangan';
+        return '<a class="row' + (l['ttd_' + slot] ? '' : ' usulan') + '" href="#s/' + esc(l.id) + '"><div class="r1"><span class="jd">' + esc(l.judul) + '</span><span class="tag">' + l.items.length + ' item</span></div>' +
+          '<div class="meta"><span>' + esc(st) + '</span></div></a>';
+      }).join('') + '</div></section>';
+  }
+  var JENIS_LBL = { baru: 'Pasal baru', ubah: 'Perubahan', cabut: 'Pencabutan' };
+  function itemLembarHtml(it, l) {
+    var ket = it.jenis_item === 'keterangan';
+    var lbl = ket ? { baru: 'Keterangan baru', ganti: 'Ganti keterangan', cabut: 'Cabut keterangan' }[it.jenis] : JENIS_LBL[it.jenis];
+    var daftar = function (arr, cls) { return arr.length ? '<ol class="ayat ' + cls + '">' + arr.map(function (a, i) { return '<li><span class="n">' + (ket ? '' : '(' + (i + 1) + ')') + '</span><p>' + esc(a) + '</p></li>'; }).join('') + '</ol>' : ''; };
+    var isi = '';
+    if (it.jenis === 'cabut') isi = '<div class="bv"><div class="bv-l">Yang dicabut</div>' + daftar(it.sebelum.length ? it.sebelum : it.sesudah, 'lama') + '</div>';
+    else if (it.sebelum.length) isi = '<div class="bv"><div class="bv-l">Sebelum</div>' + daftar(it.sebelum, 'lama') + '</div><div class="bv"><div class="bv-l">Sesudah</div>' + daftar(it.sesudah, 'baru') + '</div>';
+    else isi = '<div class="bv">' + daftar(it.sesudah, 'baru') + '</div>';
+    return '<div class="li-item"><div class="li-h"><span class="tag kuning">' + esc(lbl) + '</span><a href="#p/' + it.nomor + '" class="li-no">Pasal ' + it.nomor + ' · ' + esc(it.judul) + '</a></div>' + isi +
+      (it.alasan ? '<p class="li-alasan"><b>Alasan:</b> ' + esc(it.alasan) + '</p>' : '') +
+      (l.status === 'menunggu' ? '<button type="button" class="btn small ghost" data-defer="' + esc(it.id) + '">Diskusikan dulu</button>' : '') + '</div>';
+  }
+  function lembarHtml(id) {
+    var l = lembarById(id);
+    var top = '<div class="pasal-top"><a class="back" href="#" aria-label="Kembali ke daftar">' + ICON.back + '</a><span class="no">Lembar Pengesahan</span></div>';
+    if (!l) return '<div class="pasal">' + top + '<p class="km-empty">' + (S.data ? 'Lembar ini sudah sah, dibatalkan, atau tidak ada.' : 'Memuat…') + '</p></div>';
+    var slot = S.data.slot_saya || C.slotTtd(ME);
+    var pernyataan = 'Kami, ' + namaSlot('riki') + ' dan ' + namaSlot('febie') + ', sudah membaca semua perubahan di lembar ini dan menyepakatinya dengan sadar, tanpa paksaan. ' +
+      'Kami berkomitmen menjalankannya bersama sampai kami sepakat mengubahnya lagi.';
+    var kotak = ['riki', 'febie'].map(function (sl) {
+      var d = l['ttd_' + sl], milikku = sl === slot, bisa = !d && (milikku || demo);
+      return '<div class="ttd-box' + (d ? ' isi' : '') + '"><div class="ttd-nm">' + esc(namaSlot(sl)) + (milikku ? ' (kamu)' : '') + '</div>' +
+        (d ? ttdSvg(d) + '<div class="ttd-at">' + esc(tgl(l['ttd_' + sl + '_at'])) + '</div>'
+          : bisa ? '<button type="button" class="btn small kuning" data-sign="' + sl + '">' + ICON.pen + 'Tanda tangani' + (milikku ? '' : ' (simulasi)') + '</button>'
+          : '<div class="ttd-wait">Menunggu tanda tangan ' + esc(namaSlot(sl)) + '</div>') + '</div>';
+    }).join('');
+    var lain = slot === 'riki' ? 'febie' : 'riki';
+    var st = l['ttd_' + slot] ? 'Menunggu tanda tangan ' + namaSlot(lain) + '.' : l['ttd_' + lain] ? namaSlot(lain) + ' sudah menandatangani. Giliranmu.' : 'Baca semua item, lalu tanda tangani. Berlaku setelah kalian berdua tanda tangan.';
+    return '<article class="pasal lembar" aria-labelledby="lb-h">' + top + '<h2 id="lb-h">' + esc(l.judul) + '</h2>' +
+      '<p class="info kuning" role="status">' + esc(st) + '</p>' +
+      '<div class="li-list">' + l.items.map(function (it) { return itemLembarHtml(it, l); }).join('') + '</div>' +
+      '<blockquote class="pernyataan">' + esc(pernyataan) + '</blockquote>' +
+      '<div class="ttd-grid">' + kotak + '</div>' +
+      '<p class="cap">Tanda tangan di app adalah tanda komitmen pribadi berdua, bukan tanda tangan elektronik resmi.' + (l.items.length > 1 ? ' "Diskusikan dulu" mengeluarkan item dari lembar; tanda tangan yang sudah ada perlu diulang.' : '') + '</p></article>';
+  }
+
+  // ---------- sheet umum ----------
+  function bukaSheet(judul, isiHtml, kelas) {
+    var scrim = document.createElement('div'); scrim.className = 'scrim';
+    var sh = document.createElement('div'); sh.className = 'sheet km-form ' + (kelas || ''); sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.setAttribute('aria-labelledby', 'sh-h');
+    sh.innerHTML = '<div class="grab"></div><div class="sheet-h"><h3 id="sh-h">' + esc(judul) + '</h3><button type="button" class="iconbtn" data-close aria-label="Tutup">' + ICON.x + '</button></div>' + isiHtml;
+    document.body.appendChild(scrim); document.body.appendChild(sh);
+    requestAnimationFrame(function () { scrim.classList.add('show'); sh.classList.add('show'); });
+    var prev = document.activeElement;
+    var api = { el: sh, tutup: function (tanpaFokus) {
+      scrim.classList.remove('show'); sh.classList.remove('show'); document.removeEventListener('keydown', onKey);
+      setTimeout(function () { scrim.remove(); sh.remove(); if (!tanpaFokus && prev && prev.focus && document.contains(prev)) prev.focus(); }, 280);
+    } };
+    function onKey(e) { if (e.key === 'Escape') api.tutup(); }
+    document.addEventListener('keydown', onKey);
+    scrim.addEventListener('click', function () { api.tutup(); });
+    $('[data-close]', sh).addEventListener('click', function () { api.tutup(); });
+    return api;
+  }
+  function kirimForm(sh, btnLabel, action, payload, sukses) {
+    var errEl = $('.fb-err', sh.el), btn = $('button[type=submit]', sh.el);
+    errEl.textContent = ''; btn.disabled = true; btn.textContent = 'Menyimpan…';
+    aksi(action, payload).then(function (r) { sh.tutup(true); sukses(r); }, function (ex) { errEl.textContent = ex.message; btn.disabled = false; btn.textContent = btnLabel; });
+  }
+  function keLembar(r, pesan) { toast(pesan); var h = '#s/' + r.pengesahan_id; if (location.hash === h) render(); else location.hash = h; }
+
+  // ---------- Ubah pasal ----------
+  function bukaFormUbah(p) {
+    var ayat = p.ayat.slice();
+    var sh = bukaSheet('Ubah Pasal ' + p.nomor, '<p class="fb-sub">Isi lama tetap berlaku sampai perubahan ditandatangani berdua. Nomor pasal tetap ' + p.nomor + '.</p>' +
+      '<form novalidate><div class="field"><span class="lbl">Isi ayat</span><div class="fb-ayat-w"></div><button type="button" class="btn small ghost" data-add>+ Tambah ayat</button></div>' +
+      '<div class="field"><label for="fu-alasan">Alasan <span class="opt">(wajib, 1 kalimat cukup)</span></label><input class="input" id="fu-alasan" maxlength="200" autocomplete="off" placeholder="Kenapa perlu diubah"></div>' +
+      '<p class="fb-err" role="alert"></p><button type="submit" class="btn">Simpan usulan perubahan</button></form>');
+    var w = $('.fb-ayat-w', sh.el);
+    function sync() { $$('textarea', w).forEach(function (t, i) { ayat[i] = t.value; }); }
+    function draw() {
+      w.innerHTML = ayat.map(function (a, i) {
+        return '<div class="fb-ayat"><span class="n">(' + (i + 1) + ')</span><textarea class="input" rows="3" aria-label="Ayat ' + (i + 1) + '">' + esc(a) + '</textarea>' +
+          (ayat.length > 1 ? '<button type="button" class="iconbtn" data-del="' + i + '" aria-label="Hapus ayat ' + (i + 1) + '">' + ICON.x + '</button>' : '') + '</div>';
+      }).join('');
+      $$('[data-del]', w).forEach(function (b) { b.addEventListener('click', function () { sync(); ayat.splice(+b.getAttribute('data-del'), 1); draw(); }); });
+    }
+    draw();
+    $('[data-add]', sh.el).addEventListener('click', function () { sync(); ayat.push(''); draw(); var t = $$('textarea', w); t[t.length - 1].focus(); });
+    $('form', sh.el).addEventListener('submit', function (e) {
+      e.preventDefault(); sync();
+      kirimForm(sh, 'Simpan usulan perubahan', 'komitmen.usul_ubah', { pasal_id: p.id, ayat: ayat, alasan: $('#fu-alasan', sh.el).value }, function (r) { keLembar(r, 'Usulan perubahan Pasal ' + r.nomor + ' tersimpan'); });
+    });
+    setTimeout(function () { var t = $('textarea', w); if (t) t.focus(); }, 300);
+  }
+  // ---------- Cabut pasal ----------
+  function bukaFormCabut(p) {
+    var sh = bukaSheet('Cabut Pasal ' + p.nomor, '<p class="fb-sub">Pasal tetap ada di arsip "Dicabut" dan nomornya tidak dipakai ulang. Berlaku setelah ditandatangani berdua.</p>' +
+      '<form novalidate><div class="field"><label for="fc-alasan">Alasan <span class="opt">(wajib)</span></label><textarea class="input" id="fc-alasan" rows="3" maxlength="300" placeholder="Kenapa pasal ini dicabut"></textarea></div>' +
+      '<p class="fb-err" role="alert"></p><button type="submit" class="btn">Usulkan pencabutan</button></form>');
+    $('form', sh.el).addEventListener('submit', function (e) {
+      e.preventDefault();
+      kirimForm(sh, 'Usulkan pencabutan', 'komitmen.usul_cabut', { pasal_id: p.id, alasan: $('#fc-alasan', sh.el).value }, function (r) { keLembar(r, 'Usulan pencabutan Pasal ' + r.nomor + ' tersimpan'); });
+    });
+    setTimeout(function () { $('#fc-alasan', sh.el).focus(); }, 300);
+  }
+  // ---------- Keterangan: baru / ganti / cabut ----------
+  function bukaFormKet(p, jenis, lama) {
+    jenis = jenis || 'baru';
+    var judul = { baru: 'Keterangan untuk Pasal ', ganti: 'Ganti keterangan Pasal ', cabut: 'Cabut keterangan Pasal ' }[jenis] + p.nomor;
+    var label = jenis === 'cabut' ? 'Usulkan pencabutan' : 'Simpan usulan keterangan';
+    var sh = bukaSheet(judul, '<p class="fb-sub">' + (jenis === 'cabut' ? 'Keterangan ini akan dicabut setelah ditandatangani berdua.' : 'Menjelaskan cara kalian menjalankan pasal ini tanpa mengubah teks aslinya. Berlaku setelah ditandatangani berdua.') + '</p>' +
+      (lama ? '<div class="ket"><div class="lbl">Keterangan sekarang</div><p>' + esc(lama.isi) + '</p></div>' : '') +
+      '<form novalidate>' + (jenis === 'cabut' ? '' : '<div class="field"><label for="fk-isi">' + (jenis === 'ganti' ? 'Keterangan baru' : 'Isi keterangan') + '</label><textarea class="input" id="fk-isi" rows="4" maxlength="2000">' + esc(jenis === 'ganti' ? lama.isi : '') + '</textarea></div>') +
+      '<p class="fb-err" role="alert"></p><button type="submit" class="btn">' + label + '</button></form>');
+    $('form', sh.el).addEventListener('submit', function (e) {
+      e.preventDefault();
+      var isi = $('#fk-isi', sh.el);
+      kirimForm(sh, label, 'komitmen.usul_keterangan', { pasal_id: p.id, jenis: jenis, menggantikan_id: lama ? lama.id : '', isi: isi ? isi.value : '' },
+        function (r) { keLembar(r, 'Usulan keterangan Pasal ' + r.nomor + ' tersimpan'); });
+    });
+    setTimeout(function () { var t = $('#fk-isi', sh.el); if (t) t.focus(); }, 300);
+  }
+  // ---------- Riwayat ----------
+  function bukaRiwayat(p) {
+    var sh = bukaSheet('Riwayat Pasal ' + p.nomor, '<div class="rw" aria-live="polite"><p class="fb-sub">Memuat…</p></div>');
+    var box = $('.rw', sh.el);
+    var ST = { berlaku: 'Berlaku', digantikan: 'Digantikan', usulan: 'Usulan', ditunda: 'Ditunda', dicabut: 'Dicabut' };
+    baca('komitmen.history', { pasal_id: p.id }).then(function (r) {
+      box.innerHTML = r.riwayat.length ? r.riwayat.map(function (x) {
+        var ket = x.jenis_item === 'keterangan';
+        var judul = ket ? { baru: 'Keterangan', ganti: 'Keterangan (ganti)', cabut: 'Cabut keterangan' }[x.jenis] : 'Versi ' + x.versi + ' · ' + (JENIS_LBL[x.jenis] || '');
+        var isi = ket ? '<p>' + esc(x.isi) + '</p>' : x.jenis === 'cabut' ? '' : '<ol class="ayat">' + x.ayat.map(function (a, i) { return '<li><span class="n">(' + (i + 1) + ')</span><p>' + esc(a) + '</p></li>'; }).join('') + '</ol>';
+        return '<div class="rw-i ' + esc(x.status) + '"><div class="rw-h"><b>' + esc(judul) + '</b><span class="tag' + (x.status === 'berlaku' ? ' kuning' : '') + '">' + esc(ST[x.status] || x.status) + '</span></div>' +
+          '<div class="rw-m">' + esc(x.berlaku_sejak ? 'Disahkan ' + tgl(x.berlaku_sejak) : 'Diusulkan ' + tgl(x.dibuat_at)) + (x.pengesahan_judul ? ' · ' + esc(x.pengesahan_judul) : '') + '</div>' +
+          isi + (x.alasan ? '<p class="li-alasan"><b>Alasan:</b> ' + esc(x.alasan) + '</p>' : '') + '</div>';
+      }).join('') : '<p class="fb-sub">Belum ada riwayat.</p>';
+    }, function (e) { box.innerHTML = '<p class="fb-err">' + esc(e.offline ? 'Butuh koneksi internet untuk melihat riwayat.' : e.message) + '</p>'; });
+  }
+  // ---------- Kotak tanda tangan (gambar dengan jari) ----------
+  function bukaPadTtd(l, slot) {
+    var simulasi = slot !== (S.data.slot_saya || C.slotTtd(ME));
+    var sh = bukaSheet('Tanda tangan ' + namaSlot(slot) + (simulasi ? ' (simulasi)' : ''), '<p class="fb-sub">' + esc(l.judul) + ' · ' + l.items.length + ' item</p>' +
+      '<div class="pad-w"><canvas class="pad" width="600" height="240" aria-label="Kotak tanda tangan. Gambar tanda tanganmu di sini."></canvas><span class="pad-ph">Gambar tanda tanganmu di sini</span></div>' +
+      '<p class="fb-err" role="alert"></p><div class="pad-acts"><button type="button" class="btn ghost" data-ulang>Ulangi</button><button type="button" class="btn kuning" data-simpan disabled>Simpan tanda tangan</button></div>', 'pad-sheet');
+    var cv = $('canvas', sh.el), ctx = cv.getContext('2d'), garis = [], cur = null;
+    var warna = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#fff';
+    function titik(e) { var r = cv.getBoundingClientRect(); return [Math.round((e.clientX - r.left) / r.width * 3000) / 10, Math.round((e.clientY - r.top) / r.height * 1200) / 10]; }
+    function gambar() {
+      ctx.clearRect(0, 0, cv.width, cv.height); ctx.strokeStyle = warna; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      garis.forEach(function (g) { ctx.beginPath(); g.forEach(function (t, i) { var x = t[0] * 2, y = t[1] * 2; if (i) ctx.lineTo(x, y); else { ctx.moveTo(x, y); ctx.lineTo(x + .1, y); } }); ctx.stroke(); });
+      var ada = garis.length > 0;
+      $('[data-simpan]', sh.el).disabled = !ada; $('.pad-ph', sh.el).style.display = ada ? 'none' : '';
+    }
+    cv.addEventListener('pointerdown', function (e) { e.preventDefault(); cv.setPointerCapture(e.pointerId); cur = [titik(e)]; garis.push(cur); gambar(); });
+    cv.addEventListener('pointermove', function (e) { if (!cur) return; var t = titik(e), a = cur[cur.length - 1]; if (Math.abs(t[0] - a[0]) + Math.abs(t[1] - a[1]) < 1.2) return; cur.push(t); gambar(); });
+    ['pointerup', 'pointercancel'].forEach(function (ev) { cv.addEventListener(ev, function () { cur = null; }); });
+    $('[data-ulang]', sh.el).addEventListener('click', function () { garis = []; gambar(); });
+    $('[data-simpan]', sh.el).addEventListener('click', function () {
+      var d = garis.map(function (g) { return 'M' + g[0].join(' ') + (g.length > 1 ? ' L' + g.slice(1).map(function (t) { return t.join(' '); }).join(' ') : ' L' + (g[0][0] + .1) + ' ' + g[0][1]); }).join(' ');
+      var btn = this, errEl = $('.fb-err', sh.el); btn.disabled = true; btn.textContent = 'Menyimpan…'; errEl.textContent = '';
+      aksi('pengesahan.sign', { id: l.id, ttd: d, isi_hash: l.isi_hash, slot: slot }, simulasi ? slotUser(slot) : null).then(function (r) {
+        sh.tutup(true);
+        if (r.sah) { toast('Sah! Semua item di lembar ini berlaku hari ini'); location.hash = ''; }
+        else { toast('Tanda tangan tersimpan'); render(); }
+      }, function (ex) { errEl.textContent = ex.message; btn.disabled = false; btn.textContent = 'Simpan tanda tangan'; });
+    });
+    gambar();
+  }
+
   // ================= render & event =================
   var root = $('#km');
   function render() {
-    var n = currentNomor();
-    root.setAttribute('data-view', n ? 'pasal' : 'list');
+    var n = currentNomor(), sid = currentLembar();
+    root.setAttribute('data-view', n || sid ? 'pasal' : 'list');
     var y = window.scrollY;
     root.innerHTML = '<div class="km-list">' + listHtml() + '</div><div class="km-detail">' +
-      (n ? pasalHtml(n) : '<div class="km-empty"><p>Pilih pasal untuk membaca isinya.</p></div>') + '</div>';
+      (n ? pasalHtml(n) : sid ? lembarHtml(sid) : '<div class="km-empty"><p>Pilih pasal untuk membaca isinya.</p></div>') + '</div>';
     bind();
-    if (!n) window.scrollTo(0, y);
+    if (!n && !sid) window.scrollTo(0, y);
   }
   function renderItems() { // ketik di kolom cari: hanya daftar yang diperbarui, fokus input tetap
     var it = $('#items'); if (!it) return render();
@@ -490,11 +681,35 @@
       aksi('komitmen.tarik_usulan', { pasal_id: tk.getAttribute('data-id') }).then(function () { toast('Usulan ditarik'); if (location.hash) location.hash = ''; else render(); },
         function (e) { tk.disabled = false; toast(e.message); });
     });
+    var pasalOf = function (id) { return S.data.pasal.filter(function (x) { return x.id === id; })[0]; };
+    $$('[data-pact]', root).forEach(function (b) { b.addEventListener('click', function () {
+      var p = pasalOf(b.getAttribute('data-id')), a = b.getAttribute('data-pact'); if (!p) return;
+      if (a === 'ubah') bukaFormUbah(p); else if (a === 'cabut') bukaFormCabut(p); else if (a === 'ket') bukaFormKet(p, 'baru'); else bukaRiwayat(p);
+    }); });
+    $$('[data-ket-ganti],[data-ket-cabut]', root).forEach(function (b) { b.addEventListener('click', function () {
+      var kid = b.getAttribute('data-ket-ganti') || b.getAttribute('data-ket-cabut');
+      var p = S.data.pasal.filter(function (x) { return x.keterangan.some(function (k) { return k.id === kid; }); })[0];
+      if (p) bukaFormKet(p, b.hasAttribute('data-ket-ganti') ? 'ganti' : 'cabut', p.keterangan.filter(function (k) { return k.id === kid; })[0]);
+    }); });
+    $$('[data-ulang]', root).forEach(function (b) { b.addEventListener('click', function () {
+      b.disabled = true;
+      aksi('komitmen.ajukan_ulang', { item_id: b.getAttribute('data-ulang') }).then(function (r) { keLembar(r, 'Usulan diajukan lagi'); }, function (e) { b.disabled = false; toast(e.message); });
+    }); });
+    var sid = currentLembar(), l = sid && lembarById(sid);
+    $$('[data-defer]', root).forEach(function (b) { b.addEventListener('click', function () {
+      if (!confirm('Diskusikan dulu? Item ini keluar dari lembar dan ditunda. Tanda tangan yang sudah ada di lembar ini perlu diulang.')) return;
+      b.disabled = true;
+      aksi('pengesahan.defer', { id: sid, item_id: b.getAttribute('data-defer') }).then(function (r) {
+        toast('Ditunda ke evaluasi berikutnya'); if (r.status === 'batal') location.hash = ''; else render();
+      }, function (e) { b.disabled = false; toast(e.message); });
+    }); });
+    $$('[data-sign]', root).forEach(function (b) { b.addEventListener('click', function () { if (l) bukaPadTtd(l, b.getAttribute('data-sign')); }); });
     bindRows();
   }
   function scrollFokus() {
-    var n = currentNomor(); if (!n) return;
-    var det = $('.km-detail');
+    var n = currentNomor(), det = $('.km-detail');
+    if (!n && currentLembar()) { if (window.matchMedia('(min-width: 900px)').matches) det.scrollTop = 0; else window.scrollTo(0, 0); return; }
+    if (!n) return;
     if (window.matchMedia('(min-width: 900px)').matches) det.scrollTop = 0; else window.scrollTo(0, 0);
     var f = S.fokus, el = null;
     if (f && f.di === 'ayat') el = document.getElementById('ayat-' + f.idx);
@@ -506,15 +721,16 @@
   window.addEventListener('hashchange', function () {
     var listY = window.scrollY;
     render();
-    if (currentNomor()) scrollFokus(); else { window.scrollTo(0, S.listY || 0); S.fokus = null; }
-    if (currentNomor()) S.listY = S.listY || listY;
+    var detail = currentNomor() || currentLembar();
+    if (detail) scrollFokus(); else { window.scrollTo(0, S.listY || 0); S.fokus = null; S.listY = 0; }
+    if (detail) S.listY = S.listY || listY;
   });
   window.addEventListener('storage', function (e) { if (e.key === 'k_theme') location.reload(); });
 
   var ui = LS.get('k_km_ui', null);
   if (ui) { S.filter = ['semua', 'pranikah', 'usulan', 'dicabut'].indexOf(ui.filter) >= 0 ? ui.filter : 'semua'; S.tab = ui.tab === 'definisi' || ui.tab === 'az' ? 'definisi' : 'kesepakatan'; }
   load();
-  if (currentNomor()) scrollFokus();
+  if (currentNomor() || currentLembar()) scrollFokus();
   // offline: halaman ikut cache service worker yang sama dengan app
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(function () {});
 })();
