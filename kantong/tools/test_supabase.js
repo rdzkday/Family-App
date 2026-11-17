@@ -32,7 +32,7 @@ function mockDb() {
     pengesahan: [{ id: 's-1', judul: 'Perjanjian Pranikah', jenis: 'pranikah', evaluasi_id: '', ttd_riki: 'M0 0L1 1', ttd_riki_at: 'x', ttd_febie: 'M1 1L0 0',
       ttd_febie_at: 'y', isi_hash: '', status: 'sah', dibuat_at: '' }, { id: 's-2', judul: 'Usulan', jenis: 'tunggal', evaluasi_id: '', ttd_riki: 'M0 0',
       ttd_riki_at: 'x', ttd_febie: '', ttd_febie_at: '', isi_hash: '', status: 'menunggu', dibuat_at: '' }],
-    evaluasi: [],
+    evaluasi: [], jurnal: [], siklus: [], siklus_atur: [],
     sesi: [],
     akses: [{ user_id: 'riki', token_hash: sha('r'.repeat(40)) }, { user_id: 'istri', token_hash: sha('i'.repeat(40)) }]
   };
@@ -329,6 +329,27 @@ function mockGoogle() {
     ok(await call(R, 'month', { bulan: '2026-11' }));
     delete db.tabel.fitur;
     ok(await call(R, 'todo.list', {}));
+  });
+  await t('siklus lewat Edge Function: tanggal & boolean benar, suami hanya lihat jadwal yang dibagikan', async () => {
+    const d0 = { ...deps, calendar: null };
+    assert.strictEqual((await call(I, 'siklus.save', { id: 'sk-1', mulai: '2026-11-01' }, d0)).ok, false, 'belum aktif');
+    ok(await call(I, 'siklus.atur', { aktif: true, setuju: 1 }, d0));
+    ok(await call(I, 'siklus.save', { id: 'sk-1', mulai: '2026-10-05', akhir: '2026-10-09', catatan: 'pusing' }, d0));
+    ok(await call(I, 'siklus.save', { id: 'sk-2', mulai: '2026-11-02' }, d0));
+    const row = db.tabel.siklus.find((x) => x.id === 'sk-1'), row2 = db.tabel.siklus.find((x) => x.id === 'sk-2');
+    assert.strictEqual(row.mulai, '2026-10-05'); assert.strictEqual(row.akhir, '2026-10-09'); assert.strictEqual(row.abaikan_jarak, false);
+    assert.strictEqual(row2.akhir, null, 'selesai kosong -> null di Postgres');
+    const atur = db.tabel.siklus_atur.find((x) => x.id === 'istri');
+    assert.strictEqual(atur.aktif, true); assert.strictEqual(atur.versi_teks, 1); assert.strictEqual(atur.tampil, true);
+    const vr = ok(await call(R, 'siklus.list', {}, d0));
+    assert.strictEqual(vr.dibagikan, true); assert.deepStrictEqual(vr.siklus.map((x) => [x.mulai, x.akhir, x.catatan]), [['2026-10-05', '2026-10-09', ''], ['2026-11-02', '', '']]);
+    assert.strictEqual((await call(R, 'siklus.save', { id: 'sk-3', mulai: '2026-11-03' }, d0)).ok, false, 'suami tidak bisa mencatat');
+    ok(await call(R, 'siklus.atur', { tampil: false }, d0));
+    assert.strictEqual(db.tabel.siklus_atur.find((x) => x.id === 'riki').tampil, false);
+    assert.strictEqual(ok(await call(I, 'siklus.list', {}, d0)).tampil, true, 'pilihan suami tidak mengubah istri');
+    ok(await call(I, 'siklus.delete', { id: 'sk-1' }, d0));
+    const hapus = db.tabel.siklus.find((x) => x.id === 'sk-1');
+    assert.deepStrictEqual([hapus.mulai, hapus.akhir, hapus.catatan], [null, null, ''], 'hapus: tanggal null, catatan kosong');
   });
   resetTokenCache();
   console.log(`\n${lulus} test lulus`);

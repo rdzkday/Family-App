@@ -20,6 +20,15 @@ function todoPemilikInfo(id) {
   return todoPemilikList().filter(function (p) { return p.id === id; })[0] || { id: id, nama: id, warna: 'var(--surface-3)' };
 }
 function canWriteTodo(t) { return C.canWriteTodo(me(), t); }
+// To-do = tugas tanpa waktu (tercatat tanggal dibuat). Agenda = punya tanggal/jam, tampil di Kalender & Google Calendar.
+function isAgenda(t) { return C.todoTipe(t) !== 'catatan' && !!t.tanggal; }
+function isTugas(t) { return C.todoTipe(t) === 'todo' && !t.tanggal; }
+function todoDibuatLabel(t) {
+  var d = String(t.dibuat || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return '';
+  var l = dayLabel(d);
+  return 'Dibuat ' + (l === 'Hari ini' || l === 'Kemarin' ? l.toLowerCase() : l) + (d.slice(0, 4) !== todayISO().slice(0, 4) ? ' ' + d.slice(0, 4) : '');
+}
 function todoFilter() { return S.prefs.todoFilter || 'untukku'; }
 function todoMatch(t, f) {
   if (f === 'semua') return true;
@@ -56,7 +65,7 @@ function todoSorted(list) {
 }
 // status kalender per baris (UX copy dari brief: menunggu koneksi / menyinkronkan / tersinkron / gagal)
 function todoStatusHtml(t) {
-  if (!t.tanggal) return '';
+  if (!t.tanggal) { var dl = todoDibuatLabel(t); return dl ? '<span class="td-st">' + esc(dl) + '</span>' : ''; }
   var waktu = esc(todoWaktuLabel(t));
   if (t._pending) {
     var sedang = S.syncing || !S.lastError;
@@ -126,8 +135,8 @@ function simpanTodo(f, existing, errEl) {
   if (errEl) errEl.textContent = '';
   enqueue('todo.save', payload);
   if (tipe === 'catatan') toast(existing ? 'Catatan diperbarui' : 'Catatan tersimpan');
-  else if (existing && existing.tanggal && !payload.tanggal) toast('Waktu dihapus. Event kalender ikut dihapus, to-do tetap ada.');
-  else if (payload.tanggal) toast(existing ? 'Perubahan disimpan. Masuk ke Google Calendar.' : 'Tersimpan. Masuk ke Google Calendar.');
+  else if (existing && existing.tanggal && !payload.tanggal) toast('Jadi to-do tanpa waktu. Event kalender ikut dihapus.');
+  else if (payload.tanggal) toast(existing ? 'Agenda diperbarui. Masuk ke Google Calendar.' : 'Agenda tersimpan. Masuk ke Google Calendar.');
   else toast(existing ? 'Perubahan disimpan' : 'Tersimpan');
   return payload;
 }
@@ -140,12 +149,15 @@ function openTodoSheet(t, init) {
       seharian: !!t.tanggal && !t.jam, jam: t.jam || jamDefault, durasi: C.num(t.durasi) || C.TODO_DURASI }
     : Object.assign({ id: '', tipe: 'todo', judul: '', isi: '', pemilik: todoDefaultPemilik(), aturWaktu: false, tanggal: todayISO(), seharian: false, jam: jamDefault, durasi: C.TODO_DURASI }, init || {});
   if (f.tipe === 'evaluasi') { f.aturWaktu = true; if (!f.judul) f.judul = C.EVALUASI_JUDUL; }
-  var NAMA = { todo: 'to-do', catatan: 'catatan', evaluasi: 'jadwal evaluasi' }[f.tipe];
-  var judulSheet = t ? (editable ? 'Ubah ' + NAMA : 'Detail ' + NAMA) : ({ todo: 'To-do baru', catatan: 'Catatan baru', evaluasi: 'Jadwalkan evaluasi' })[f.tipe];
+  if (!t && init && init.agenda) f.aturWaktu = true;
+  // to-do tidak punya waktu; agenda (aturWaktu) wajib bertanggal
+  var namaDari = function () { return f.tipe === 'catatan' ? 'catatan' : f.tipe === 'evaluasi' ? 'jadwal evaluasi' : f.aturWaktu ? 'agenda' : 'to-do'; };
+  var NAMA = namaDari();
+  var judulSheet = t ? (editable ? 'Ubah ' + NAMA : 'Detail ' + NAMA) : ({ todo: f.aturWaktu ? 'Agenda baru' : 'To-do baru', catatan: 'Catatan baru', evaluasi: 'Jadwalkan evaluasi' })[f.tipe];
   openSheet(judulSheet, function (sh) {
     function hintText() {
       if (f.tipe === 'catatan') return 'Catatan hanya di app, tidak pernah masuk kalender.';
-      if (!f.aturWaktu) return 'Tanpa waktu: hanya di app, tidak masuk kalender.';
+      if (!f.aturWaktu) return (t ? todoDibuatLabel(t) + '. ' : 'Tanggal dibuat dicatat otomatis. ') + 'To-do hanya di app, tidak masuk kalender.';
       var spec = C.todoEventSpec({ id: f.id || 'x', judul: f.judul || 'to-do', pemilik: f.pemilik, tanggal: f.tanggal, jam: f.seharian ? '' : f.jam, durasi: f.durasi, selesai: t ? t.selesai : false }, db());
       var kapan = todoWaktuLabel({ tanggal: f.tanggal, jam: f.seharian ? '' : f.jam });
       if (!spec.seharian) kapan += '–' + spec.akhir.slice(11);
@@ -159,12 +171,11 @@ function openTodoSheet(t, init) {
       sh.el.innerHTML = (editable ? '' : '<div class="readonly-note">' + ICON.lock + '<span>' + (catatan ? 'Catatan' : 'To-do') + ' ini milik ' + esc(todoPemilikInfo(f.pemilik).nama) + '. Hanya bisa kamu lihat.</span></div>') +
         (catatan
           ? '<div class="field" style="margin-top:4px"><label for="td-isi">Catatan</label><textarea id="td-isi" class="input" rows="6" maxlength="2000" placeholder="Tulis catatan…"' + dis + '>' + esc(f.isi) + '</textarea></div>'
-          : '<div class="field" style="margin-top:4px"><label for="td-judul">' + (evaluasi ? 'Judul agenda' : 'Apa yang mau dikerjain?') + '</label><input id="td-judul" class="input" maxlength="120" placeholder="mis. bayar listrik" autocomplete="off" value="' + esc(f.judul) + '"' + dis + '></div>') +
+          : '<div class="field" style="margin-top:4px"><label for="td-judul">' + (f.aturWaktu ? 'Nama agenda' : 'Apa yang mau dikerjain?') + '</label><input id="td-judul" class="input" maxlength="120" placeholder="' + (f.aturWaktu ? 'mis. kontrol ke dokter' : 'mis. beli galon') + '" autocomplete="off" value="' + esc(f.judul) + '"' + dis + '></div>') +
         '<div class="field"><span class="lbl">Untuk</span><div class="chips wrap" role="group" aria-label="Pemilik to-do">' + todoPemilikList().map(function (p) {
           return '<button type="button" class="chip" data-tp="' + esc(p.id) + '" aria-pressed="' + (f.pemilik === p.id) + '" style="--c:' + p.warna + '"' + dis + '><span class="dot" style="background:' + p.warna + '"></span>' + esc(p.nama) + '</button>';
         }).join('') + '</div></div>' +
-        (catatan ? '' : toggleHtml('td-eval', 'Agenda evaluasi bulanan', evaluasi ? 'Pengingat muncul di Beranda ' + C.EVALUASI_PENGINGAT_JAM + ' jam sebelumnya' : 'Jadikan jadwal evaluasi berdua', evaluasi).replace('<button ', '<button' + dis + ' ')) +
-        (catatan || evaluasi ? '' : toggleHtml('td-waktu', 'Atur waktu', f.aturWaktu ? 'Masuk ke Google Calendar "Rumah Kita"' : 'Tanpa waktu: hanya di app', f.aturWaktu).replace('<button ', '<button' + dis + ' ')) +
+        (catatan || !f.aturWaktu ? '' : toggleHtml('td-eval', 'Agenda evaluasi bulanan', evaluasi ? 'Pengingat muncul di Beranda ' + C.EVALUASI_PENGINGAT_JAM + ' jam sebelumnya' : 'Jadikan jadwal evaluasi berdua', evaluasi).replace('<button ', '<button' + dis + ' ')) +
         (f.aturWaktu && !catatan ?
           '<div class="field row2"><div><label for="td-tgl">Tanggal</label><input id="td-tgl" class="input" type="date" value="' + esc(f.tanggal) + '"' + dis + '></div>' +
           '<div><label for="td-jam">Jam</label><input id="td-jam" class="input" type="time" step="300" value="' + esc(f.jam) + '"' + (f.seharian || !editable ? ' disabled' : '') + '></div></div>' +
@@ -173,6 +184,7 @@ function openTodoSheet(t, init) {
             return '<button type="button" class="chip" data-td="' + x[0] + '" aria-pressed="' + (f.durasi === x[0]) + '"' + dis + '>' + x[1] + '</button>';
           }).join('') + '</div></div>' : '') : '') +
         '<div class="hint" id="td-hint">' + esc(hintText()) + '</div>' +
+        (catatan || evaluasi || !editable ? '' : '<button type="button" class="td-ubah-jenis" id="td-jenis">' + (f.aturWaktu ? 'Tidak perlu waktu? Jadikan to-do' : ICON.cal + 'Butuh tanggal & jam? Jadikan agenda') + '</button>') +
         (t && t.gcal_status === 'gagal' && C.todoPerluEvent(t) && !t._pending ? '<div class="hint" style="color:var(--todo-bad)">Terakhir gagal masuk kalender: ' + esc(t.gcal_error || 'tidak diketahui') + '</div>' : '') +
         '<div class="err" id="td-err" role="alert"></div>' +
         (editable ? '<button type="button" class="btn" id="td-save">' + (t ? 'Simpan perubahan' : 'Simpan') + '</button>' +
@@ -189,9 +201,9 @@ function openTodoSheet(t, init) {
         $$('[data-tp]', sh.el).forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
         $('#td-hint', sh.el).textContent = hintText();
       }); });
-      var tw = $('#td-waktu', sh.el); if (tw) tw.addEventListener('click', function () { f.aturWaktu = !f.aturWaktu; draw(); });
+      var tw = $('#td-jenis', sh.el); if (tw) tw.addEventListener('click', function () { f.aturWaktu = !f.aturWaktu; NAMA = namaDari(); var h = sh.el.parentNode.querySelector('.sheet-h h3'); if (h && !t) h.textContent = f.aturWaktu ? 'Agenda baru' : 'To-do baru'; draw(); });
       var te = $('#td-eval', sh.el); if (te) te.addEventListener('click', function () {
-        if (f.tipe === 'evaluasi') { f.tipe = 'todo'; if (f.judul === C.EVALUASI_JUDUL) f.judul = ''; }
+        if (f.tipe === 'evaluasi') { f.tipe = 'todo'; f.aturWaktu = true; if (f.judul === C.EVALUASI_JUDUL) f.judul = ''; }
         else { f.tipe = 'evaluasi'; f.aturWaktu = true; f.pemilik = C.TODO_BERSAMA; if (!f.judul) f.judul = C.EVALUASI_JUDUL; }
         draw();
       });
@@ -226,7 +238,8 @@ var TodoView = {
         return '<button type="button" data-tf="' + x[0] + '" aria-pressed="' + (todoFilter() === x[0]) + '">' + x[1] + '</button>';
       }).join('') + '</div>' +
       '<div class="todo-add"><input id="td-new" class="input" type="text" maxlength="120" placeholder="Tulis to-do, lalu Enter" autocomplete="off" enterkeyhint="done" aria-label="To-do baru">' +
-      '<button type="button" class="btn small ghost" id="td-time" aria-label="Atur waktu">' + ICON.cal + '<span>Atur waktu</span></button></div>' +
+      '<button type="button" class="btn small ghost" id="td-time" aria-label="Tambah agenda (dengan tanggal & jam)">' + ICON.cal + '<span>Agenda</span></button></div>' +
+      '<p class="br-help" style="margin:-4px 0 12px">To-do tanpa waktu, tercatat tanggal dibuatnya. Butuh tanggal & jam? Pakai Agenda (tampil di Kalender & Google Calendar).</p>' +
       '<div id="td-list"></div>';
     $$('[data-tf]', el).forEach(function (b) { b.addEventListener('click', function () {
       S.prefs.todoFilter = b.getAttribute('data-tf'); persist();
@@ -241,7 +254,7 @@ var TodoView = {
       if (simpanTodo({ judul: judul, pemilik: todoDefaultPemilik(), aturWaktu: false, durasi: C.TODO_DURASI }, null)) { inp.value = ''; }
     });
     $('#td-time', el).addEventListener('click', function () {
-      openTodoSheet(null, { judul: inp.value.trim(), aturWaktu: true });
+      openTodoSheet(null, { judul: inp.value.trim(), agenda: true });
       inp.value = '';
     });
     this.update(el);
@@ -250,7 +263,7 @@ var TodoView = {
     var box = $('#td-list', el); if (!box) return this.render(el);
     if (S.todos === null) { box.innerHTML = skeleton(3); return; }
     var f = todoFilter(), semua = todos().filter(function (t) { return todoMatch(t, f); });
-    var list = semua.filter(function (t) { return C.todoTipe(t) !== 'catatan'; });
+    var list = semua.filter(isTugas);
     var buka = todoSorted(list.filter(function (t) { return !C.bool(t.selesai); }));
     var beres = list.filter(function (t) { return C.bool(t.selesai); })
       .sort(function (a, b) { return String(b.diubah || '').localeCompare(String(a.diubah || '')); }).slice(0, 20);

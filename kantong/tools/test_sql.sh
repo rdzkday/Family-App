@@ -67,6 +67,22 @@ JR='[{"tabel":"jurnal","baris":{"id":"riki|_pengaturan","pemilik":"riki","jenis"
 [ "$(q "select kantong_simpan('$JR'::jsonb)")" = "2" ] || { echo "simpan jurnal gagal"; exit 1; }
 [ "$(q "select jsonb_array_length(kantong_muat()->'jurnal')")" = "2" ] || { echo "jurnal harus ada di snapshot"; exit 1; }
 echo "✓ jurnal Daily Mood: tersimpan & ikut snapshot"
+SK='[{"tabel":"siklus","baris":{"id":"sk-1","pemilik":"istri","mulai":"2026-10-01","akhir":null,"abaikan_jarak":false,"catatan":"kram","dibuat":"x","diubah":"x","dihapus":""}},{"tabel":"siklus","baris":{"id":"sk-2","pemilik":"istri","mulai":null,"akhir":null,"abaikan_jarak":false,"catatan":"","dibuat":"x","diubah":"x","dihapus":"y"}},{"tabel":"siklus_atur","baris":{"id":"istri","aktif":true,"bagikan_jadwal":true,"bagikan_catatan":false,"tampil":true,"setuju_at":"x","versi_teks":1,"diubah":"x"}}]'
+[ "$(q "select kantong_simpan('$SK'::jsonb)")" = "3" ] || { echo "simpan siklus gagal"; exit 1; }
+node -e '
+const s = JSON.parse(process.argv[1]); const a = require("assert");
+a.strictEqual(s.siklus.length, 2); a.strictEqual(s.siklus.find((x) => x.id === "sk-1").mulai, "2026-10-01");
+a.strictEqual(s.siklus.find((x) => x.id === "sk-2").mulai, null);
+a.strictEqual(s.siklus_atur[0].aktif, true); a.strictEqual(s.siklus_atur[0].versi_teks, 1);
+' "$(q "select kantong_muat()")"
+BADSK='[{"tabel":"siklus","baris":{"id":"sk-3","pemilik":"istri","mulai":"2026-10-05","akhir":"2026-10-01","abaikan_jarak":false,"catatan":"","dibuat":"","diubah":"","dihapus":""}}]'
+if q "select kantong_simpan('$BADSK'::jsonb)" 2>/dev/null; then echo "akhir sebelum mulai harus ditolak"; exit 1; fi
+NOUSER='[{"tabel":"siklus_atur","baris":{"id":"siapa","aktif":false,"bagikan_jadwal":true,"bagikan_catatan":false,"tampil":true,"setuju_at":"","versi_teks":0,"diubah":""}}]'
+if q "select kantong_simpan('$NOUSER'::jsonb)" 2>/dev/null; then echo "siklus_atur user tak dikenal harus ditolak"; exit 1; fi
+[ "$(psql -qtA "$PGURL" -c "set role anon; select count(*) from siklus" 2>&1 | tr -d '\n' | grep -c 'permission denied\|^0$')" = "1" ] || { echo "anon tidak boleh membaca siklus"; exit 1; }
+[ "$(psql -qtA "$PGURL" -c "set role authenticated; select count(*) from siklus_atur" 2>&1 | tr -d '\n' | grep -c 'permission denied\|^0$')" = "1" ] || { echo "authenticated tidak boleh membaca siklus_atur"; exit 1; }
+[ "$(q "select coalesce(array_to_string(proconfig, ','), '') from pg_proc where proname = 'kantong_admin_tandai'")" = "search_path=public" ] || { echo "kantong_admin_tandai harus punya search_path tetap"; exit 1; }
+echo "✓ siklus: tersimpan & ikut snapshot, tanggal null untuk tombstone, akhir>=mulai dijaga, anon/authenticated ditolak"
 
 # kantong_muat: snapshot semua tabel, tanggal sebagai string, null tetap null
 MUAT="$(q "select kantong_muat()")"

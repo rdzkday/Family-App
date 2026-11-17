@@ -21,6 +21,6 @@ function makeDemoSeed() {
   return {
     buku: [{ id: 'riki', nama: 'Riki', tipe: 'Pribadi', pemilik: 'riki', urutan: 1 }, { id: 'istri', nama: 'Febie', tipe: 'Pribadi', pemilik: 'istri', urutan: 2 }, { id: 'rt', nama: 'Rumah Tangga', tipe: 'Bersama', pemilik: '', urutan: 3 }],
     users: [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'istri', nama: 'Febie', buku: 'istri' }],
-    kategori: kat, kantong: kan, budget: [], transaksi: [], todo: []
+    kategori: kat, kantong: kan, budget: [], transaksi: [], todo: [], siklus: [], siklus_atur: []
   };
 }

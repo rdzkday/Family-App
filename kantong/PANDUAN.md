@@ -158,6 +158,20 @@ URL lama (`/kantong.html`, `/komitmen.html`, `/ruang-catat/`, `/#todo`, `/#agend
 
 Aturan ini dijalankan di server (`core.js` di Edge Function), bukan cuma di tampilan.
 
+### Siklus (catatan haid)
+
+Migrasi `20261121000000_siklus.sql` (tabel `siklus`, `siklus_atur`). Pemilik = user `istri`.
+
+| | Jadwal (tanggal & perkiraan) | Catatan teks | Mencatat / mengubah |
+|---|---|---|---|
+| Istri | selalu | selalu | ya (setelah mengaktifkan & setuju teks privasi) |
+| Suami | hanya kalau Siklus aktif **dan** istri membagikan jadwal | hanya kalau istri juga membagikan catatan | tidak |
+
+- **Tampil/sembunyi** dipilih masing-masing (chip "Siklus" di Agenda › Kalender atau Pengaturan › Siklus); tidak mengubah apa pun untuk pasangan.
+- Hapus catatan = tanggal & isi dikosongkan di database. "Hapus semua" juga menarik persetujuan dan mematikan Siklus.
+- Tidak pernah dikirim ke Google Calendar. Pemilik project Supabase tetap bisa membuka tabel lewat dashboard (disebutkan di teks privasi).
+- Teks privasi berubah → naikkan `SIKLUS_VERSI_TEKS` di `core.js`; istri diminta setuju ulang.
+
 ## Cara update nanti
 
 - **Logika (`public/shared/core.js`)**: ubah, lalu `node kantong/tools/build_core.js` supaya salinan untuk Edge Function (`core.mjs`) ikut. `node kantong/tools/test_core.js` menolak kalau salinan tidak sinkron.
@@ -169,6 +183,7 @@ Aturan ini dijalankan di server (`core.js` di Edge Function), bukan cuma di tamp
 
 ```bash
 node kantong/tools/test_core.js        # logika bersama (tanpa data asli)
+node kantong/tools/test_siklus.js      # Siklus: perkiraan + aturan privasi
 node kantong/tools/test_supabase.js    # Edge Function dengan database & Google tiruan
 bash kantong/tools/test_sql.sh         # skema SQL di Postgres lokal (Ubuntu: butuh paket postgresql)
 ```

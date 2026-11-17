@@ -6,7 +6,7 @@
 // HALAMAN & daftarHalaman ada di base.js (dimuat sebelum modul fitur).
 function tabDariHash() {
   var h = HALAMAN[PAGE]; if (!h) return PAGE;
-  var t = location.hash.slice(1);
+  var t = location.hash.slice(1); t = h.alias[t] || t;
   return h.tabs.some(function (x) { return x[0] === t; }) ? t : h.tabs[0][0];
 }
 function tabSeg() {

@@ -84,7 +84,7 @@ function utangAntara(store, bersama, pribadi) {
 }
 
 // ---------------------------------------------------------------- versi & salinan core
-eq('versi core naik ke 1.7.0', C.VERSION, '1.7.0');
+eq('versi core naik ke 1.8.0', C.VERSION, '1.8.0');
 (function () {
   // core.mjs (Edge Function Supabase) harus persis hasil build_core.js
   var fs = require('fs'), build = require(path.join(__dirname, 'build_core.js'));
@@ -857,6 +857,7 @@ function komCall(st, uid, action, payload) {
   eq('aksi kalender milik agenda', C.fiturDariAksi('kalender.status').id, 'agenda');
   eq('aksi pengesahan milik komitmen', C.fiturDariAksi('pengesahan.sign').id, 'komitmen');
   eq('aksi jurnal milik mood', C.fiturDariAksi('jurnal.save').id, 'mood');
+  eq('aksi siklus ikut agenda', C.fiturDariAksi('siklus.list').id, 'agenda');
   eq('bootstrap bukan milik fitur', C.fiturDariAksi('bootstrap'), null);
   eq('monthly bukan aksi month', C.fiturDariAksi('monthly'), null);
   eq('setelan null = semua aktif', C.fiturAktif(null, 'agenda'), true);
