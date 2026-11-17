@@ -1,7 +1,7 @@
 /*
- * Kantong — core logic (dipakai bersama oleh PWA, mode demo, dan Google Apps Script).
- * File ini HARUS identik dengan apps-script/Core.gs.
- * Tanpa optional chaining / nullish agar aman di runtime Apps Script V8.
+ * Kantong — core logic (dipakai bersama oleh PWA, mode demo, dan Edge Function Supabase).
+ * Salinan untuk Edge Function dibuat oleh: node kantong/tools/build_core.js
+ * Gaya ES5 (tanpa optional chaining) dipertahankan supaya jalan di browser lama.
  */
 var KantongCore = (function () {
   'use strict';

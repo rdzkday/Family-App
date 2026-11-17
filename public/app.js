@@ -1421,7 +1421,7 @@
     render: function (el) {
       if (S.sub) return ({ kantong: KantongList, kategori: KategoriList, budget: BudgetEdit })[S.sub.type].render(el);
       var demo = S.conn.mode === 'demo';
-      var host = demo ? 'Mode demo, tersimpan di HP ini' : (/supabase\.(co|in)\//.test(S.conn.api || '') ? 'Terhubung ke Supabase' : 'Terhubung ke Google Sheets');
+      var host = demo ? 'Mode demo, tersimpan di HP ini' : (/supabase\.(co|in)\//.test(S.conn.api || '') ? 'Terhubung ke Supabase' : 'Terhubung ke server');
       el.innerHTML = '<div class="topbar"><div><h1>Pengaturan</h1></div>' + syncPill() + '</div>' +
         '<div class="menu"><div style="padding:16px;border-bottom:1px solid var(--surface-2)"><div style="font-weight:700;font-size:17px">' + esc(me().nama) + '</div><div class="faint" style="font-size:13px">' + host + '</div></div>' +
         '<button data-s="sync"><span class="main">Sinkron sekarang<div class="t2">' + (S.lastSync ? 'Terakhir ' + new Date(S.lastSync).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Belum sinkron di sesi ini') + (S.outbox.length ? ', ' + S.outbox.length + ' belum terkirim' : '') + '</div></span></button>' +
@@ -1890,7 +1890,7 @@
         var b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
         while (b64.length % 4) b64 += '=';
         var o = JSON.parse(atob(b64));
-        // API bisa Supabase Edge Function (…/functions/v1/kantong) atau Apps Script lama (script.google.com)
+        // API = Supabase Edge Function (…/functions/v1/kantong)
         if (!/^https:\/\/[^\s/]+\.[^\s/]+\//.test(o.api) || typeof o.token !== 'string' || o.token.length < 20) throw new Error();
         conn = { mode: 'remote', api: o.api, token: o.token };
       } catch (e) { $('#c-err').textContent = 'Kode tidak dikenali. Salin ulang kode koneksi (Supabase: hasil kantong_buat_kode).'; return; }

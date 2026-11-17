@@ -86,7 +86,7 @@ function utangAntara(store, bersama, pribadi) {
 // ---------------------------------------------------------------- versi & salinan core
 eq('versi core naik ke 1.5.0', C.VERSION, '1.5.0');
 (function () {
-  // core.mjs (Supabase) dan Core.gs (Apps Script) harus persis hasil build_core.js
+  // core.mjs (Edge Function Supabase) harus persis hasil build_core.js
   var fs = require('fs'), build = require(path.join(__dirname, 'build_core.js'));
   Object.keys(build.targets).forEach(function (f) {
     var ada = fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');

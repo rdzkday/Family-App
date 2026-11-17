@@ -19,7 +19,6 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | ✅ Live | PWA di Vercel: Catat, To-do, Ringkasan, Riwayat, Pengaturan |
 | ✅ Live | Offline: catatan tersimpan di HP, dikirim saat online |
 | ⏳ Perlu setup sekali | Sync to-do ke Google Calendar "Rumah Kita" (secret belum diisi, PANDUAN §7) |
-| ⏳ Perlu dilakukan | Impor data lama dari Google Sheets (PANDUAN §5) |
 | 🆕 Baru | Beranda (`/`): ringkasan Kantong, to-do & catatan, pengingat evaluasi (6 jam sebelum), shortcut Komitmen, mood → Ruang Catat |
 | 🧪 Fase 4a | Komitmen (`komitmen.html`): baca & cari pasal, modul Kesepakatan + Definisi A–Z. Usul/ubah/TTD menyusul. Brief: `claude/komitmen-brief.md` |
 | ✅ Live | Ruang Catat (`/ruang-catat/`): jurnal mood, data di HP saja. Terima `?mood=` dari Beranda |
@@ -91,8 +90,6 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | `supabase/functions/kantong/` | Edge Function: API + adapter Postgres + Google Calendar |
 | `kantong/PANDUAN.md` | Panduan pasang & update |
 | `kantong/tools/` | `test_core.js`, `test_supabase.js`, `test_sql.sh`, `build_core.js`, `deploy_supabase.js` |
-| `kantong/apps-script/` | Backend lama (Google Sheets), masih kompatibel, tidak dikembangkan |
-| `kantong-pastel/`, `public/dark/` | Varian tampilan lama |
 
 ## Update & tes
 
@@ -102,6 +99,6 @@ node kantong/tools/test_supabase.js    # 18 tes Edge Function (DB & Google tirua
 bash kantong/tools/test_sql.sh         # skema SQL di Postgres lokal
 ```
 
-- Ubah `public/core.js` → `node kantong/tools/build_core.js` (salinan untuk Edge Function & Apps Script).
+- Ubah `public/core.js` → `node kantong/tools/build_core.js` (salinan untuk Edge Function).
 - Deploy API: `supabase functions deploy kantong --no-verify-jwt` atau `SUPABASE_ACCESS_TOKEN=sbp_xxx node kantong/tools/deploy_supabase.js serskylzlevhjidqrvjm`.
 - PWA: push ke `main`.

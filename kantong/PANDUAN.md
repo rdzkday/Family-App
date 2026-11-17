@@ -7,7 +7,6 @@ Backend memakai **Supabase** (Postgres + Edge Function). Logika bisnis ada di `p
 | `public/` | PWA. Di-deploy ke Vercel (push ke `main`). Tidak berisi data keuangan. |
 | `supabase/migrations/` | Skema database: tabel, kode akses, fungsi RPC |
 | `supabase/functions/kantong/` | Edge Function: API untuk PWA + sync to-do ke Google Calendar |
-| `kantong/apps-script/` | Backend lama (Google Sheets). Masih bisa dipakai, tidak dikembangkan lagi |
 | `kantong/tools/` | Tes & alat bantu (`build_core.js`, `test_core.js`, `test_supabase.js`, `test_sql.sh`) |
 
 Butuh di laptop: [Supabase CLI](https://supabase.com/docs/guides/cli) dan Node.
@@ -64,7 +63,7 @@ select kantong_buat_kode('istri', 'https://<PROJECT_ID>.supabase.co/functions/v1
 
 Hasilnya adalah kode koneksi (teks panjang) untuk masing-masing. Kirim lewat chat pribadi, jangan dibagikan ke orang lain. Yang disimpan di database hanya hash-nya. Menjalankan ulang perintah ini = kode lama langsung mati (berguna kalau HP hilang).
 
-## 5. Pindahkan data dari Google Sheets (10 menit, kalau ada)
+## 5. Pindahkan data dari Google Sheets (opsional, lewati kalau mulai dari nol)
 
 Nama tabel dan kolom di Supabase sama dengan tab di Sheet, hanya huruf kecil.
 
@@ -156,7 +155,7 @@ Aturan ini dijalankan di server (`core.js` di Edge Function), bukan cuma di tamp
 
 ## Cara update nanti
 
-- **Logika (`public/core.js`)**: ubah, lalu `node kantong/tools/build_core.js` supaya salinan untuk Edge Function (`core.mjs`) dan Apps Script (`Core.gs`) ikut. `node kantong/tools/test_core.js` menolak kalau salinan tidak sinkron.
+- **Logika (`public/core.js`)**: ubah, lalu `node kantong/tools/build_core.js` supaya salinan untuk Edge Function (`core.mjs`) ikut. `node kantong/tools/test_core.js` menolak kalau salinan tidak sinkron.
 - **API**: `supabase functions deploy kantong --no-verify-jwt`. URL tidak berubah, kode koneksi tetap berlaku.
 - **Skema**: tambah file di `supabase/migrations/`, lalu `supabase db push`.
 - **PWA**: push ke `main`. HP otomatis memuat versi baru saat online.
@@ -175,6 +174,6 @@ bash kantong/tools/test_sql.sh         # skema SQL di Postgres lokal (Ubuntu: bu
 - **Salah input massal**: transaksi yang dihapus dari app tidak benar-benar hilang (kolom `dihapus` terisi). Supabase juga menyimpan backup harian (Database → Backups).
 - **Cek log API**: Supabase → Edge Functions → kantong → Logs.
 
-## Versi lama (Google Sheets + Apps Script)
+## Versi lama (Google Sheets)
 
-Masih ada di `kantong/apps-script/` dan tetap kompatibel dengan PWA (kode koneksi lama tetap bisa dipakai). Tidak dikembangkan lagi; panduan lamanya ada di riwayat git.
+Sudah dihapus dari repo (data dimulai dari nol di Supabase). Kodenya masih ada di riwayat git sebelum commit pembersihan.
