@@ -1,11 +1,12 @@
 // Service worker Beranda/Kantong/Agenda/Komitmen: network-first untuk app shell (update selalu masuk saat online),
 // fallback ke cache saat offline. Request API (POST ke Supabase) tidak disentuh. Daily Mood punya SW sendiri.
-const CACHE = 'kantong-v20-kalender-email';
+const CACHE = 'kantong-v21-pengaturan-kalender';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest',
   'shared/core.js', 'shared/base.js', 'shared/ui.js', 'shared/shell.js', 'shared/connect.js', 'shared/demo.js', 'shared/start.js',
   'shared/tokens.css', 'shared/styles.css',
   'beranda/beranda.js', 'beranda/pengaturan.js', 'beranda/beranda.css', 'daily-mood/data.js',
   'kantong/', 'kantong/index.html', 'kantong/transaksi.js', 'kantong/laporan.js', 'kantong/catat.js', 'kantong/atur.js',
+  'pengaturan/', 'pengaturan/index.html',
   'agenda/', 'agenda/index.html', 'agenda/todo.js', 'agenda/agenda.js',
   'komitmen/', 'komitmen/index.html', 'komitmen/komitmen.js', 'komitmen/komitmen.css',
   'fonts/jakarta.woff2', 'icons/icon.svg', 'icons/icon-animated.svg', 'icons/icon-32.png', 'icons/icon-192.png', 'icons/apple-touch-icon.png'];

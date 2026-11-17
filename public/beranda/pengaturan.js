@@ -1,4 +1,4 @@
-/* Beranda — Pengaturan semua fitur dalam satu kartu, expand-collapse per fitur:
+/* Pengaturan semua fitur (halaman /pengaturan/, akses dari gear Beranda), expand-collapse per fitur:
    Umum · Kantong · Agenda · Komitmen · Daily Mood. Menggantikan tab Pengaturan Kantong & halaman Setelan.
    Skrip biasa (bukan modul): nama top-level dipakai bersama file js/ lain. Urutan muat ada di tiap index.html halaman. */
 'use strict';
@@ -22,7 +22,7 @@ var Pengaturan = {
     if (!box) return;
     var buka = aturBuka();
     box.className = 'br-card br-atur';
-    box.innerHTML = '<div class="br-card-h"><h2 id="br-atur-h"><span class="br-ic" style="--c:var(--br-muted);--cb:var(--br-inset)">' + ICON.gear + '</span>Pengaturan</h2></div>' +
+    box.innerHTML =
       '<div class="atur">' + ATUR_FITUR.map(function (f) {
         var on = !!buka[f[0]];
         return '<div class="atur-item" data-atur="' + f[0] + '">' +
@@ -55,12 +55,23 @@ var Pengaturan = {
     });
   }
 };
-// #pengaturan atau #pengaturan/<fitur>: buka bagian itu lalu gulir ke sana
+// Halaman Pengaturan (/pengaturan/): diakses dari ikon gear di Beranda. Kembali (kanan atas) → Beranda.
+var PengaturanView = {
+  render: function (el) {
+    el.innerHTML = '<div class="topbar"><div><div class="date">Family App</div><h1>Pengaturan</h1></div>' +
+      '<div class="top-actions"><a class="atur-back" href="' + (ROOT || './') + '" aria-label="Kembali ke Beranda">' + ICON.left + 'Beranda</a></div></div>' +
+      '<section id="pengaturan" aria-label="Pengaturan semua fitur"></section>';
+    Pengaturan.render($('#pengaturan', el));
+    bukaPengaturanDariHash();
+  },
+  update: function (el) { var b = $('#pengaturan', el); if (b) Pengaturan.update(b); else this.render(el); }
+};
+// #<fitur> (misal #kantong, #mood): buka bagian itu lalu gulir ke sana
 function bukaPengaturanDariHash() {
-  var m = /^#pengaturan(?:\/(\w+))?$/.exec(location.hash), box = $('#pengaturan');
-  if (!m || !box) return;
-  if (m[1] && ATUR_FITUR.some(function (f) { return f[0] === m[1]; })) Pengaturan.toggle(box, m[1], true);
-  setTimeout(function () { (m[1] ? $('[data-atur="' + m[1] + '"]', box) : box).scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+  var m = /^#(\w+)$/.exec(location.hash), box = $('#pengaturan');
+  if (!m || !box || !ATUR_FITUR.some(function (f) { return f[0] === m[1]; })) return;
+  Pengaturan.toggle(box, m[1], true);
+  setTimeout(function () { var t = $('[data-atur="' + m[1] + '"]', box); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
 }
 function aturBaris(label, sub, kanan, attr) {
   return '<button type="button" class="atur-row"' + (attr || '') + '><span class="main"><span class="t1">' + label + '</span>' + (sub ? '<span class="t2">' + sub + '</span>' : '') + '</span>' + (kanan || ICON.right) + '</button>';

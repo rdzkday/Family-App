@@ -26,9 +26,10 @@ function renderView() {
   if (!S.boot) { $('#view').innerHTML = '<div class="topbar"><div><h1>Memuat data…</h1></div></div>' + skeleton(5); return; }
   if (!S.bukuView) S.bukuView = me().buku;
   var v = PAGE === 'beranda' ? BerandaView
+    : PAGE === 'pengaturan' ? PengaturanView
     : PAGE === 'agenda' ? ({ todo: TodoView, catatan: CatatanView, jadwal: JadwalView }[S.tab] || TodoView)
     : ({ home: HomeView, ringkasan: RingkasanView, riwayat: RiwayatView }[S.tab] || HomeView);
-  if (PAGE === 'agenda') $('#view').classList.add('br-narrow');
+  if (PAGE === 'agenda' || PAGE === 'pengaturan') $('#view').classList.add('br-narrow');
   view = v; v.render($('#view'));
 }
 function refresh() {
