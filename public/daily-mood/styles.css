@@ -1,6 +1,6 @@
 /* Daily Mood: kolom selebar ponsel, tab bar bawah; wajah mood 5 warna sebagai karakter utama.
    Token sama dengan Beranda (tokens.css): gelap, aksen violet Daily Mood, mood dari brief. */
-@font-face{font-family:"Plus Jakarta Sans";src:url("fonts/jakarta.woff2") format("woff2");font-weight:200 800;font-display:swap}
+@font-face{font-family:"Plus Jakarta Sans";src:url("../fonts/jakarta.woff2") format("woff2");font-weight:200 800;font-display:swap}
 :root{
   --bg:#0A0C10; --app:#0E1014; --surface:#161920; --ink:#ECEEF2; --muted:#9AA3B2; --line:#262B35;
   --accent:#C4B5FD; --accent-2:#A89BF5; --accent-soft:#252137; --on-accent:#17132A;
