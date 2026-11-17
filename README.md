@@ -35,6 +35,31 @@ Data keuangan pribadi tidak disertakan di repo ini.
 
 ---
 
+## Setup login & admin panel (sekali saja)
+
+1. **Jalankan migrasi** — Supabase › SQL Editor › tempel & Run isi file berurutan:
+   - `supabase/migrations/20261119000000_login.sql`
+   - `supabase/migrations/20261119100000_admin.sql`
+2. **Deploy Edge Function** `kantong` (terminal, di folder repo):
+   ```bash
+   supabase functions deploy kantong --no-verify-jwt --project-ref serskylzlevhjidqrvjm
+   ```
+3. **Buat akun admin pertama** (SQL Editor):
+   ```sql
+   select kantong_atur_login('riki', 'riki', 'password-kuat-min-8');
+   update login set admin = true where user_id = 'riki';
+   ```
+4. **Merge branch ke `main`** → Vercel rilis otomatis.
+5. **Buka admin panel** `https://<url-vercel>/admin/` → masuk dengan akun admin.
+6. **Buat akun Febie** di panel: Buat login (baris Febie) → isi username → Simpan → salin password yang muncul → kirim ke Febie lewat jalur pribadi.
+7. **Login di HP**: buka app → isi username + password → Masuk.
+
+### Admin panel (`/admin/`)
+- Tambah akun (user baru otomatis dapat buku pribadi), ubah nama/username, aktif/nonaktif, jadikan admin.
+- **Reset password** (user lupa) → password acak 12 karakter, tampil sekali, semua HP user itu keluar.
+- Keluarkan semua HP, hapus login (data keuangan tetap aman).
+- Pengaman: admin tidak bisa menonaktifkan/menghapus akunnya sendiri; non-admin ditolak server.
+
 ## Cara pakai
 
 ### Pertama kali

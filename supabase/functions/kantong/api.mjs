@@ -78,10 +78,10 @@ export async function handleRequest(rawBody, deps) {
     try { r = await rpc(cfg, 'kantong_login', { p_username: username, p_password: password }); }
     catch (e) { return { ok: false, error: 'Kesalahan server: ' + e.message }; }
     if (!r || !r.ok) {
-      return { ok: false, code: 'LOGIN', error: r && r.alasan === 'terkunci'
-        ? 'Terlalu banyak percobaan. Coba lagi 15 menit lagi.' : 'Username atau password salah' };
+      const pesan = { terkunci: 'Terlalu banyak percobaan. Coba lagi 15 menit lagi.', nonaktif: 'Akun dinonaktifkan. Hubungi admin.' };
+      return { ok: false, code: 'LOGIN', error: (r && pesan[r.alasan]) || 'Username atau password salah' };
     }
-    return { ok: true, data: { token: r.token, user_id: r.user_id } };
+    return { ok: true, data: { token: r.token, user_id: r.user_id, admin: !!r.admin } };
   }
 
   const token = typeof body.token === 'string' ? body.token : '';
@@ -91,6 +91,17 @@ export async function handleRequest(rawBody, deps) {
   if (body.action === 'logout') {
     try { await rpc(cfg, 'kantong_logout', { p_hash: hash }); } catch (e) { /* abaikan */ }
     return { ok: true, data: {} };
+  }
+
+  // Admin panel: semua cek hak & aksi ada di Postgres (kantong_admin).
+  if (body.action === 'admin') {
+    const p = body.payload || {};
+    let r;
+    try { r = await rpc(cfg, 'kantong_admin', { p_hash: hash, p_aksi: String(p.aksi || ''), p_data: p.data || {} }); }
+    catch (e) { return { ok: false, error: 'Kesalahan server: ' + e.message }; }
+    if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'Gagal', code: r && r.code };
+    delete r.ok;
+    return { ok: true, data: r };
   }
 
   let store, sesiUser;

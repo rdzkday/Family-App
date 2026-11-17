@@ -116,6 +116,26 @@ q "select kantong_logout('$H')" >/dev/null
 for i in 1 2 3 4 5; do q "select kantong_login('riki','x$i')" >/dev/null; done
 [ "$(q "select kantong_login('riki','rahasia123')->>'alasan'")" = "terkunci" ] || { echo "5x salah harus terkunci"; exit 1; }
 if psql -qtA -v ON_ERROR_STOP=1 "$PGURL" -c "set role anon; select kantong_login('riki','rahasia123')" >/dev/null 2>&1; then echo "anon tidak boleh login langsung"; exit 1; fi
+# Admin panel
+q "update login set admin = true, gagal = 0, kunci_sampai = null where user_id = 'riki'" >/dev/null
+q "select kantong_atur_login('riki','riki','rahasia123')" >/dev/null
+q "update login set admin = true where user_id = 'riki'" >/dev/null
+AT="$(q "select kantong_login('riki','rahasia123')->>'token'")"
+AH="$(q "select encode(extensions.digest('$AT','sha256'),'hex')")"
+[ "$(q "select kantong_admin('$AH','list','{}')->>'ok'")" = "true" ] || { echo "admin list gagal"; exit 1; }
+PW="$(q "select kantong_admin('$AH','simpan','{\"user_id\":\"tamu\",\"username\":\"tamu\",\"nama\":\"Tamu\"}')->>'password'")"
+[ "${#PW}" = "12" ] || { echo "akun baru harus dapat password 12 karakter"; exit 1; }
+[ "$(q "select kantong_login('tamu','$PW')->>'ok'")" = "true" ] || { echo "password hasil generate harus bisa login"; exit 1; }
+TH="$(q "select encode(extensions.digest(kantong_login('tamu','$PW')->>'token','sha256'),'hex')")"
+[ "$(q "select kantong_admin('$TH','list','{}')->>'code'")" = "AUTH" ] || { echo "non-admin harus ditolak"; exit 1; }
+PW2="$(q "select kantong_admin('$AH','reset','{\"user_id\":\"tamu\"}')->>'password'")"
+[ "$(q "select kantong_login('tamu','$PW')->>'ok'")" = "false" ] || { echo "password lama harus mati setelah reset"; exit 1; }
+[ -z "$(q "select kantong_cek_sesi('$TH')")" ] || { echo "reset harus mencabut sesi"; exit 1; }
+q "select kantong_admin('$AH','simpan','{\"user_id\":\"tamu\",\"username\":\"tamu\",\"aktif\":false}')" >/dev/null
+[ "$(q "select kantong_login('tamu','$PW2')->>'alasan'")" = "nonaktif" ] || { echo "akun nonaktif harus ditolak"; exit 1; }
+[ "$(q "select kantong_admin('$AH','hapus','{\"user_id\":\"riki\"}')->>'ok'")" = "false" ] || { echo "admin tidak boleh hapus diri sendiri"; exit 1; }
+[ "$(q "select kantong_admin('$AH','hapus','{\"user_id\":\"tamu\"}')->>'ok'")" = "true" ] || { echo "hapus gagal"; exit 1; }
+echo "✓ admin: list, buat+generate password, reset, nonaktif, hapus, non-admin ditolak"
 echo "✓ login: bcrypt, sesi, logout, kunci 5x salah, anon ditolak"
 
 # RLS: anon tidak bisa baca apa pun, tidak bisa memanggil RPC
