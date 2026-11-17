@@ -1,0 +1,74 @@
+/* Design token bersama: Beranda, Kantong, Komitmen (Ruang Catat memakai nilai yang sama di styles-nya sendiri).
+   Sumber: claude/beranda-brief. Gelap = default. Terang = opsional lewat data-theme="light" (Kantong & Komitmen). */
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('fonts/jakarta.woff2') format('woff2');
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+:root {
+  /* ---- brief ---- */
+  --br-bg: #0E1014;
+  --br-surface: #161920;
+  --br-border: #262B35;
+  --br-inset: #0E1014;
+  --br-divider: #20242D;
+  --br-text: #ECEEF2;
+  --br-muted: #9AA3B2;
+  --br-kantong: #7DD3A8;
+  --br-kantong-bg: #1B2A23;
+  --br-agenda: #93C5FD;
+  --br-agenda-bg: #1A2433;
+  --br-agenda-line: #3B4A63;
+  --br-komit: #FCD34D;
+  --br-komit-card: #1C1A13;
+  --br-komit-line: #3D3520;
+  --br-komit-text: #D6CFB8;
+  --br-catat: #C4B5FD;
+  --br-catat-bg: #252137;
+  --br-bad: #F87171;
+  --br-r: 22px;
+  --br-r-in: 14px;
+
+  /* ---- nama lama yang dipakai styles.css / komitmen.css, dipetakan ke token brief ---- */
+  --bg: var(--br-bg);
+  --surface: var(--br-surface);
+  --surface-2: #1D2129;
+  --surface-3: #2C323E;
+  --line: var(--br-border);
+  --text: var(--br-text);
+  --text-2: var(--br-muted);
+  --text-3: #7A8394;
+  --ink: #0E1014;               /* teks di atas warna pastel/aksen, selalu gelap */
+  --accent: var(--br-kantong);
+  --accent-ink: #0E1014;
+  --in: var(--br-kantong);
+  --over: var(--br-bad);
+  --tf: var(--br-agenda);
+  --b-riki: #9DBFF5;
+  --b-istri: #F5A9C4;
+  --b-rt: var(--br-komit);
+  --hero: #1B2A23;
+  --hero-2: #2A2614;
+  --tabbar: rgba(14, 16, 20, .92);
+  --scrim: rgba(0, 0, 0, .6);
+  --shadow: none;
+  --todo-ok: var(--br-agenda);
+  --todo-bad: var(--br-bad);
+  color-scheme: dark;
+}
+
+/* tema terang (opsional, hanya Kantong & Komitmen; Beranda tetap gelap sampai desain terangnya ada) */
+:root[data-theme="light"] {
+  --bg: #F7F5FC; --surface: #FFFFFF; --surface-2: #F0EDF7; --surface-3: #E4DFF0; --line: #E4DFF0;
+  --text: #2B2638; --text-2: #6B6480; --text-3: #8A839C;
+  --ink: #2B2638; --accent: #C9B8FF; --accent-ink: #2B2638;
+  --in: #2F8A66; --over: #D9546A; --tf: #5B73C9;
+  --b-riki: #B8D4FF; --b-istri: #FFC6DA; --b-rt: #FFE29A;
+  --hero: #E9E1FF; --hero-2: #FFE7D6;
+  --tabbar: rgba(255, 255, 255, .9); --scrim: rgba(43, 38, 56, .35);
+  --shadow: 0 6px 20px rgba(80, 60, 140, .07);
+  --todo-ok: #3F5BB5; --todo-bad: #B8364C;
+  color-scheme: light;
+}

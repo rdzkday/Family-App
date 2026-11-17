@@ -1,35 +1,5 @@
-@font-face {
-  font-family: 'Nunito';
-  src: url('fonts/nunito.woff2') format('woff2');
-  font-weight: 200 1000;
-  font-display: swap;
-}
-
-/* ---------- tema terang (default) ---------- */
+/* Warna & font ada di tokens.css (dimuat sebelum file ini). Di sini hanya ukuran & komponen. */
 :root {
-  --bg: #F7F5FC;
-  --surface: #FFFFFF;
-  --surface-2: #F0EDF7;
-  --surface-3: #E4DFF0;
-  --line: #E4DFF0;
-  --text: #2B2638;
-  --text-2: #6B6480;
-  --text-3: #9C95AE;
-  --ink: #2B2638;            /* teks di atas warna pastel, selalu gelap */
-  --accent: #C9B8FF;         /* lavender */
-  --accent-ink: #2B2638;
-  --in: #2F8A66;
-  --over: #D9546A;
-  --tf: #5B73C9;
-  --b-riki: #B8D4FF;         /* biru langit */
-  --b-istri: #FFC6DA;        /* pink */
-  --b-rt: #FFE29A;           /* butter */
-  --hero: #E9E1FF;
-  --hero-2: #FFE7D6;
-  --shadow: 0 6px 20px rgba(80, 60, 140, .07);
-  --tabbar: rgba(255, 255, 255, .9);
-  --scrim: rgba(43, 38, 56, .35);
-
   --gutter: 16px;
   --r-sheet: 28px;
   --r-card: 24px;
@@ -37,35 +7,12 @@
   --tab-h: 66px;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
-  color-scheme: light;
-}
-
-/* ---------- tema gelap ---------- */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #1B1925; --surface: #252232; --surface-2: #2E2A3D; --surface-3: #3A3550; --line: #3A3550;
-    --text: #F3F0FA; --text-2: #B9B2CC; --text-3: #7F7896;
-    --accent: #BFAEFF; --in: #8EE3BC; --over: #FF9AAA; --tf: #A9B9FF;
-    --b-riki: #9DBFF5; --b-istri: #F5A9C4; --b-rt: #F2D383;
-    --hero: #33294F; --hero-2: #3D2F2A;
-    --shadow: none; --tabbar: rgba(27, 25, 37, .9); --scrim: rgba(0, 0, 0, .55);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #1B1925; --surface: #252232; --surface-2: #2E2A3D; --surface-3: #3A3550; --line: #3A3550;
-  --text: #F3F0FA; --text-2: #B9B2CC; --text-3: #7F7896;
-  --accent: #BFAEFF; --in: #8EE3BC; --over: #FF9AAA; --tf: #A9B9FF;
-  --b-riki: #9DBFF5; --b-istri: #F5A9C4; --b-rt: #F2D383;
-  --hero: #33294F; --hero-2: #3D2F2A;
-  --shadow: none; --tabbar: rgba(27, 25, 37, .9); --scrim: rgba(0, 0, 0, .55);
-  color-scheme: dark;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
 body {
-  font-family: 'Nunito', ui-rounded, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 15px; line-height: 1.45; font-weight: 500;
   -webkit-font-smoothing: antialiased; overscroll-behavior-y: none;
 }
@@ -377,9 +324,6 @@ input.input:disabled { opacity: .5; }
 
 /* ---------- v4: to-do rumah tangga + Google Calendar ---------- */
 /* warna status: kontras >= 4.5:1 di atas --surface pada kedua tema */
-:root { --todo-ok: #3F5BB5; --todo-bad: #B8364C; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --todo-ok: #A9B9FF; --todo-bad: #FF9AAA; } }
-:root[data-theme="dark"] { --todo-ok: #A9B9FF; --todo-bad: #FF9AAA; }
 
 .todo-add { display: flex; gap: 8px; align-items: stretch; margin: 16px 0 16px; }
 .todo-add .input { flex: 1; min-width: 0; min-height: 52px; }

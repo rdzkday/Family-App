@@ -1,43 +1,6 @@
 /* Beranda (index.html): tema gelap sesuai design token brief. Ditumpuk di atas styles.css,
    jadi sheet Kantong (catat transaksi, to-do) ikut memakai warna Beranda. */
-@font-face {
-  font-family: 'Plus Jakarta Sans';
-  src: url('fonts/jakarta.woff2') format('woff2');
-  font-weight: 200 800;
-  font-display: swap;
-}
-
 body.br-page {
-  /* token Beranda */
-  --br-bg: #0E1014;
-  --br-surface: #161920;
-  --br-border: #262B35;
-  --br-inset: #0E1014;
-  --br-divider: #20242D;
-  --br-text: #ECEEF2;
-  --br-muted: #9AA3B2;
-  --br-kantong: #7DD3A8;
-  --br-kantong-bg: #1B2A23;
-  --br-agenda: #93C5FD;
-  --br-agenda-bg: #1A2433;
-  --br-agenda-line: #3B4A63;
-  --br-komit: #FCD34D;
-  --br-komit-card: #1C1A13;
-  --br-komit-line: #3D3520;
-  --br-komit-text: #D6CFB8;
-  --br-catat: #C4B5FD;
-  --br-catat-bg: #252137;
-  --br-bad: #F87171;
-  --br-r: 22px;
-  --br-r-in: 14px;
-
-  /* token Kantong ditimpa supaya sheet & form senada */
-  --bg: var(--br-bg); --surface: var(--br-surface); --surface-2: #1D2129; --surface-3: #2C323E; --line: var(--br-border);
-  --text: var(--br-text); --text-2: var(--br-muted); --text-3: #7A8394;
-  --accent: var(--br-kantong); --accent-ink: #0E1014; --in: var(--br-kantong); --over: var(--br-bad); --tf: var(--br-agenda);
-  --todo-ok: var(--br-agenda); --todo-bad: var(--br-bad);
-  --scrim: rgba(0, 0, 0, .6); --shadow: none;
-
   background: var(--br-bg);
   color: var(--br-text);
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;

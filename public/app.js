@@ -74,18 +74,17 @@
   var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
   var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
   var PAGE = window.KANTONG_PAGE === 'beranda' ? 'beranda' : 'kantong';
-  function themePref() { return PAGE === 'beranda' ? 'dark' : LS.get('k_theme', 'auto'); }
-  function isDark() { var t = themePref(); return t === 'dark' || (t === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches); }
+  function themePref() { return PAGE === 'beranda' ? 'dark' : (LS.get('k_theme', 'dark') === 'light' ? 'light' : 'dark'); }
+  function isDark() { return themePref() === 'dark'; }
   function applyTheme() {
     var t = themePref(), r = document.documentElement;
-    if (t === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', t);
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', PAGE === 'beranda' ? '#0E1014' : isDark() ? '#1B1925' : '#F7F5FC');
+    if (t === 'dark') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', t);
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', isDark() ? '#0E1014' : '#F7F5FC');
   }
   function setTheme(t) { LS.set('k_theme', t); applyTheme(); }
   function berandaBtn() { return '<button class="theme-btn" data-act="beranda" aria-label="Ke Beranda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v8a2 2 0 0 1-2 2h-3v-6h-6v6H6a2 2 0 0 1-2-2z"/></svg></button>'; }
   function themeBtn() { return '<button class="theme-btn" data-act="theme" aria-label="Ganti tema terang/gelap">' + (isDark() ? SUN : MOON) + '</button>'; }
   applyTheme();
-  if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyTheme(); });
 
   // ================= state =================
   var S = {
@@ -1427,7 +1426,7 @@
         '<button data-s="sync"><span class="main">Sinkron sekarang<div class="t2">' + (S.lastSync ? 'Terakhir ' + new Date(S.lastSync).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Belum sinkron di sesi ini') + (S.outbox.length ? ', ' + S.outbox.length + ' belum terkirim' : '') + '</div></span></button>' +
         (demo ? '<button data-s="switch"><span class="main">Masuk sebagai ' + esc((db().Users.filter(function (u) { return u.id !== me().id; })[0] || { nama: 'pengguna lain' }).nama) + '<div class="t2">Coba aturan baca/tulis antar buku</div></span></button>' : '') +
         '</div>' +
-        '<section class="section"><div class="section-h"><h2>Tampilan</h2></div><div class="menu" style="padding-top:16px"><div class="seg" role="group" aria-label="Tema">' + [['auto', 'Ikut HP'], ['light', 'Terang'], ['dark', 'Gelap']].map(function (x) { return '<button data-theme-set="' + x[0] + '" aria-pressed="' + (themePref() === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div></div></section>' +
+        '<section class="section"><div class="section-h"><h2>Tampilan</h2></div><div class="menu" style="padding-top:16px"><div class="seg" role="group" aria-label="Tema">' + [['dark', 'Gelap'], ['light', 'Terang']].map(function (x) { return '<button data-theme-set="' + x[0] + '" aria-pressed="' + (themePref() === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div></div></section>' +
         '<section class="section"><div class="menu">' +
         '<button data-s="budget"><span class="main">Budget bulanan<div class="t2">Atur budget per kategori</div></span>' + ICON.right + '</button>' +
         '<button data-s="kategori"><span class="main">Kategori<div class="t2">' + db().Kategori.filter(function (k) { return C.bool(k.aktif) && k.id !== C.KAT_REIMBURSE; }).length + ' kategori aktif</div></span>' + ICON.right + '</button>' +

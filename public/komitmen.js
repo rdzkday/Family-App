@@ -17,7 +17,7 @@
     get: function (k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
     set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* penuh / diblokir */ } }
   };
-  (function () { var t = LS.get('k_theme', 'auto'); if (t !== 'auto') document.documentElement.setAttribute('data-theme', t); })();
+  (function () { if (LS.get('k_theme', 'dark') === 'light') document.documentElement.setAttribute('data-theme', 'light'); })();
 
   var BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
   function tgl(iso) { // '2026-10-12...' -> '12 Okt 2026'

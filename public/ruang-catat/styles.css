@@ -1,26 +1,12 @@
-/* Ruang Catat — kolom selebar ponsel, tab bar bawah; wajah mood 5 warna sebagai karakter utama */
-@font-face{font-family:"Fredoka";src:url("fonts/fredoka.woff2") format("woff2");font-weight:300 700;font-display:swap}
-@font-face{font-family:"Nunito";src:url("fonts/nunito.woff2") format("woff2");font-weight:200 1000;font-display:swap}
+/* Ruang Catat: kolom selebar ponsel, tab bar bawah; wajah mood 5 warna sebagai karakter utama.
+   Token sama dengan Beranda (tokens.css): gelap, aksen violet Ruang Catat, mood dari brief. */
+@font-face{font-family:"Plus Jakarta Sans";src:url("fonts/jakarta.woff2") format("woff2");font-weight:200 800;font-display:swap}
 :root{
-  --bg:#E6E3F7; --app:#F6F5FD; --surface:#FFFFFF; --ink:#2B2540; --muted:#6E6889; --line:#E1DDF2;
-  --accent:#5B4BDB; --accent-2:#4537B8; --accent-soft:#ECE9FC; --on-accent:#FFFFFF;
-  --m1:#F0646B; --m2:#FF9F43; --m3:#F4CF4C; --m4:#5CC98B; --m5:#3BB3C9; --face:#2B2540;
-  --font-display:"Fredoka", "Trebuchet MS", system-ui, sans-serif;
-  --font-body:"Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#100E1A; --app:#17142A; --surface:#211D38; --ink:#EEEBFA; --muted:#A9A3C6; --line:#332D52;
-    --accent:#9D91FF; --accent-2:#7A6CF0; --accent-soft:#2C2650; --on-accent:#17142A;
-    --m1:#F27C82; --m2:#FFB066; --m3:#F2D46B; --m4:#72D39C; --m5:#5CC3D6; --face:#17142A;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#100E1A; --app:#17142A; --surface:#211D38; --ink:#EEEBFA; --muted:#A9A3C6; --line:#332D52;
-  --accent:#9D91FF; --accent-2:#7A6CF0; --accent-soft:#2C2650; --on-accent:#17142A;
-  --m1:#F27C82; --m2:#FFB066; --m3:#F2D46B; --m4:#72D39C; --m5:#5CC3D6; --face:#17142A;
+  --bg:#0A0C10; --app:#0E1014; --surface:#161920; --ink:#ECEEF2; --muted:#9AA3B2; --line:#262B35;
+  --accent:#C4B5FD; --accent-2:#A89BF5; --accent-soft:#252137; --on-accent:#17132A;
+  --m1:#F87171; --m2:#FB923C; --m3:#FCD34D; --m4:#86EFAC; --m5:#7DD3A8; --face:#0E1014;
+  --font-display:"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body:"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: dark;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
