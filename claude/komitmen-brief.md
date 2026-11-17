@@ -1,6 +1,6 @@
 # Brief Fitur: Komitmen (Kamus Kesepakatan Berbentuk Pasal)
 
-Versi 3 · 17 Nov 2026 · Pemilik: Riki (UI/UX) · Pengguna: Riki & Febie
+Versi 4 · 17 Nov 2026 · Pemilik: Riki (UI/UX) · Pengguna: Riki & Febie
 Turunan dari `claude/beranda-brief.md` (§2 poin 3–4, §5, Fase 4). Kalau bertentangan, **brief ini yang berlaku untuk Komitmen**. Skema tab `Komitmen` di brief Beranda §5 **diganti** oleh §10 di sini.
 
 > Untuk Claude Code: bahasa singkat, poin, awam. Rekomendasi + alasan **sebelum** keputusan jangka panjang.
@@ -10,6 +10,7 @@ Turunan dari `claude/beranda-brief.md` (§2 poin 3–4, §5, Fase 4). Kalau bert
 **Riwayat keputusan Riki:**
 - *17 Nov (v2):* persetujuan berdua **wajib dengan tanda tangan** · isi awal = **import perjanjian pranikah** · tanggal berlaku = **tanggal disetujui** · **tanpa kunci/PIN**.
 - *17 Nov (v3):* TTD **per Lembar Pengesahan** · **nomor pasal global** + pencarian bisa langsung ke nomor/isi · pasal pranikah **hanya bisa dibaca + diberi Keterangan tambahan** · file pranikah (PDF/foto) **menyusul** setelah dokumen fisik ketemu.
+- *17 Nov (v4, jawaban §16):* keterangan **wajib TTD berdua** · keterangan boleh untuk **semua pasal** · Bab **dibuat otomatis**, **Definisi jadi modul terpisah** dari Kesepakatan · kalimat pernyataan **ditulis Claude** (draf §6) · **tidak ada hapus permanen**, semua lewat Cabut · warna **ikut tema pastel app**.
 
 ---
 
@@ -71,19 +72,25 @@ Bayangkan seperti **undang-undang mini rumah tangga**:
 5. **Nomor pasal global** (Pasal 1, 2, 3 … lintas bab), tetap selamanya, nomor yang dicabut tidak dipakai ulang.
 6. **Pencarian** bisa menemukan pasal lewat **nomor** maupun **isi** (§8A).
 7. **Pasal dari perjanjian pranikah: hanya bisa dibaca.** Tidak bisa diubah atau dicabut di app. Yang bisa: **menambah Keterangan** (§7).
+8. *(v4)* **Keterangan boleh untuk semua pasal** (pranikah & biasa), dan **wajib TTD berdua**.
+9. *(v4)* **Dua modul:** **Kesepakatan** (dikelompokkan per Bab) dan **Definisi** (kamus A–Z, tanpa Bab). Nomor pasal tetap global untuk keduanya.
+10. *(v4)* **Bab dibuat otomatis** dari isi kesepakatan (Claude yang menyusun saat import/evaluasi; Riki & Febie tidak perlu menentukan daftar Bab di depan).
+11. *(v4)* **Tidak ada hapus permanen.** Semua penghapusan lewat **Cabut** (tetap di arsip, nomor tidak dipakai ulang).
 
 **Rekomendasi (konfirmasi ke Riki):**
-8. **Mengubah = membuat versi baru**, bukan menimpa. Versi lama tetap di "Riwayat".
-9. **Mencabut** = pasal berstatus *Dicabut*, tetap ada di arsip.
-10. **Wajib isi alasan** setiap ubah/cabut (1 kalimat cukup).
-11. Tiap versi/keterangan menyimpan **sumber**: Perjanjian Pranikah / sesi evaluasi / "Di luar evaluasi".
-12. Komitmen **tidak pernah** masuk Google Calendar, to-do, atau catatan.
-13. Format tanggal "12 Okt 2026". Label: **"Berlaku sejak …"** (versi 1) / **"Diubah …"** (versi ≥ 2).
+12. **Mengubah = membuat versi baru**, bukan menimpa. Versi lama tetap di "Riwayat".
+13. **Mencabut** = pasal berstatus *Dicabut*, tetap ada di arsip.
+14. **Wajib isi alasan** setiap ubah/cabut (1 kalimat cukup).
+15. Tiap versi/keterangan menyimpan **sumber**: Perjanjian Pranikah / sesi evaluasi / "Di luar evaluasi".
+16. Komitmen **tidak pernah** masuk Google Calendar, to-do, atau catatan.
+17. Format tanggal "12 Okt 2026". Label: **"Berlaku sejak …"** (versi 1) / **"Diubah …"** (versi ≥ 2).
 
 ## 6. Tanda tangan (pengesahan) — FINAL: per Lembar Pengesahan
 
 1. Usulan (baru/ubah/cabut/keterangan) terkumpul dalam satu **Lembar Pengesahan** — otomatis per sesi evaluasi, per import, atau per usulan tunggal di luar evaluasi.
-2. Lembar menampilkan daftar semua perubahan (sebelum vs sesudah + alasan), lalu kalimat pernyataan (copy final dari Riki).
+2. Lembar menampilkan daftar semua perubahan (sebelum vs sesudah + alasan), lalu kalimat pernyataan.
+   - **Draf kalimat pernyataan (v4, ditulis Claude, boleh direvisi):**
+     > “Kami, {nama 1} dan {nama 2}, sudah membaca semua perubahan di lembar ini dan menyepakatinya dengan sadar, tanpa paksaan. Kami berkomitmen menjalankannya bersama sampai kami sepakat mengubahnya lagi.”
 3. Masing-masing **menggambar TTD dengan jari** di HP sendiri (tidak harus bersamaan).
 4. Sebelum TTD, tiap orang bisa tandai item **"Diskusikan dulu"** → item keluar dari lembar, tetap jadi usulan untuk evaluasi berikutnya. Kalau lembar berubah setelah satu orang TTD → TTD itu **batal**, harus diulang.
 5. TTD kedua masuk → semua item di lembar **Berlaku** dengan tanggal hari itu.
@@ -111,11 +118,11 @@ Bayangkan seperti **undang-undang mini rumah tangga**:
 - Sumber: "Perjanjian Pranikah · akta [tanggal akta]". Tanggal berlaku di app = tanggal TTD; tanggal akta tampil sebagai info.
 - **Hanya bisa dibaca.** Tombol Ubah & Cabut **tidak muncul**. Yang muncul: **+ Keterangan**.
 
-**Keterangan tambahan (berlaku untuk pasal pranikah):**
+**Keterangan tambahan (v4: berlaku untuk semua pasal, pranikah maupun biasa):**
 - Fungsi: menjelaskan tafsir/cara menjalankan pasal versi kalian, **tanpa mengubah teks asli**.
 - Tampil di bawah ayat, terpisah jelas: kotak bertanda "Keterangan" + tanggal disahkan.
 - Satu pasal boleh punya **beberapa keterangan**, urut tanggal.
-- Rekomendasi: keterangan **juga lewat Lembar Pengesahan + TTD berdua** (konsisten dengan aturan #1). → *Konfirmasi ke Riki, §16 #1.*
+- Keterangan **wajib lewat Lembar Pengesahan + TTD berdua** (keputusan v4).
 - Keterangan bisa **diganti** (keterangan baru menggantikan yang lama; yang lama masuk Riwayat) atau **dicabut** — keduanya juga lewat TTD.
 - Isi keterangan ikut **bisa dicari**.
 
@@ -138,8 +145,8 @@ Bayangkan seperti **undang-undang mini rumah tangga**:
 1. Buka pasal → **Ubah** → edit ayat + alasan → Simpan → *Usulan*, Lembar Pengesahan tunggal dibuat.
 2. Pasangan dapat banner → buka lembar → lihat sebelum vs sesudah → TTD atau "Diskusikan dulu".
 
-**D. Tambah keterangan pada pasal pranikah**
-1. Buka pasal pranikah → **+ Keterangan** → tulis → Simpan → *Usulan* → Lembar Pengesahan → TTD berdua.
+**D. Tambah keterangan pada pasal (pranikah atau biasa)**
+1. Buka pasal → **+ Keterangan** → tulis → Simpan → *Usulan* → Lembar Pengesahan → TTD berdua.
 
 **E. Tambah definisi di luar evaluasi**
 - Boleh. Sumber "Di luar evaluasi". Tetap lewat Lembar Pengesahan + TTD.
@@ -147,12 +154,12 @@ Bayangkan seperti **undang-undang mini rumah tangga**:
 ## 9. Struktur layar
 
 **Daftar Komitmen (mobile 390 px)**
-1. Header "Komitmen" + jumlah pasal berlaku.
+1. Header "Komitmen" + jumlah berlaku ("7 kesepakatan · 3 definisi berlaku").
 2. Kolom cari (placeholder: "Cari kata atau nomor pasal").
-3. Chip filter: **Semua · Kesepakatan · Definisi · Pranikah · Usulan · Dicabut**.
-4. Tab tampilan: **Per Bab** (default) | **A–Z** (hanya Definisi, huruf indeks di sisi kanan).
+3. Chip filter: **Semua · Pranikah · Usulan · Dicabut**.
+4. Tab modul *(v4)*: **Kesepakatan** (default, per Bab) | **Definisi A–Z** (huruf indeks di sisi kanan). Pencarian mencari di kedua modul sekaligus.
 5. Banner kuning bila ada lembar menunggu TTD-mu: "1 lembar menunggu tanda tanganmu".
-6. Daftar pasal per Bab. Tiap baris: `Pasal 4` · judul · cuplikan 1 baris · "Diubah 12 Okt 2026". Pasal pranikah: ikon gembok kecil + "Pranikah".
+6. Daftar pasal per Bab (modul Kesepakatan). Tiap baris: `Pasal 4` · judul · cuplikan 1 baris · "Diubah 12 Okt 2026". Pasal pranikah: ikon gembok kecil + "Pranikah".
 7. Tombol **Mulai evaluasi**.
 
 **Halaman pasal**
@@ -160,7 +167,7 @@ Bayangkan seperti **undang-undang mini rumah tangga**:
 - Ayat bernomor (1), (2), …
 - *(Pranikah)* blok **Keterangan** di bawah ayat: tiap keterangan dalam kotak terpisah + tanggal disahkan.
 - Footer: Berlaku sejak / Diubah · Versi · Sumber · 2 TTD kecil.
-- Tombol: non-pranikah = **Ubah**, **Cabut**, **Riwayat** · pranikah = **+ Keterangan**, **Riwayat**.
+- Tombol: non-pranikah = **Ubah**, **Cabut**, **+ Keterangan**, **Riwayat** · pranikah = **+ Keterangan**, **Riwayat**.
 - *(Definisi)* "Lihat juga: Pasal 7" bila pasal lain memakai istilah ini.
 
 **Lembar Pengesahan**
@@ -173,7 +180,7 @@ Bayangkan seperti **undang-undang mini rumah tangga**:
 
 **Desktop**: kiri = cari + daftar, kanan = isi pasal.
 
-**Warna**: token Komitmen brief Beranda §3 (`#FCD34D`, kartu `#1C1A13`, border `#3D3520`, teks `#D6CFB8`). Usulan = kuning outline · Berlaku = normal · Dicabut = muted + judul dicoret · Keterangan = kotak `#0E1014` border kiri `#FCD34D`. Garis TTD = `#ECEEF2` di atas `#0E1014`.
+**Warna (v4: ikut tema pastel app, terang + gelap)**: aksen = butter `--b-rt` (`#FFE29A` terang / `#F2D383` gelap), kartu `--surface`, teks `--text`. Usulan = outline butter · Berlaku = normal · Dicabut = muted + judul dicoret · Keterangan = kotak `--surface-2` border kiri butter. Garis TTD = `--text` di atas `--surface-2`.
 
 **Contoh tampilan (isi = placeholder):**
 
@@ -188,7 +195,7 @@ Pasal 3 Perjanjian Pranikah
 ┃ [Penjelasan/tafsir yang kalian sepakati]
 Berlaku sejak 1 Des 2026 · Akta [tanggal] · ✍ R ✍ F
 
-BAB II – DEFINISI
+MODUL DEFINISI (A–Z)
 
 Pasal 16 – Selingkuh                    [Definisi]
 (1) Selingkuh adalah [definisi yang kalian sepakati].
@@ -294,15 +301,18 @@ Tiap fase: demo dulu (`KANTONG_PREVIEW`), cek Playwright 390×844 (termasuk meng
 - [ ] Tap target ≥ 44 px, kontras ≥ 4.5:1, kotak TTD nyaman di 390 px.
 - [ ] `node kantong/tools/test_core.js` lulus + tes baru `komitmen.*`, `keterangan.*`, `pengesahan.*`, `evaluasi.*`.
 
-## 16. Pertanyaan terbuka (tanya Riki, jangan ditebak)
+## 16. Pertanyaan terbuka
 
-1. **Keterangan** pada pasal pranikah juga wajib TTD berdua? Rekomendasi: ya (konsisten dengan aturan #1).
-2. Keterangan hanya untuk pasal pranikah, atau boleh juga untuk pasal biasa? Rekomendasi: pranikah saja — pasal biasa cukup diubah langsung.
-3. Daftar **Bab** di luar "Perjanjian Pranikah"? (Contoh arah: Definisi, Batasan dengan Lawan Jenis, Keuangan, Komunikasi & Konflik, Waktu Bersama, Keluarga Besar.)
-4. Kalimat pernyataan di atas kotak TTD — mau ditulis sendiri?
-5. Boleh **hapus permanen** pasal non-pranikah (misal salah ketik total), atau semua lewat "Cabut"?
-6. *(Menunggu)* File perjanjian pranikah — PDF atau foto, dikirim saat dokumen fisik ketemu.
-7. *(Baru, §17)* Warna Komitmen: ikut tema pastel yang sekarang dipakai app (butter `--b-rt`, terang + gelap), atau tetap palet gelap `#1C1A13`/`#FCD34D`? Rekomendasi: ikut tema app.
+**Terjawab 17 Nov (v4):**
+1. Keterangan wajib TTD berdua? → **Ya.**
+2. Keterangan hanya pranikah? → **Semua pasal.**
+3. Daftar Bab? → **Dibuat otomatis**; Definisi **modul terpisah** dari Kesepakatan.
+4. Kalimat pernyataan ditulis sendiri? → **Tidak**, Claude yang menulis (draf di §6).
+5. Hapus permanen? → **Tidak.** Semua lewat Cabut.
+7. Warna? → **Ikut tema pastel app.**
+
+**Masih menunggu:**
+6. File perjanjian pranikah (PDF atau foto), dikirim lewat chat saat dokumen fisik ketemu.
 
 ---
 
@@ -318,6 +328,7 @@ Tiap fase: demo dulu (`KANTONG_PREVIEW`), cek Playwright 390×844 (termasuk meng
 - **Skrip import (§7 langkah 4)** kirim ke Edge Function/Supabase, bukan Sheet.
 - **Kotak TTD per orang:** kolom `ttd_riki` = user yang buku pribadinya `riki`; `ttd_febie` = pasangan (id user di database `istri`).
 - **Aksi `home`** belum ada di backend; Beranda masih membaca cache HP. Ringkasan Komitmen di Beranda diambil dari cache `komitmen.list`.
-- **Warna:** app sekarang pakai tema pastel (terang + gelap). Komitmen memakai token butter `--b-rt` yang sama dengan kartu Komitmen di Beranda. Palet gelap §9 menunggu jawaban §16 #7.
+- **Warna:** ikut tema pastel app (keputusan v4), token butter `--b-rt`.
+- **Bab otomatis (asumsi v4):** Claude menyusun nama Bab dari isi saat import pranikah & saat evaluasi. Di app, usulan pasal baru akan menyarankan Bab yang ada atau Bab baru (Fase 4b). Definisi tidak punya Bab (`bab_id` kosong).
 
-**Status Fase 4a (17 Nov):** dikerjakan dengan data contoh. Halaman `public/komitmen.html`. Belum di-deploy; migrasi `supabase/migrations/20261117000000_komitmen.sql` perlu dijalankan di Supabase sebelum rilis.
+**Status Fase 4a (17 Nov, diperbarui v4):** modul Kesepakatan | Definisi A–Z, keterangan tampil di semua pasal. dikerjakan dengan data contoh. Halaman `public/komitmen.html`. Belum di-deploy; migrasi `supabase/migrations/20261117000000_komitmen.sql` perlu dijalankan di Supabase sebelum rilis.

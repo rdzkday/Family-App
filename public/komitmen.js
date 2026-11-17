@@ -68,9 +68,9 @@
     P(3, 'b1', 'kesepakatan', '[Contoh] Utang', null, { pranikah: 3, kunci: 'utang, pinjaman', versi: [{ sumber: 'pranikah', ayat: [
       '[Contoh teks akta] Utang yang dibuat sebelum perkawinan menjadi tanggungan pihak yang membuatnya.',
       '[Contoh teks akta] Utang selama perkawinan untuk keperluan rumah tangga ditanggung bersama.'] }] });
-    P(4, 'b2', 'definisi', 'Selingkuh', null, { versi: [{ ayat: ['Selingkuh adalah [definisi yang kalian sepakati].', 'Termasuk di dalamnya: [contoh perilaku].', 'Tidak termasuk: [contoh yang disepakati bukan selingkuh].'] }] });
-    P(5, 'b2', 'definisi', 'Lawan jenis', null, { versi: [{ ayat: ['Lawan jenis adalah [definisi yang kalian sepakati].', 'Termasuk: [contoh, misal rekan kerja, teman lama].'] }] });
-    P(6, 'b2', 'definisi', 'Waktu berkualitas', null, { kunci: 'quality time', versi: [{ ayat: ['Waktu berkualitas adalah [definisi yang kalian sepakati].'] }] });
+    P(4, '', 'definisi', 'Selingkuh', null, { versi: [{ ayat: ['Selingkuh adalah [definisi yang kalian sepakati].', 'Termasuk di dalamnya: [contoh perilaku].', 'Tidak termasuk: [contoh yang disepakati bukan selingkuh].'] }] });
+    P(5, '', 'definisi', 'Lawan jenis', null, { versi: [{ ayat: ['Lawan jenis adalah [definisi yang kalian sepakati].', 'Termasuk: [contoh, misal rekan kerja, teman lama].'] }] });
+    P(6, '', 'definisi', 'Waktu berkualitas', null, { kunci: 'quality time', versi: [{ ayat: ['Waktu berkualitas adalah [definisi yang kalian sepakati].'] }] });
     P(7, 'b3', 'kesepakatan', 'Chat pribadi dengan lawan jenis', null, { kunci: 'whatsapp, dm, pesan', versi: [
       { ayat: ['[Contoh versi lama] Chat pribadi dengan lawan jenis dibatasi.'], sah: 'sah-pra' },
       { ayat: ['[Contoh] Chat pribadi dengan lawan jenis hanya untuk urusan [yang disepakati].', '[Contoh] Percakapan yang bisa dianggap selingkuh tidak disembunyikan dari pasangan.'],
@@ -86,7 +86,9 @@
       { id: 'k1', pasal_id: 'p2', isi: '[Contoh keterangan] Cara kalian menjalankan pasal ini, tanpa mengubah teks aslinya.', menggantikan_id: '', jenis: 'baru', evaluasi_id: '',
         pengesahan_id: 'sah-okt', status: 'berlaku', berlaku_sejak: T1, dibuat_oleh: 'istri', dibuat_at: T1 },
       { id: 'k2', pasal_id: 'p3', isi: '[Contoh keterangan] Pinjaman ke teman atau keluarga, termasuk lawan jenis, diberitahukan ke pasangan.', menggantikan_id: '', jenis: 'baru',
-        evaluasi_id: '', pengesahan_id: 'sah-okt', status: 'berlaku', berlaku_sejak: T1, dibuat_oleh: 'riki', dibuat_at: T1 }
+        evaluasi_id: '', pengesahan_id: 'sah-okt', status: 'berlaku', berlaku_sejak: T1, dibuat_oleh: 'riki', dibuat_at: T1 },
+      { id: 'k3', pasal_id: 'p9', isi: '[Contoh keterangan] Keterangan juga bisa ditempel di pasal biasa, misal cara menghitung batas nominal.', menggantikan_id: '',
+        jenis: 'baru', evaluasi_id: '', pengesahan_id: 'sah-okt', status: 'berlaku', berlaku_sejak: T1, dibuat_oleh: 'istri', dibuat_at: T1 }
     ];
     var S1 = 'M14 78 C 30 30, 46 30, 52 72 S 70 100, 84 52 S 112 22, 120 70 C 126 96, 150 92, 168 60 S 200 40, 214 70 L 286 64';
     var S2 = 'M16 70 C 40 20, 60 110, 86 60 C 100 34, 118 34, 124 62 C 130 92, 160 88, 176 56 C 188 34, 206 44, 210 66 C 214 86, 250 80, 284 52';
@@ -97,8 +99,8 @@
     return {
       Buku: [{ id: 'riki', nama: 'Riki', tipe: 'Pribadi', pemilik: 'riki', urutan: 1 }, { id: 'istri', nama: 'Febie', tipe: 'Pribadi', pemilik: 'istri', urutan: 2 }],
       Users: [{ id: 'riki', nama: 'Riki', buku: 'riki' }, { id: 'istri', nama: 'Febie', buku: 'istri' }],
-      KomitmenBab: [bab('b1', 'I', 'Perjanjian Pranikah', 1), bab('b2', 'II', 'Definisi', 2), bab('b3', 'III', 'Batasan dengan Lawan Jenis', 3),
-        bab('b4', 'IV', 'Keuangan', 4), bab('b5', 'V', 'Waktu Bersama', 5)],
+      KomitmenBab: [bab('b1', 'I', 'Perjanjian Pranikah', 1), bab('b3', 'II', 'Batasan dengan Lawan Jenis', 2),
+        bab('b4', 'III', 'Keuangan', 3), bab('b5', 'IV', 'Waktu Bersama', 4)],
       KomitmenPasal: pasal, KomitmenVersi: versi, KomitmenKeterangan: ket,
       Pengesahan: [sah('sah-pra', 'Perjanjian Pranikah', 'pranikah', T0, true, true), sah('sah-okt', 'Evaluasi Okt 2026', 'evaluasi', T1, true, true),
         sah('sah-nov', 'Evaluasi Nov 2026', 'evaluasi', T2, false, true)],
@@ -111,7 +113,7 @@
   var remote = !!(conn && conn.mode !== 'demo' && conn.api && conn.token);
   var demo = !remote;
   var cache = remote ? LS.get('k_komitmen', null) : null;   // { data, at }
-  var S = { data: null, q: '', filter: 'semua', tab: 'bab', status: '', fokus: null };
+  var S = { data: null, q: '', filter: 'semua', tab: 'kesepakatan', status: '', fokus: null };
   var ME = (boot && boot.user) || { id: 'riki', nama: 'Riki', buku: 'riki' };
 
   function demoData() {
@@ -144,8 +146,6 @@
   function babOf(id) { return (S.data.bab || []).filter(function (b) { return b.id === id; })[0]; }
   function lolosFilter(p) {
     switch (S.filter) {
-      case 'kesepakatan': return p.status !== 'dicabut' && p.tipe === 'kesepakatan';
-      case 'definisi': return p.status !== 'dicabut' && p.tipe === 'definisi';
       case 'pranikah': return p.status !== 'dicabut' && p.sumber_asal === 'pranikah';
       case 'usulan': return p.status === 'usulan' || p.ada_usulan;
       case 'dicabut': return p.status === 'dicabut';
@@ -273,14 +273,21 @@
       return '<div class="km-empty"><p>Belum ada kesepakatan. Mulai dari evaluasi bulanan pertama kalian.</p></div>';
     }
     if (S.q.trim()) return hasilCari();
-    var items = S.data.pasal.filter(lolosFilter);
-    if (!items.length) return '<div class="km-empty"><p>' + ({ usulan: 'Tidak ada usulan yang menunggu.', dicabut: 'Belum ada pasal yang dicabut.' }[S.filter] || 'Belum ada pasal di sini.') + '</p></div>';
-    return S.tab === 'az' ? listAz(items) : listBab(items);
+    var def = S.tab === 'definisi';
+    var items = S.data.pasal.filter(function (p) { return lolosFilter(p) && (p.tipe === 'definisi') === def; });
+    if (!items.length) return '<div class="km-empty"><p>' + ({ usulan: 'Tidak ada usulan yang menunggu.', dicabut: 'Belum ada yang dicabut.' }[S.filter] ||
+      (def ? 'Belum ada definisi.' : 'Belum ada kesepakatan di sini.')) + '</p></div>';
+    return def ? listAz(items) : listBab(items);
+  }
+  function jumlahLabel(d) {
+    var k = 0, f = 0;
+    d.pasal.forEach(function (p) { if (p.status === 'berlaku') { if (p.tipe === 'definisi') f++; else k++; } });
+    return k + ' kesepakatan · ' + f + ' definisi berlaku';
   }
   function listHtml() {
-    var d = S.data, FIL = [['semua', 'Semua'], ['kesepakatan', 'Kesepakatan'], ['definisi', 'Definisi'], ['pranikah', 'Pranikah'], ['usulan', 'Usulan'], ['dicabut', 'Dicabut']];
+    var d = S.data, FIL = [['semua', 'Semua'], ['pranikah', 'Pranikah'], ['usulan', 'Usulan'], ['dicabut', 'Dicabut']];
     return '<header class="km-head"><a class="back" href="beranda.html" aria-label="Kembali ke Beranda">' + ICON.back + '</a>' +
-      '<div><h1>Komitmen</h1><p class="sub">' + (d ? d.berlaku + ' pasal berlaku' : '&nbsp;') + '</p></div>' +
+      '<div><h1>Komitmen</h1><p class="sub">' + (d ? jumlahLabel(d) : '&nbsp;') + '</p></div>' +
       (S.status ? '<span class="km-status" role="status">' + esc(S.status) + '</span>' : '') + '</header>' +
       (demo ? '<div class="km-demo">Data contoh, bukan isi kesepakatan asli.' + (conn ? '' : ' Hubungkan dulu di Kantong untuk melihat data kalian.') + '</div>' : '') +
       (d && d.menunggu_ttd ? '<div class="km-banner" role="status">' + ICON.pen + '<span>' + d.menunggu_ttd + ' lembar menunggu tanda tanganmu</span></div>' : '') +
@@ -290,8 +297,8 @@
       '<div class="chips" role="group" aria-label="Filter">' + FIL.map(function (f) {
         return '<button type="button" class="chip" data-filter="' + f[0] + '" aria-pressed="' + (S.filter === f[0]) + '">' + f[1] + '</button>';
       }).join('') + '</div>' +
-      (S.q.trim() ? '' : '<div class="seg" role="group" aria-label="Tampilan"><button type="button" data-tab="bab" aria-pressed="' + (S.tab === 'bab') + '">Per Bab</button>' +
-        '<button type="button" data-tab="az" aria-pressed="' + (S.tab === 'az') + '">A–Z</button></div>') +
+      (S.q.trim() ? '' : '<div class="seg" role="group" aria-label="Modul"><button type="button" data-tab="kesepakatan" aria-pressed="' + (S.tab !== 'definisi') + '">Kesepakatan</button>' +
+        '<button type="button" data-tab="definisi" aria-pressed="' + (S.tab === 'definisi') + '">Definisi A–Z</button></div>') +
       '<div id="items">' + itemsHtml() + '</div>' +
       '<button type="button" class="btn ghost eval" disabled>Mulai evaluasi <span class="dev-tag">Fase berikutnya</span></button>';
   }
@@ -314,10 +321,10 @@
     var ttd = sah && sah.status === 'sah' ? '<div class="ttd" aria-label="' + esc('Disahkan ' + tgl(p.berlaku_sejak) + ' oleh ' + namaPasangan()) + '">' +
       '<figure>' + ttdSvg(sah.ttd_riki) + '<figcaption>' + esc(namaSlot('riki')) + '</figcaption></figure>' +
       '<figure>' + ttdSvg(sah.ttd_febie) + '<figcaption>' + esc(namaSlot('febie')) + '</figcaption></figure></div>' : '';
-    var acts = p.terkunci ? ['+ Keterangan', 'Riwayat'] : ['Ubah', 'Cabut', 'Riwayat'];
+    var acts = p.terkunci ? ['+ Keterangan', 'Riwayat'] : ['Ubah', 'Cabut', '+ Keterangan', 'Riwayat'];
     return '<article class="pasal' + (p.status === 'dicabut' ? ' dicabut' : '') + '" aria-labelledby="pasal-judul">' +
       '<div class="pasal-top"><a class="back" href="#" aria-label="Kembali ke daftar">' + ICON.back + '</a><span class="no">Pasal ' + p.nomor +
-      (babOf(p.bab_id) ? ' · Bab ' + esc(babOf(p.bab_id).nomor) : '') + '</span></div>' +
+      (p.tipe === 'definisi' ? ' · Definisi' : babOf(p.bab_id) ? ' · Bab ' + esc(babOf(p.bab_id).nomor) : '') + '</span></div>' +
       '<h2 id="pasal-judul">' + hl(p.judul, q) + '</h2><div class="tags">' + tags(p, true) + '</div>' +
       (p.rujukan_asli ? '<div class="rujukan">' + hl(p.rujukan_asli, q) + '</div>' : '') + info +
       '<ol class="ayat">' + p.ayat.map(function (a, i) {
@@ -399,7 +406,7 @@
   window.addEventListener('storage', function (e) { if (e.key === 'k_theme') location.reload(); });
 
   var ui = LS.get('k_km_ui', null);
-  if (ui) { S.filter = ui.filter || 'semua'; S.tab = ui.tab || 'bab'; }
+  if (ui) { S.filter = ['semua', 'pranikah', 'usulan', 'dicabut'].indexOf(ui.filter) >= 0 ? ui.filter : 'semua'; S.tab = ui.tab === 'definisi' || ui.tab === 'az' ? 'definisi' : 'kesepakatan'; }
   load();
   if (currentNomor()) scrollFokus();
   // offline: halaman ikut cache service worker yang sama dengan app
