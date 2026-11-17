@@ -84,6 +84,8 @@ Data keuangan pribadi tidak disertakan di repo ini.
 |---|---|
 | `public/` | PWA yang di-deploy. `core.js` = logika bersama (aturan, hitungan, to-do) |
 | `public/index.html` | Beranda (halaman awal). Kantong pindah ke `public/kantong.html` (`#todo` = tab To-do) |
+| `public/js/` | Kode app, dipecah per bagian (base, ui, transaksi, todo, shell, laporan, pengaturan, beranda, connect, demo, start). Skrip biasa, urutan muat di HTML |
+| `public/tokens.css` | Design token bersama (warna, font). Gelap default, terang opsional |
 | `public/komitmen.html` | Komitmen: kamus kesepakatan berbentuk pasal (baca & cari) |
 | `public/ruang-catat/` | Ruang Catat: jurnal mood (localStorage, service worker sendiri) |
 | `supabase/migrations/` | Skema database |
