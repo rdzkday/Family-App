@@ -90,11 +90,12 @@ mark { background: var(--km); color: var(--ink); border-radius: 4px; padding: 0 
 .ayat { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .ayat li { display: flex; gap: 10px; padding: 8px 10px; margin: 0 -10px; border-radius: 12px; scroll-margin: 24px; transition: background .6s; }
 .ayat .n { flex: none; min-width: 26px; font-weight: 900; color: var(--text-2); font-variant-numeric: tabular-nums; }
-.ayat p { margin: 0; font-size: 16px; line-height: 1.6; }
+.ayat p { margin: 0; font-size: 16px; line-height: 1.6; white-space: pre-line; }
+.pembuka { margin: 0 0 8px; font-size: 16px; line-height: 1.6; white-space: pre-line; padding: 8px 10px; margin-left: -10px; margin-right: -10px; border-radius: 12px; scroll-margin: 24px; transition: background .6s; }
 .pasal.dicabut .ayat p { color: var(--text-2); }
 .ket { margin: 14px 0 0; padding: 12px 14px; background: var(--surface-2); border-left: 4px solid var(--km); border-radius: 4px 14px 14px 4px; scroll-margin: 24px; transition: background .6s; }
 .ket .lbl { font-size: 12px; font-weight: 900; color: var(--text-2); margin-bottom: 4px; }
-.ket p { margin: 0; font-size: 15px; line-height: 1.55; }
+.ket p { margin: 0; font-size: 15px; line-height: 1.55; white-space: pre-line; }
 .fokus { background: color-mix(in srgb, var(--km) 45%, transparent) !important; }
 .lihat { margin-top: 16px; font-size: 14px; font-weight: 700; color: var(--text-2); }
 .lihat a { color: var(--tf); font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; }

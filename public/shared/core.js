@@ -539,7 +539,17 @@ var KantongCore = (function () {
 
   // ---------- komitmen: baca & cari (Fase 4a) ----------
   // Pasal = map (nomor & judul tetap), Versi = isi pada satu waktu. Yang tampil = versi berlaku (atau usulan untuk pasal baru).
+  // isi_ayat: JSON array teks ayat, atau objek {pembuka, ayat} untuk pasal yang punya kalimat tanpa nomor (mis. teks akta pranikah)
+  function isiObjek(v) {
+    if (v && typeof v === 'object' && Object.prototype.toString.call(v) !== '[object Array]') return v;
+    var s = String(v == null ? '' : v).trim();
+    if (s.charAt(0) !== '{') return null;
+    try { var o = JSON.parse(s); return o && typeof o === 'object' ? o : null; } catch (e) { return null; }
+  }
+  function pembukaDari(v) { var o = isiObjek(v); return o ? String(o.pembuka == null ? '' : o.pembuka) : ''; }
   function ayatDari(v) {
+    var obj = isiObjek(v);
+    if (obj) v = obj.ayat || [];
     if (Object.prototype.toString.call(v) === '[object Array]') return v.map(function (x) { return String(x == null ? '' : x); });
     var s = String(v == null ? '' : v).trim();
     if (!s) return [];
@@ -601,7 +611,7 @@ var KantongCore = (function () {
         id: p.id, nomor: num(p.nomor), bab_id: String(p.bab_id || ''), tipe: p.tipe === 'definisi' ? 'definisi' : 'kesepakatan',
         judul: String(p.judul || ''), kata_kunci: listDari(p.kata_kunci), sumber_asal: p.sumber_asal === 'pranikah' ? 'pranikah' : 'app',
         rujukan_asli: String(p.rujukan_asli || ''), terkunci: bool(p.terkunci), status: String(p.status || 'usulan'),
-        versi: isi ? num(isi.versi) : 0, ayat: isi ? ayatDari(isi.isi_ayat) : [], sumber: isi ? String(isi.sumber || '') : '',
+        versi: isi ? num(isi.versi) : 0, ayat: isi ? ayatDari(isi.isi_ayat) : [], pembuka: isi ? pembukaDari(isi.isi_ayat) : '', sumber: isi ? String(isi.sumber || '') : '',
         berlaku_sejak: cur && cur.status === 'berlaku' ? String(cur.berlaku_sejak || '') : '',
         pengesahan_id: cur && cur.status === 'berlaku' ? pid : '',
         dicabut: cabut ? { tanggal: String(cabut.berlaku_sejak || ''), alasan: String(cabut.alasan || '') } : null,
@@ -619,10 +629,12 @@ var KantongCore = (function () {
       d.lihat_juga = [];
       var istilah = normCari(d.judul);
       if (d.tipe !== 'definisi' || !istilah) return;
+      var alias = [normCari(d.judul.replace(/\([^)]*\)/g, ' '))];
+      var kurung = /\(([^)]+)\)/.exec(d.judul); if (kurung) alias.push(normCari(kurung[1]));
       pasal.forEach(function (p) {
         if (p.id === d.id || p.status === 'dicabut') return;
-        var teks = normCari(p.ayat.join(' ') + ' ' + p.keterangan.map(function (k) { return k.isi; }).join(' '));
-        if (kataUtuh(teks, istilah)) d.lihat_juga.push(p.nomor);
+        var teks = normCari((p.pembuka || '') + ' ' + p.ayat.join(' ') + ' ' + p.keterangan.map(function (k) { return k.isi; }).join(' '));
+        if (kataUtuh(teks, istilah) || alias.some(function (a) { return a && kataUtuh(teks, a); })) d.lihat_juga.push(p.nomor);
       });
     });
     var slot = slotTtd(user);
@@ -653,9 +665,10 @@ var KantongCore = (function () {
     var nq = normCari(q);
     if (!nq) return [];
     var nomor = nomorDariKueri(q), toks = nq.split(' '), out = [];
-    var TINGKAT = { judul: 1, kata_kunci: 2, rujukan: 2, ayat: 3, keterangan: 3 };
+    var TINGKAT = { judul: 1, kata_kunci: 2, rujukan: 2, pembuka: 3, ayat: 3, keterangan: 3 };
     (pasal || []).forEach(function (p) {
       var f = [['judul', -1, p.judul], ['kata_kunci', -1, (p.kata_kunci || []).join(', ')], ['rujukan', -1, p.rujukan_asli]];
+      if (p.pembuka) f.push(['pembuka', -1, p.pembuka]);
       (p.ayat || []).forEach(function (a, i) { f.push(['ayat', i, a]); });
       (p.keterangan || []).forEach(function (k, i) { f.push(['keterangan', i, k.isi]); });
       var lokasi = [], semua = '';
@@ -682,7 +695,7 @@ var KantongCore = (function () {
       if (!p || p.dihapus) throw err('Pasal tidak ditemukan');
       var sah = byId(db.Pengesahan || []);
       var item = (db.KomitmenVersi || []).filter(function (v) { return v.pasal_id === id; }).map(function (v) {
-        return { jenis_item: 'versi', id: v.id, versi: num(v.versi), jenis: v.jenis, status: v.status, ayat: ayatDari(v.isi_ayat), alasan: String(v.alasan || ''),
+        return { jenis_item: 'versi', id: v.id, versi: num(v.versi), jenis: v.jenis, status: v.status, ayat: ayatDari(v.isi_ayat), pembuka: pembukaDari(v.isi_ayat), alasan: String(v.alasan || ''),
           sumber: String(v.sumber || ''), berlaku_sejak: String(v.berlaku_sejak || ''), dibuat_at: String(v.dibuat_at || ''),
           pengesahan_id: String(v.pengesahan_id || ''), pengesahan_judul: sah[v.pengesahan_id] ? String(sah[v.pengesahan_id].judul || '') : '' };
       }).concat((db.KomitmenKeterangan || []).filter(function (k) { return k.pasal_id === id; }).map(function (k) {
@@ -831,7 +844,8 @@ var KantongCore = (function () {
       var p = pmap[v.pasal_id] || {};
       var lama = v.jenis === 'baru' ? null : (db.KomitmenVersi || []).filter(function (x) { return x.pasal_id === v.pasal_id && x.status === 'berlaku'; })[0];
       return { id: v.id, jenis_item: 'versi', jenis: v.jenis, pasal_id: v.pasal_id, nomor: num(p.nomor), judul: String(p.judul || ''), tipe: String(p.tipe || ''),
-        sesudah: v.jenis === 'cabut' ? [] : ayatDari(v.isi_ayat), sebelum: lama ? ayatDari(lama.isi_ayat) : [], alasan: String(v.alasan || ''), dibuat_oleh: String(v.dibuat_oleh || '') };
+        sesudah: v.jenis === 'cabut' ? [] : ayatDari(v.isi_ayat), sebelum: lama ? ayatDari(lama.isi_ayat) : [],
+        pembuka: v.jenis === 'cabut' ? '' : pembukaDari(v.isi_ayat), alasan: String(v.alasan || ''), dibuat_oleh: String(v.dibuat_oleh || '') };
     });
     var ks = (db.KomitmenKeterangan || []).filter(function (k) { return k.pengesahan_id === sid && k.status === 'usulan'; }).map(function (k) {
       var p = pmap[k.pasal_id] || {}, lama = kmap[k.menggantikan_id];
@@ -842,7 +856,7 @@ var KantongCore = (function () {
   }
   // "sidik jari" isi lembar (FNV-1a 32-bit): isi berubah → hash beda → TTD lama batal
   function hashLembar(items) {
-    var s = JSON.stringify(items.map(function (i) { return [i.id, i.jenis, i.sesudah, i.alasan]; })), h = 0x811c9dc5;
+    var s = JSON.stringify(items.map(function (i) { return i.pembuka ? [i.id, i.jenis, i.sesudah, i.alasan, i.pembuka] : [i.id, i.jenis, i.sesudah, i.alasan]; })), h = 0x811c9dc5;
     for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul ? Math.imul(h, 0x01000193) : (h * 0x01000193) | 0; }
     return ('0000000' + (h >>> 0).toString(16)).slice(-8);
   }
@@ -1416,7 +1430,7 @@ var KantongCore = (function () {
     cleanTodo: cleanTodo, canWriteTodo: canWriteTodo, todoEventSpec: todoEventSpec, todoPerluEvent: todoPerluEvent,
     todoSudahLewat: todoSudahLewat, todoSyncMassal: todoSyncMassal, todoTidakDikirimLewat: todoTidakDikirimLewat,
     komitmenView: komitmenView, cariKomitmen: cariKomitmen, hashLembar: hashLembar, lembarItems: lembarItems, nomorDariKueri: nomorDariKueri, normCari: normCari,
-    ayatDari: ayatDari, slotTtd: slotTtd,
+    ayatDari: ayatDari, pembukaDari: pembukaDari, slotTtd: slotTtd,
     isTime: isTime, TODO_BERSAMA: TODO_BERSAMA, TODO_DURASI: TODO_DURASI, TODO_SELESAI_EVENT: TODO_SELESAI_EVENT,
     TODO_TIPE: TODO_TIPE, todoTipe: todoTipe, evaluasiPengingat: evaluasiPengingat, EVALUASI_JUDUL: EVALUASI_JUDUL,
     EVALUASI_PENGINGAT_JAM: EVALUASI_PENGINGAT_JAM,

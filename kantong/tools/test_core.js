@@ -874,5 +874,51 @@ function komCall(st, uid, action, payload) {
   eq('batch: op lain tetap jalan', b.results[1].ok, true);
 })();
 
+// ---------------------------------------------------------------- komitmen: teks pembuka (pasal akta tanpa nomor ayat) + pengesahan pranikah
+(function () {
+  var T = '2026-11-19T10:00:00+07:00';
+  var sd = seed();
+  sd.KomitmenBab = [{ id: 'b1', nomor: 'I', judul: 'Akta', urutan: 1, dibuat_at: T, dihapus: '' }];
+  var P = function (id, nomor, tipe, judul, bab) {
+    return { id: id, nomor: nomor, bab_id: bab, tipe: tipe, judul: judul, kata_kunci: 'pranikah', sumber_asal: 'pranikah', rujukan_asli: 'Pasal ' + nomor + ' Akta Contoh',
+      terkunci: true, status: 'usulan', versi_berlaku_id: '', dibuat_oleh: 'u-riki', dibuat_at: T, diubah_at: T, dihapus: '' };
+  };
+  var V = function (pid, isi) {
+    return { id: pid + '-v1', pasal_id: pid, versi: 1, isi_ayat: JSON.stringify(isi), alasan: '', jenis: 'baru', sumber: 'pranikah', evaluasi_id: '',
+      pengesahan_id: 'sah-pra', status: 'usulan', berlaku_sejak: '', dibuat_oleh: 'u-riki', dibuat_at: T };
+  };
+  sd.KomitmenPasal = [P('a1', 1, 'definisi', 'Istilah Contoh (ISC)', ''), P('a2', 2, 'kesepakatan', 'Akibat', 'b1')];
+  sd.KomitmenVersi = [V('a1', { pembuka: 'Para pihak sepakat bahwa istilah contoh mencakup [placeholder].', ayat: [] }),
+    V('a2', { pembuka: 'Apabila ISC terjadi, maka :', ayat: ['Ayat satu [placeholder];', 'Ayat dua\na. butir'] })];
+  sd.KomitmenKeterangan = [];
+  sd.Pengesahan = [{ id: 'sah-pra', judul: 'Perjanjian Pranikah', jenis: 'pranikah', evaluasi_id: '', ttd_riki: '', ttd_riki_at: '', ttd_febie: '', ttd_febie_at: '',
+    isi_hash: '', status: 'menunggu', dibuat_at: T }];
+  var st = C.memoryStore(sd);
+  var L = komCall(st, 'u-riki', 'komitmen.list');
+  var by = {}; L.pasal.forEach(function (p) { by[p.nomor] = p; });
+  eq('pembuka.tampil di view', by[2].pembuka, 'Apabila ISC terjadi, maka :');
+  eq('pembuka.ayat tetap bernomor dari 1', by[2].ayat.length, 2);
+  eq('pembuka.pasal tanpa ayat', by[1].ayat.length, 0);
+  eq('pembuka.ayatDari objek', C.ayatDari('{"pembuka":"x","ayat":["a"]}').join('|'), 'a');
+  eq('pembuka.pembukaDari array = kosong', C.pembukaDari('["a"]'), '');
+  var h = C.cariKomitmen(L.pasal, 'mencakup');
+  eq('pembuka.bisa dicari', h.length && h[0].pasal.nomor, 1);
+  eq('pembuka.lokasi', h[0].lokasi[0].di, 'pembuka');
+  eq('pembuka.lihat juga lewat singkatan dalam kurung', by[1].lihat_juga.join(','), '2');
+  eq('pembuka.usulan belum berlaku', L.berlaku, 0);
+  eq('pembuka.lembar menunggu TTD', L.menunggu_ttd, 1);
+  var lb = komCall(st, 'u-riki', 'pengesahan.get', { id: 'sah-pra' });
+  eq('pembuka.lembar berisi 2 item', lb.items.length, 2);
+  eq('pembuka.ikut tampil di lembar', lb.items[1].pembuka, 'Apabila ISC terjadi, maka :');
+  lempar('pembuka.pasal pranikah tidak bisa diubah', function () { komCall(st, 'u-riki', 'komitmen.usul_ubah', { pasal_id: 'a2', ayat: ['x'], alasan: 'y' }); });
+  komCall(st, 'u-riki', 'pengesahan.sign', { id: 'sah-pra', isi_hash: lb.isi_hash, ttd: 'M0 0L5 5' });
+  var r = komCall(st, 'u-febie', 'pengesahan.sign', { id: 'sah-pra', isi_hash: lb.isi_hash, ttd: 'M0 5L5 0' });
+  eq('pembuka.TTD kedua: sah', r.sah, true);
+  var L2 = komCall(st, 'u-febie', 'komitmen.list');
+  eq('pembuka.setelah sah: 2 berlaku', L2.berlaku, 2);
+  eq('pembuka.setelah sah: pembuka tetap', L2.pasal[1].pembuka, 'Apabila ISC terjadi, maka :');
+  eq('pembuka.tanggal berlaku = TTD kedua', L2.pasal[0].berlaku_sejak, NOW);
+})();
+
 console.log('\n' + lulus + ' cek lulus, ' + gagal + ' gagal.');
 process.exit(gagal ? 1 : 0);

@@ -127,7 +127,7 @@
     return s && s.jenis === 'evaluasi' ? s.judul : 'Evaluasi';
   }
   function lokasiLabel(l) {
-    return { nomor: 'nomor pasal', judul: 'di judul', kata_kunci: 'di kata kunci', rujukan: 'di rujukan asli', keterangan: 'di keterangan' }[l.di] ||
+    return { nomor: 'nomor pasal', judul: 'di judul', kata_kunci: 'di kata kunci', rujukan: 'di rujukan asli', keterangan: 'di keterangan', pembuka: 'di teks pasal' }[l.di] ||
       (l.di === 'ayat' ? 'di ayat (' + (l.idx + 1) + ')' : '');
   }
   // highlight: cocokkan versi ternormalisasi (tanpa huruf besar/aksen) lalu petakan balik ke teks asli
@@ -176,10 +176,10 @@
 
   // ================= daftar =================
   function rowHtml(p, hit) {
-    var q = hit ? S.q : '', snip = p.ayat[0] || '', lok = '';
+    var q = hit ? S.q : '', snip = p.pembuka || p.ayat[0] || '', lok = '';
     if (hit) {
-      var l = hit.lokasi.filter(function (x) { return x.di === 'ayat' || x.di === 'keterangan'; })[0];
-      if (l) snip = potong(l.di === 'ayat' ? p.ayat[l.idx] : p.keterangan[l.idx].isi, q);
+      var l = hit.lokasi.filter(function (x) { return x.di === 'ayat' || x.di === 'keterangan' || x.di === 'pembuka'; })[0];
+      if (l) snip = potong(l.di === 'ayat' ? p.ayat[l.idx] : l.di === 'pembuka' ? p.pembuka : p.keterangan[l.idx].isi, q);
       lok = lokasiLabel(hit.lokasi[0]);
       if (hit.lokasi[0].di === 'nomor' && hit.lokasi[1]) lok = '';
     }
@@ -300,6 +300,7 @@
       (p.tipe === 'definisi' ? ' · Definisi' : babOf(p.bab_id) ? ' · Bab ' + esc(babOf(p.bab_id).nomor) : '') + '</span></div>' +
       '<h2 id="pasal-judul">' + hl(p.judul, q) + '</h2><div class="tags">' + tags(p, true) + '</div>' +
       (p.rujukan_asli ? '<div class="rujukan">' + hl(p.rujukan_asli, q) + '</div>' : '') + info +
+      (p.pembuka ? '<p class="pembuka" id="pembuka">' + hl(p.pembuka, q) + '</p>' : '') +
       '<ol class="ayat">' + p.ayat.map(function (a, i) {
         return '<li id="ayat-' + i + '"><span class="n">(' + (i + 1) + ')</span><p>' + hl(a, q) + '</p></li>';
       }).join('') + '</ol>' +
@@ -417,6 +418,7 @@
     if (it.jenis === 'cabut') isi = '<div class="bv"><div class="bv-l">Yang dicabut</div>' + daftar(it.sebelum.length ? it.sebelum : it.sesudah, 'lama') + '</div>';
     else if (it.sebelum.length) isi = '<div class="bv"><div class="bv-l">Sebelum</div>' + daftar(it.sebelum, 'lama') + '</div><div class="bv"><div class="bv-l">Sesudah</div>' + daftar(it.sesudah, 'baru') + '</div>';
     else isi = '<div class="bv">' + daftar(it.sesudah, 'baru') + '</div>';
+    if (it.pembuka) isi = '<p class="pembuka">' + esc(it.pembuka) + '</p>' + isi;
     return '<div class="li-item"><div class="li-h"><span class="tag kuning">' + esc(lbl) + '</span><a href="#p/' + it.nomor + '" class="li-no">Pasal ' + it.nomor + ' · ' + esc(it.judul) + '</a></div>' + isi +
       (it.alasan ? '<p class="li-alasan"><b>Alasan:</b> ' + esc(it.alasan) + '</p>' : '') +
       (l.status === 'menunggu' ? '<button type="button" class="btn small ghost" data-defer="' + esc(it.id) + '">Diskusikan dulu</button>' : '') + '</div>';
@@ -531,7 +533,7 @@
       box.innerHTML = r.riwayat.length ? r.riwayat.map(function (x) {
         var ket = x.jenis_item === 'keterangan';
         var judul = ket ? { baru: 'Keterangan', ganti: 'Keterangan (ganti)', cabut: 'Cabut keterangan' }[x.jenis] : 'Versi ' + x.versi + ' · ' + (JENIS_LBL[x.jenis] || '');
-        var isi = ket ? '<p>' + esc(x.isi) + '</p>' : x.jenis === 'cabut' ? '' : '<ol class="ayat">' + x.ayat.map(function (a, i) { return '<li><span class="n">(' + (i + 1) + ')</span><p>' + esc(a) + '</p></li>'; }).join('') + '</ol>';
+        var isi = ket ? '<p>' + esc(x.isi) + '</p>' : x.jenis === 'cabut' ? '' : (x.pembuka ? '<p class="pembuka">' + esc(x.pembuka) + '</p>' : '') + '<ol class="ayat">' + x.ayat.map(function (a, i) { return '<li><span class="n">(' + (i + 1) + ')</span><p>' + esc(a) + '</p></li>'; }).join('') + '</ol>';
         return '<div class="rw-i ' + esc(x.status) + '"><div class="rw-h"><b>' + esc(judul) + '</b><span class="tag' + (x.status === 'berlaku' ? ' kuning' : '') + '">' + esc(ST[x.status] || x.status) + '</span></div>' +
           '<div class="rw-m">' + esc(x.berlaku_sejak ? 'Disahkan ' + tgl(x.berlaku_sejak) : 'Diusulkan ' + tgl(x.dibuat_at)) + (x.pengesahan_judul ? ' · ' + esc(x.pengesahan_judul) : '') + '</div>' +
           isi + (x.alasan ? '<p class="li-alasan"><b>Alasan:</b> ' + esc(x.alasan) + '</p>' : '') + '</div>';
@@ -658,6 +660,7 @@
     var f = S.fokus, el = null;
     if (f && f.di === 'ayat') el = document.getElementById('ayat-' + f.idx);
     if (f && f.di === 'keterangan') el = document.getElementById('ket-' + f.idx);
+    if (f && f.di === 'pembuka') el = document.getElementById('pembuka');
     if (!el) return;
     el.scrollIntoView({ block: 'center' });
     el.classList.add('fokus'); setTimeout(function () { el.classList.remove('fokus'); }, 1600);
