@@ -268,10 +268,10 @@ var TodoView = {
     var beres = list.filter(function (t) { return C.bool(t.selesai); })
       .sort(function (a, b) { return String(b.diubah || '').localeCompare(String(a.diubah || '')); }).slice(0, 20);
     var html;
-    if (!buka.length && !beres.length) html = '<div class="list"><div class="empty">Belum ada to-do. Tulis satu hal yang mau dikerjain hari ini.</div></div>';
+    if (!buka.length && !beres.length) html = '<div class="list">' + emptyIl('kosong-todo', 'Belum ada to-do. Tulis satu hal yang mau dikerjain hari ini.') + '</div>';
     else {
       html = buka.length ? '<div class="list todo-list">' + buka.map(todoRow).join('') + '</div>'
-        : '<div class="list"><div class="empty">Semua beres. Tulis to-do berikutnya di atas.</div></div>';
+        : '<div class="list">' + emptyIl('kosong-todo', 'Semua beres. Tulis to-do berikutnya di atas.') + '</div>';
       if (beres.length) html += '<section class="section"><div class="section-h"><h2>Selesai</h2><span class="aside">' + beres.length + ' terakhir</span></div><div class="list todo-list">' + beres.map(todoRow).join('') + '</div></section>';
     }
     box.innerHTML = html;

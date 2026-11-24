@@ -202,7 +202,7 @@
     tabsEl.classList.add('hidden');
     const p = draftProfile;
     if (onboardStep === 0){
-      view.innerHTML = '<div class="hero"><h2>Kenalan dulu</h2><p class="muted">Dua pertanyaan singkat supaya pilihan di aplikasi pas dengan kondisimu. '+(REMOTE ? 'Tersimpan di akunmu, hanya kamu yang bisa membaca.' : 'Semua tersimpan di perangkat ini.')+'</p></div>' +
+      view.innerHTML = '<div class="hero">'+ilus('onboarding-05-daily-mood','lg')+'<h2>Kenalan dulu</h2><p class="muted">Dua pertanyaan singkat supaya pilihan di aplikasi pas dengan kondisimu. '+(REMOTE ? 'Tersimpan di akunmu, hanya kamu yang bisa membaca.' : 'Semua tersimpan di perangkat ini.')+'</p></div>' +
         '<div class="card"><label for="nm"><h3>Mau dipanggil siapa?</h3></label><input type="text" id="nm" value="'+esc(p.name)+'" placeholder="Opsional"></div>' +
         '<div class="card"><h3>Usia kamu</h3><div class="age">'+AGES.map(a => '<button type="button" class="chip" data-age="'+a+'" aria-pressed="'+(p.age===a)+'">'+a+'</button>').join('')+'</div></div>' +
         '<button type="button" class="btn wide" data-act="ob-next" '+(p.age?'':'disabled')+'>Lanjut</button>';

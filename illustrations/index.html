@@ -1,0 +1,281 @@
+<title>Ilustrasi Family App</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: header + filter chip, grid kartu ilustrasi, lalu panduan gaya. Token = tokens.css Family App (gelap default). */
+:root {
+  --bg: #0E1014; --surface: #161920; --surface-2: #1D2129; --line: #262B35;
+  --text: #ECEEF2; --muted: #9AA3B2;
+  --kantong: #7DD3A8; --agenda: #93C5FD; --komit: #FCD34D; --catat: #C4B5FD; --bad: #F87171;
+  --on-accent: #0E1014;
+  --font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 22px; --r-in: 14px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #F5F6F8; --surface: #FFFFFF; --surface-2: #EEF0F3; --line: #E2E5EB; --text: #14171C; --muted: #5B6472;
+  --kantong: #1E7F55; --agenda: #2F5FBF; --komit: #8A6100; --catat: #6550C8; --bad: #C2343F; --on-accent: #FFFFFF; color-scheme: light; } }
+:root[data-theme="light"] {
+  --bg: #F5F6F8; --surface: #FFFFFF; --surface-2: #EEF0F3; --line: #E2E5EB; --text: #14171C; --muted: #5B6472;
+  --kantong: #1E7F55; --agenda: #2F5FBF; --komit: #8A6100; --catat: #6550C8; --bad: #C2343F; --on-accent: #FFFFFF; color-scheme: light; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font: 500 15px/1.55 var(--font); margin: 0; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 28px 120px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 28px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
+h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 800; }
+h2 { font-size: 22px; font-weight: 800; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--agenda); outline-offset: 2px; border-radius: 8px; }
+
+header { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: end; }
+header .intro { max-width: 62ch; display: flex; flex-direction: column; gap: 10px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.fact { padding: 6px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: 13px; font-weight: 700; color: var(--muted); }
+.fact b { color: var(--text); }
+.seg { justify-self: start; display: flex; padding: 4px; gap: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+.seg button { min-height: 40px; padding: 0 16px; border-radius: 999px; font-weight: 700; font-size: 14px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+
+.filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.chip { flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 700; font-size: 14px; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; }
+.chip[aria-pressed="true"] { background: var(--kantong); border-color: var(--kantong); color: var(--on-accent); }
+.chip .n { font-size: 12px; opacity: .75; font-variant-numeric: tabular-nums; }
+
+.group { display: flex; flex-direction: column; gap: 14px; }
+.group-h { display: flex; align-items: baseline; gap: 10px; }
+.group-h .n { color: var(--muted); font-weight: 700; font-size: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.card.picked { border-color: var(--kantong); box-shadow: 0 0 0 1px var(--kantong); }
+.art { position: relative; background: var(--bg); aspect-ratio: 4 / 3; display: grid; place-items: center; max-width: 100%; }
+.art img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.art.mini img { width: 50%; height: auto; }
+.badge { position: absolute; top: 10px; left: 10px; padding: 3px 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: 11.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.pick { position: absolute; top: 8px; right: 8px; min-height: 40px; padding: 0 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-weight: 800; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.pick[aria-pressed="true"] { background: var(--kantong); border-color: var(--kantong); color: var(--on-accent); }
+.pick svg { width: 16px; height: 16px; }
+.meta { flex: 1; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+.meta h3 { font-size: 15.5px; font-weight: 800; line-height: 1.35; }
+.meta .use { font-size: 13.5px; color: var(--muted); }
+.file { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 2px; }
+.file code { font: 500 12.5px var(--mono); color: var(--muted); overflow-wrap: anywhere; min-width: 0; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--c, var(--muted)); }
+.copy { margin-left: auto; flex: none; min-height: 32px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.empty { padding: 40px 16px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: var(--r); }
+
+.guide { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel.wide { grid-column: 1 / -1; }
+.panel h3 { font-size: 16px; font-weight: 800; }
+.label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.sheet { background: var(--bg); border-radius: var(--r-in); overflow-x: auto; }
+.sheet img { display: block; width: 100%; min-width: 480px; }
+ul.rules { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; }
+ul.rules li::marker { color: var(--kantong); }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.sw { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.sw i { display: block; height: 44px; border-radius: 12px; background: var(--c); border: 1px solid var(--line); }
+.sw b { font-weight: 800; }
+.sw code { font: 500 11.5px var(--mono); color: var(--muted); }
+.refs { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.refs a { color: var(--agenda); font-weight: 700; text-decoration: none; }
+.refs a:hover { text-decoration: underline; }
+.refs span { display: block; font-size: 13.5px; color: var(--muted); }
+
+.tray { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding-block: 12px calc(12px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--surface); border-top: 1px solid var(--line); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.tray .txt { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; }
+.tray .txt small { display: block; color: var(--muted); font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn { min-height: 44px; padding: 0 18px; border-radius: var(--r-in); font-weight: 800; font-size: 14.5px; border: 1px solid var(--line); }
+.btn.primary { background: var(--kantong); border-color: var(--kantong); color: var(--on-accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+.toast { position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-weight: 700; font-size: 14px; z-index: 30; }
+textarea.fallback { width: 100%; min-height: 70px; font: 500 12.5px var(--mono); background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+
+@media (max-width: 640px) {
+  header { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="intro">
+      <h1>Ilustrasi Family App</h1>
+      <p class="muted">Paket ilustrasi flat untuk Family App, dibangun dari icon aplikasi: Kantong dan dua koin, biru untuk Riki dan pink untuk Febie. Tiap gambar punya versi terang dan gelap. Tandai yang mau dipakai, lalu salin daftarnya.</p>
+      <div class="facts" id="facts"></div>
+    </div>
+    <div class="seg" role="group" aria-label="Tema">
+      <button id="th-light" aria-pressed="false">Terang</button>
+      <button id="th-dark" aria-pressed="false">Gelap</button>
+    </div>
+  </header>
+
+  <nav class="filters" id="filters" aria-label="Kategori"></nav>
+  <main id="list" class="group" style="gap:32px"></main>
+
+  <section class="group" aria-labelledby="g-h">
+    <div class="group-h"><h2 id="g-h">Panduan gaya</h2></div>
+    <div class="guide">
+      <div class="panel wide">
+        <div class="label">Karakter</div>
+        <h3>Riki & Febie, si koin dari icon aplikasi</h3>
+        <p class="muted">Badan bulat dengan cincin koin. Pembeda bukan hanya warna (aman untuk buta warna): Riki punya jambul, Febie punya pita lavender. 10 ekspresi siap pakai.</p>
+        <div class="sheet"><img id="sheet" alt="Lembar ekspresi Riki dan Febie: senyum, senang, kedip, kaget, tenang, ngantuk, fokus, cemas, sedih, sayang"></div>
+      </div>
+      <div class="panel">
+        <div class="label">Aturan bentuk</div>
+        <ul class="rules">
+          <li>Flat geometris: lingkaran, rounded-rect, kurva. Tanpa outline hitam.</li>
+          <li>Shading 2 tone dari warna yang sama, cahaya dari kiri atas.</li>
+          <li>Latar blob organik memakai warna latar fitur (mint Kantong, biru Agenda, kuning Komitmen, lavender Daily Mood).</li>
+          <li>Tanpa teks di dalam gambar, supaya copy tetap di UI dan mudah diubah.</li>
+          <li>Karakter jadi pendukung pesan, bukan hiasan. Satu ide per gambar.</li>
+          <li>Kanvas 320×240 (4:3). Detail terkecil ≥ 6px di ukuran tampil.</li>
+          <li>Animasi CSS/SMIL ringan, berhenti otomatis saat <i>reduce motion</i> aktif.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <div class="label">Palet (diambil dari tokens.css & icon.svg)</div>
+        <div class="swatches" id="swatches"></div>
+      </div>
+      <div class="panel wide">
+        <div class="label">Referensi yang dipakai</div>
+        <ul class="refs">
+          <li><a href="https://atlassian.design/foundations/illustrations" target="_blank" rel="noopener">Atlassian Design System: Illustrations</a><span>Spot illustration untuk satu konsep: empty state, error, perayaan.</span></li>
+          <li><a href="https://www.sap.com/design-system/fiori-design-web/v1-96/foundations/visual/ux-illustrations" target="_blank" rel="noopener">SAP Fiori: UX Illustrations</a><span>Hindari teks di ilustrasi, desain minimal, tambah ilustrasi hanya jika ruang cukup.</span></li>
+          <li><a href="https://v1.lightningdesignsystem.com/guidelines/empty-state" target="_blank" rel="noopener">Salesforce Lightning: Empty state</a><span>Pesan wajib, ilustrasi & CTA opsional. Karakter tidak boleh mengalahkan pesan.</span></li>
+          <li><a href="https://seeds.sproutsocial.com/patterns/empty-states" target="_blank" rel="noopener">Sprout Social Seeds: Empty states</a><span>Lebar konten empty state maks. 400px, CTA harus bisa ditindaklanjuti.</span></li>
+          <li><a href="https://www.ibm.com/design/language/illustration/flat-style/design" target="_blank" rel="noopener">IBM Design Language: Flat style</a><span>Ukuran objek minimum di ilustrasi flat.</span></li>
+          <li><a href="https://getillustrations.com/blog/flat-vector-illustration-guide/" target="_blank" rel="noopener">Flat Vector Illustration Guide</a><span>3–6 warna per gambar dengan satu warna dominan, konsisten satu sub-gaya.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="tray" role="region" aria-label="Pilihan">
+  <div class="txt"><span id="t-count">Belum ada yang dipilih</span><small id="t-list">Tekan "Pilih" di kartu untuk menandai.</small></div>
+  <button class="btn" id="t-clear" disabled>Kosongkan</button>
+  <button class="btn primary" id="t-copy" disabled>Salin daftar</button>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script id="manifest" type="application/json">[{"slug":"loading-kantong","kategori":"Loading","judul":"Koin berjatuhan masuk ke Kantong","pakai_untuk":"Layar memuat penuh (splash / \"Memuat data…\").","warna_latar":"kantong","ukuran":"320x240","animasi":true},{"slug":"loading-sinkron","kategori":"Loading","judul":"Riki dan Febie mengoper koin bolak-balik","pakai_untuk":"Sedang sinkron antrean offline ke server.","warna_latar":"agenda","ukuran":"320x240","animasi":true},{"slug":"loading-mini","kategori":"Loading","judul":"Dua koin memantul bergantian","pakai_untuk":"Loader kecil di tombol/kartu (ganti spinner). Ukuran 120×56.","warna_latar":"transparan","ukuran":"120x56","animasi":true},{"slug":"onboarding-01-selamat-datang","kategori":"Onboarding","judul":"Riki dan Febie menyapa di depan Kantong","pakai_untuk":"Onboarding 1 — \"Selamat datang di Family App\".","warna_latar":"kantong","ukuran":"320x240","animasi":false},{"slug":"onboarding-02-kantong","kategori":"Onboarding","judul":"Riki memasukkan koin ke Kantong, kartu budget melayang","pakai_untuk":"Onboarding 2 — Kantong: catat uang & budget berdua.","warna_latar":"kantong","ukuran":"320x240","animasi":false},{"slug":"onboarding-03-agenda","kategori":"Onboarding","judul":"Daftar to-do bersama, Febie mencentang dengan pensil besar","pakai_untuk":"Onboarding 3 — Agenda: to-do, catatan, jadwal.","warna_latar":"agenda","ukuran":"320x240","animasi":false},{"slug":"onboarding-04-komitmen","kategori":"Onboarding","judul":"Lembar kesepakatan ditandatangani berdua","pakai_untuk":"Onboarding 4 — Komitmen: pasal & tanda tangan berdua.","warna_latar":"komit","ukuran":"320x240","animasi":false},{"slug":"onboarding-05-daily-mood","kategori":"Onboarding","judul":"Febie duduk menulis jurnal, wajah mood melayang","pakai_untuk":"Onboarding 5 — Daily Mood: jurnal mood harian (pribadi).","warna_latar":"catat","ukuran":"320x240","animasi":false},{"slug":"onboarding-06-offline","kategori":"Onboarding","judul":"HP tetap mencatat, data naik ke awan saat online","pakai_untuk":"Onboarding 6 — Offline & sinkron otomatis.","warna_latar":"agenda","ukuran":"320x240","animasi":false},{"slug":"onboarding-07-siap","kategori":"Onboarding","judul":"Riki dan Febie melompat gembira, konfeti","pakai_untuk":"Onboarding terakhir / setup selesai — \"Siap mulai!\".","warna_latar":"kantong","ukuran":"320x240","animasi":false},{"slug":"auth-masuk","kategori":"Login & Akun","judul":"Riki membawa kunci besar ke Kantong yang digembok","pakai_untuk":"Halaman login / hubungkan akun.","warna_latar":"agenda","ukuran":"320x240","animasi":false},{"slug":"auth-keluar","kategori":"Login & Akun","judul":"Riki di ambang pintu melambai, Febie membalas","pakai_untuk":"Konfirmasi / sesudah keluar akun (logout) — \"Sampai jumpa\".","warna_latar":"catat","ukuran":"320x240","animasi":false},{"slug":"auth-sesi-berakhir","kategori":"Login & Akun","judul":"Riki tertidur di samping jam pasir","pakai_untuk":"Sesi habis / perlu login ulang.","warna_latar":"neutral","ukuran":"320x240","animasi":false},{"slug":"auth-ganti-password","kategori":"Login & Akun","judul":"Febie memegang kunci baru di depan perisai","pakai_untuk":"Ganti password / password berhasil diubah.","warna_latar":"kantong","ukuran":"320x240","animasi":false},{"slug":"kosong-transaksi","kategori":"Empty state","judul":"Riki mengintip ke dalam Kantong yang masih kosong","pakai_untuk":"Kantong › Riwayat kosong (\"Belum ada transaksi\").","warna_latar":"kantong","ukuran":"320x240","animasi":false},{"slug":"kosong-todo","kategori":"Empty state","judul":"Febie bersantai, semua to-do beres","pakai_untuk":"Agenda › To-do kosong / semua selesai.","warna_latar":"agenda","ukuran":"320x240","animasi":false},{"slug":"kosong-catatan","kategori":"Empty state","judul":"Riki berpikir di samping catatan kosong","pakai_untuk":"Agenda › Catatan kosong.","warna_latar":"agenda","ukuran":"320x240","animasi":false},{"slug":"kosong-jadwal","kategori":"Empty state","judul":"Riki duduk santai di atas kalender kosong","pakai_untuk":"Agenda › Jadwal kosong.","warna_latar":"agenda","ukuran":"320x240","animasi":false},{"slug":"kosong-komitmen","kategori":"Empty state","judul":"Febie siap menulis di buku kesepakatan yang masih kosong","pakai_untuk":"Komitmen › belum ada pasal / hasil pencarian pasal kosong.","warna_latar":"komit","ukuran":"320x240","animasi":false},{"slug":"kosong-mood","kategori":"Empty state","judul":"Slot mood hari ini masih kosong, Febie menunjuk","pakai_untuk":"Daily Mood › belum ada entri / kalender mood kosong.","warna_latar":"catat","ukuran":"320x240","animasi":false},{"slug":"kosong-pencarian","kategori":"Empty state","judul":"Riki mencari dengan kaca pembesar","pakai_untuk":"Pencarian tidak ditemukan (Riwayat, Komitmen, Agenda).","warna_latar":"neutral","ukuran":"320x240","animasi":false},{"slug":"status-offline","kategori":"Status sistem","judul":"Riki memegang steker yang terlepas, awan redup","pakai_untuk":"Banner/halaman offline — \"Kamu offline, data disimpan dulu di HP\".","warna_latar":"neutral","ukuran":"320x240","animasi":false},{"slug":"status-gagal","kategori":"Status sistem","judul":"Koin retak ditambal plester, Febie menenangkan","pakai_untuk":"Error umum — \"Gagal menyimpan, coba lagi\".","warna_latar":"bad","ukuran":"320x240","animasi":false},{"slug":"status-tersimpan","kategori":"Status sistem","judul":"Centang besar dan Febie bersorak","pakai_untuk":"Sukses — transaksi/catatan tersimpan.","warna_latar":"kantong","ukuran":"320x240","animasi":false},{"slug":"status-sinkron-selesai","kategori":"Status sistem","judul":"HP Riki dan HP Febie tersambung ke awan","pakai_untuk":"Sinkron selesai — \"Data kalian sudah sama di kedua HP\".","warna_latar":"agenda","ukuran":"320x240","animasi":false},{"slug":"status-404","kategori":"Status sistem","judul":"Riki bingung di depan papan penunjuk jalan","pakai_untuk":"Halaman tidak ditemukan.","warna_latar":"neutral","ukuran":"320x240","animasi":false},{"slug":"status-update","kategori":"Status sistem","judul":"Kotak hadiah terbuka berisi kilau, Febie terkejut senang","pakai_untuk":"Versi baru tersedia / \"Apa yang baru\".","warna_latar":"catat","ukuran":"320x240","animasi":false},{"slug":"status-budget-lewat","kategori":"Status sistem","judul":"Kantong menggembung, koin tumpah, Riki cemas","pakai_untuk":"Peringatan budget terlampaui.","warna_latar":"bad","ukuran":"320x240","animasi":false},{"slug":"momen-ttd-sah","kategori":"Momen khusus","judul":"Lembar Pengesahan bertanda tangan berdua, Riki dan Febie berpelukan","pakai_untuk":"Komitmen › Lembar Pengesahan sah (TTD kedua masuk).","warna_latar":"komit","ukuran":"320x240","animasi":false},{"slug":"momen-evaluasi-bulanan","kategori":"Momen khusus","judul":"Riki dan Febie duduk berhadapan, ngobrol evaluasi bulanan","pakai_untuk":"Pengingat / sesi evaluasi bulanan.","warna_latar":"komit","ukuran":"320x240","animasi":false}]</script>
+<script>
+(function () {
+  const data = JSON.parse(document.getElementById('manifest').textContent);
+  const root = document.documentElement;
+  const mq = window.matchMedia('(prefers-color-scheme: light)');
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  };
+  const FEAT = { kantong: 'var(--kantong)', agenda: 'var(--agenda)', komit: 'var(--komit)', catat: 'var(--catat)', bad: 'var(--bad)', neutral: 'var(--muted)', transparan: 'var(--muted)' };
+  const FEAT_NAME = { kantong: 'Kantong', agenda: 'Agenda', komit: 'Komitmen', catat: 'Daily Mood', bad: 'Peringatan', neutral: 'Netral', transparan: 'Transparan' };
+  const CATS = ['Semua', ...new Set(data.map((d) => d.kategori)), 'Dipilih'];
+  let cat = 'Semua';
+  let picked = new Set(store.get('il-picked', []));
+  const forced = store.get('il-theme', null);
+  if (forced) root.setAttribute('data-theme', forced);
+
+  const theme = () => root.getAttribute('data-theme') || (mq.matches ? 'light' : 'dark');
+  const src = (slug) => `svg/${theme()}/${slug}.svg`;
+  const el = (t, a = {}, h = '') => { const e = document.createElement(t); Object.entries(a).forEach(([k, v]) => e.setAttribute(k, v)); if (h) e.innerHTML = h; return e; };
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  document.getElementById('facts').innerHTML =
+    `<span class="fact"><b>${data.length}</b> ilustrasi</span><span class="fact"><b>2</b> tema (terang & gelap)</span>` +
+    `<span class="fact"><b>${data.filter((d) => d.animasi).length}</b> beranimasi</span><span class="fact"><b>SVG</b> · kanvas 320×240</span>`;
+
+  const SW = [['Riki', '#8FA2FF'], ['Febie', '#F28DB5'], ['Tinta', '#2B2F55'], ['Kantong', '#7DD3A8'], ['Agenda', '#93C5FD'], ['Komitmen', '#FCD34D'], ['Daily Mood', '#C4B5FD'], ['Peringatan', '#F87171'], ['Krem', '#EFE7D4'], ['Navy', '#2F3E75']];
+  document.getElementById('swatches').innerHTML = SW.map(([n, c]) => `<div class="sw" style="--c:${c}"><i></i><b>${n}</b><code>${c}</code></div>`).join('');
+
+  const toastEl = document.getElementById('toast');
+  let tt;
+  function toast(msg) { toastEl.textContent = msg; toastEl.hidden = false; clearTimeout(tt); tt = setTimeout(() => (toastEl.hidden = true), 1800); }
+  async function copy(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) { return false; }
+  }
+
+  function renderFilters() {
+    const nav = document.getElementById('filters'); nav.innerHTML = '';
+    CATS.forEach((c) => {
+      const n = c === 'Semua' ? data.length : c === 'Dipilih' ? picked.size : data.filter((d) => d.kategori === c).length;
+      const b = el('button', { class: 'chip', 'aria-pressed': String(c === cat) }, `${esc(c)} <span class="n">${n}</span>`);
+      b.onclick = () => { cat = c; renderFilters(); renderList(); };
+      nav.appendChild(b);
+    });
+  }
+
+  function card(d) {
+    const on = picked.has(d.slug);
+    const c = el('article', { class: 'card' + (on ? ' picked' : '') });
+    const mini = d.ukuran !== '320x240';
+    c.innerHTML =
+      `<div class="art${mini ? ' mini' : ''}">` +
+      `<img src="${src(d.slug)}" alt="${esc(d.judul)}" loading="lazy" data-slug="${d.slug}">` +
+      (d.animasi ? '<span class="badge">Animasi</span>' : '') +
+      `<button class="pick" aria-pressed="${on}" aria-label="${on ? 'Batal pilih' : 'Pilih'} ${esc(d.judul)}">` +
+      `<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${on ? 'Dipilih' : 'Pilih'}</button>` +
+      `</div><div class="meta"><h3>${esc(d.judul)}</h3><p class="use">${esc(d.pakai_untuk)}</p>` +
+      `<div class="file"><span class="dot" style="--c:${FEAT[d.warna_latar]}" title="Latar: ${FEAT_NAME[d.warna_latar]}"></span><code>${d.slug}.svg</code>` +
+      `<button class="copy">Salin nama</button></div></div>`;
+    c.querySelector('.pick').onclick = () => {
+      picked.has(d.slug) ? picked.delete(d.slug) : picked.add(d.slug);
+      store.set('il-picked', [...picked]);
+      renderFilters(); renderTray();
+      if (cat === 'Dipilih') renderList(); else c.replaceWith(card(d));
+    };
+    c.querySelector('.copy').onclick = async () => { toast((await copy(d.slug + '.svg')) ? 'Nama file disalin' : d.slug + '.svg'); };
+    return c;
+  }
+
+  function renderList() {
+    const list = document.getElementById('list'); list.innerHTML = '';
+    const items = cat === 'Semua' ? data : cat === 'Dipilih' ? data.filter((d) => picked.has(d.slug)) : data.filter((d) => d.kategori === cat);
+    if (!items.length) { list.appendChild(el('div', { class: 'empty' }, 'Belum ada ilustrasi yang dipilih. Tekan "Pilih" di kartu mana pun.')); return; }
+    const groups = cat === 'Semua' || cat === 'Dipilih' ? [...new Set(items.map((d) => d.kategori))] : [cat];
+    groups.forEach((gname) => {
+      const sec = el('section', { class: 'group' });
+      const its = items.filter((d) => d.kategori === gname);
+      sec.appendChild(el('div', { class: 'group-h' }, `<h2>${esc(gname)}</h2><span class="n">${its.length}</span>`));
+      const grid = el('div', { class: 'grid' });
+      its.forEach((d) => grid.appendChild(card(d)));
+      sec.appendChild(grid); list.appendChild(sec);
+    });
+  }
+
+  function renderTray() {
+    const n = picked.size, names = data.filter((d) => picked.has(d.slug)).map((d) => d.slug);
+    document.getElementById('t-count').textContent = n ? `${n} ilustrasi dipilih` : 'Belum ada yang dipilih';
+    document.getElementById('t-list').textContent = n ? names.join(', ') : 'Tekan "Pilih" di kartu untuk menandai.';
+    document.getElementById('t-copy').disabled = !n; document.getElementById('t-clear').disabled = !n;
+  }
+  document.getElementById('t-clear').onclick = () => { picked.clear(); store.set('il-picked', []); renderFilters(); renderList(); renderTray(); };
+  document.getElementById('t-copy').onclick = async () => {
+    const text = 'Ilustrasi terpilih:\n' + data.filter((d) => picked.has(d.slug)).map((d) => `- ${d.slug}.svg (${d.pakai_untuk})`).join('\n');
+    if (await copy(text)) toast('Daftar disalin');
+    else {
+      const ta = el('textarea', { class: 'fallback', 'aria-label': 'Daftar pilihan' }); ta.value = text;
+      const tray = document.querySelector('.tray'); tray.querySelector('textarea')?.remove(); tray.appendChild(ta); ta.select();
+    }
+  };
+
+  function applyTheme() {
+    const t = theme();
+    document.getElementById('th-light').setAttribute('aria-pressed', String(t === 'light'));
+    document.getElementById('th-dark').setAttribute('aria-pressed', String(t === 'dark'));
+    document.querySelectorAll('img[data-slug]').forEach((i) => (i.src = src(i.dataset.slug)));
+    document.getElementById('sheet').src = `svg/${t}/panduan-karakter.svg`;
+  }
+  ['light', 'dark'].forEach((t) => (document.getElementById('th-' + t).onclick = () => { root.setAttribute('data-theme', t); store.set('il-theme', t); applyTheme(); }));
+  mq.addEventListener?.('change', () => { if (!root.getAttribute('data-theme')) applyTheme(); });
+
+  renderFilters(); renderList(); renderTray(); applyTheme();
+})();
+</script>

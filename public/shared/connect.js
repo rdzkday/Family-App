@@ -6,10 +6,20 @@
 // Alamat API (Supabase Edge Function). Bisa ditimpa window.KANTONG_API untuk staging.
 var API_URL = window.KANTONG_API || 'https://serskylzlevhjidqrvjm.supabase.co/functions/v1/kantong';
 
+// Ilustrasi & sapaan layar login, sesuai alasan sampai di layar ini (sekali pakai).
+var LOGIN_SAPA = {
+  masuk: ['auth-masuk', 'Family App', 'Masuk untuk melihat keuangan dan agenda rumah tangga.'],
+  keluar: ['auth-keluar', 'Sampai jumpa', 'Kamu sudah keluar dari HP ini. Masuk lagi kapan saja.'],
+  sesi: ['auth-sesi-berakhir', 'Sesi berakhir', 'Demi keamanan, masuk lagi untuk lanjut.'],
+};
+var alasanLogin = 'masuk';
+
 function renderConnect() {
   var app = $('#app');
-  app.innerHTML = '<form class="connect" id="login" novalidate><img class="logo" src="' + ROOT + 'icons/icon-animated.svg" alt=""><h1>Family App</h1>' +
-    '<p>Masuk untuk melihat keuangan dan agenda rumah tangga.</p>' +
+  var sapa = LOGIN_SAPA[alasanLogin] || LOGIN_SAPA.masuk;
+  alasanLogin = 'masuk';
+  app.innerHTML = '<form class="connect" id="login" novalidate>' + ilus(sapa[0], 'lg') + '<h1>' + sapa[1] + '</h1>' +
+    '<p>' + sapa[2] + '</p>' +
     '<div class="field"><label for="l-user">Username</label><input id="l-user" class="input" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>' +
     '<div class="field"><label for="l-pass">Password</label><div style="display:flex;gap:8px;align-items:stretch">' +
       '<input id="l-pass" class="input" type="password" name="password" autocomplete="current-password" required style="flex:1;min-width:0">' +
@@ -94,7 +104,9 @@ function bukaUbahPassword() {
   });
 }
 
-function disconnect() {
+// alasan: 'keluar' (tombol Keluar) | 'sesi' (token kedaluwarsa) | kosong (keluar mode demo)
+function disconnect(alasan) {
+  alasanLogin = alasan || 'masuk';
   if (S.conn && S.conn.mode === 'remote') rpc('logout', {}).catch(function () {});   // cabut sesi perangkat ini
   ['k_conn', 'k_boot', 'k_months', 'k_outbox', 'k_demo', 'k_todos', 'k_komitmen', 'k_siklus', 'k_sk_tawar'].forEach(LS.del);
   demoStore = null;

@@ -120,7 +120,7 @@ function txRow(t, ctxBuku) {
     (rs && canWrite(t.buku) ? '<span class="paychk" data-pay="' + esc(t.id) + '" role="checkbox" aria-checked="' + (rs === 'paid') + '" aria-label="Sudah terbayar"></span>' : '') + '</button>';
 }
 function txGroups(list, ctxBuku) {
-  if (!list.length) return '<div class="list"><div class="empty">Belum ada transaksi.</div></div>';
+  if (!list.length) return '<div class="list">' + emptyIl('kosong-transaksi', 'Belum ada transaksi.') + '</div>';
   var by = {};
   list.forEach(function (t) { (by[t.tanggal] = by[t.tanggal] || []).push(t); });
   return Object.keys(by).sort().reverse().map(function (d) {

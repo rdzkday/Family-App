@@ -97,7 +97,7 @@ var AturUmum = {
       var a = b.getAttribute('data-au');
       if (a === 'sync') { sync(); toast('Menyinkronkan…'); }
       if (a === 'pw') bukaUbahPassword();
-      if (a === 'out' && confirm(demo ? 'Keluar dari mode demo? Data demo dihapus.' : 'Keluar dari akun? Perubahan yang belum terkirim akan hilang dari HP ini.')) disconnect();
+      if (a === 'out' && confirm(demo ? 'Keluar dari mode demo? Data demo dihapus.' : 'Keluar dari akun? Perubahan yang belum terkirim akan hilang dari HP ini.')) disconnect(demo ? '' : 'keluar');
     }); });
   }
 };

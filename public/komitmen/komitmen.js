@@ -97,9 +97,10 @@
     S.status = cache ? 'Memuat…' : 'Memuat kesepakatan…';
     render();
     fetchList().then(function (d) {
-      S.data = d; cache = { data: d, at: Date.now() }; LS.set('k_komitmen', cache); S.status = ''; render();
+      S.data = d; cache = { data: d, at: Date.now() }; LS.set('k_komitmen', cache); S.status = ''; S.offlinePertama = false; render();
     }, function (e) {
       S.status = cache ? 'Offline · data ' + agoLabel(cache.at) : (e.offline ? 'Butuh internet untuk memuat pertama kali.' : e.message);
+      S.offlinePertama = !cache && !!e.offline;
       render();
     });
   }
@@ -224,15 +225,17 @@
     }
     var html = note ? '<div class="km-note" role="status">' + note + '</div>' : '';
     if (!hits.length) {
-      if (!note) html += '<div class="km-empty" role="status"><p>Tidak ada pasal tentang “' + esc(S.q) + '”.</p><p>' + '<button type="button" class="link" id="usul-dari-cari">Jadikan usulan pasal baru</button>' + '</p></div>';
+      if (!note) html += emptyIl('kosong-pencarian', 'Tidak ada pasal tentang “' + esc(S.q) + '”.', { cls: 'km-empty', role: 'status', size: 'sm',
+        extra: '<p><button type="button" class="link" id="usul-dari-cari">Jadikan usulan pasal baru</button></p>' });
       return html;
     }
     return html + '<p class="bab-h" role="status">' + hits.length + ' pasal ditemukan</p><div class="rows">' + hits.map(function (h) { return rowHtml(h.pasal, h); }).join('') + '</div>';
   }
   function itemsHtml() {
-    if (!S.data) return '<div class="km-empty"><p>' + esc(S.status || 'Memuat…') + '</p></div>';
+    if (!S.data) return S.offlinePertama ? emptyIl('status-offline', esc(S.status), { cls: 'km-empty' })
+      : '<div class="km-empty"><p>' + esc(S.status || 'Memuat…') + '</p></div>';
     if (!S.data.pasal.length) {
-      return '<div class="km-empty"><p>Belum ada kesepakatan. Tulis yang pertama lewat <b>+ Pasal baru</b>.</p></div>';
+      return emptyIl('kosong-komitmen', 'Belum ada kesepakatan. Tulis yang pertama lewat <b>+ Pasal baru</b>.', { cls: 'km-empty' });
     }
     if (S.q.trim()) return hasilCari();
     var def = S.tab === 'definisi';
