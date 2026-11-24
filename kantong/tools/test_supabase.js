@@ -32,7 +32,7 @@ function mockDb() {
     pengesahan: [{ id: 's-1', judul: 'Perjanjian Pranikah', jenis: 'pranikah', evaluasi_id: '', ttd_riki: 'M0 0L1 1', ttd_riki_at: 'x', ttd_febie: 'M1 1L0 0',
       ttd_febie_at: 'y', isi_hash: '', status: 'sah', dibuat_at: '' }, { id: 's-2', judul: 'Usulan', jenis: 'tunggal', evaluasi_id: '', ttd_riki: 'M0 0',
       ttd_riki_at: 'x', ttd_febie: '', ttd_febie_at: '', isi_hash: '', status: 'menunggu', dibuat_at: '' }],
-    evaluasi: [], jurnal: [], siklus: [], siklus_atur: [],
+    evaluasi: [], jurnal: [], siklus: [], siklus_atur: [], jurnal_pasangan: [],
     sesi: [],
     akses: [{ user_id: 'riki', token_hash: sha('r'.repeat(40)) }, { user_id: 'istri', token_hash: sha('i'.repeat(40)) }]
   };
@@ -368,6 +368,18 @@ function mockGoogle() {
     const br = db.tabel.buku.find((b) => b.id === 'riki');
     assert.strictEqual(br.penghasilan, 10000000, 'penghasilan = angka (bigint)'); assert.strictEqual(br.rasio, '40,30,20,10');
     assert.strictEqual(ok(await call(R, 'bootstrap', {})).rencana.riki.penghasilan, 10000000);
+  });
+  await t('couple journaling lewat Edge Function: aktif setelah dua persetujuan, harian privat sampai dibagikan', async () => {
+    assert.strictEqual(ok(await call(R, 'cj.setuju', { setuju: true })).aktif, false);
+    const v = ok(await call(I, 'cj.setuju', { setuju: true }));
+    assert.strictEqual(v.aktif, true); assert.strictEqual(v.sets.length, 1);
+    assert.ok(db.tabel.jurnal_pasangan.some((x) => x.id === 'cj|set|1' && x.jenis === 'set'), 'set v1 tersimpan di Postgres');
+    const today = v.today;
+    ok(await call(R, 'cj.isi', { kunci: 'H:' + today, jawaban: { H1: { n: 3, c: 'oke' }, H2: { n: 4 }, H3: { n: 'tidak' } }, selesai: true }));
+    const row = db.tabel.jurnal_pasangan.find((x) => x.id === 'cj|isi|riki|H:' + today);
+    assert.strictEqual(row.pemilik, 'riki'); assert.strictEqual(JSON.parse(row.isi).jawaban.H1.n, 3);
+    const lihat = ok(await call(I, 'cj.state', {})).isian.find((x) => x.pemilik === 'riki');
+    assert.deepStrictEqual([lihat.terisi, lihat.jawaban], [true, undefined], 'pasangan hanya lihat status');
   });
   resetTokenCache();
   console.log(`\n${lulus} test lulus`);

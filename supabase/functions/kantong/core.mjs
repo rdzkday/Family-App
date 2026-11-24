@@ -35,14 +35,16 @@ var KantongCore = (function () {
     // Siklus (catatan haid istri). Baris dihapus = tombstone: tanggal & catatan dikosongkan.
     Siklus: ['id', 'pemilik', 'mulai', 'akhir', 'abaikan_jarak', 'catatan', 'dibuat', 'diubah', 'dihapus'],
     // pengaturan Siklus per user (id = id user). tampil = pilihan masing-masing; sisanya hanya berarti untuk pemilik.
-    SiklusAtur: ['id', 'aktif', 'bagikan_jadwal', 'bagikan_catatan', 'tampil', 'setuju_at', 'versi_teks', 'diubah']
+    SiklusAtur: ['id', 'aktif', 'bagikan_jadwal', 'bagikan_catatan', 'tampil', 'setuju_at', 'versi_teks', 'diubah'],
+    // Couple Journaling (sub menu Berdua di Daily Mood). isi = JSON; aturan baca/tulis di cjAksi.
+    JurnalPasangan: ['id', 'jenis', 'pemilik', 'kunci', 'isi', 'dibuat', 'diubah', 'dihapus']
   };
   var KAT_REIMBURSE = 'reimburse-masuk';   // kategori pemasukan otomatis, tidak dihitung sebagai pendapatan
   var KAT_SETORAN = 'setoran-rt';          // pengeluaran otomatis: topup dari kantong pribadi ke dompet bersama
   var KAT_SETORAN_MASUK = 'setoran-rt-in'; // pemasukan otomatis di sisi dompet bersama
   var TIPE_TX = ['Pengeluaran', 'Pemasukan', 'Transfer'];
   var JENIS_KANTONG = ['Cash', 'Debit', 'E-wallet', 'Kredit'];
-  var VERSION = '1.9.0';
+  var VERSION = '1.10.0';
   // ---------- to-do ----------
   var TODO_BERSAMA = 'bersama';          // pemilik to-do bersama (selain itu: id user)
   var TODO_DURASI = 30;                  // menit, dipakai kalau jam diisi tapi durasi kosong
@@ -63,7 +65,7 @@ var KantongCore = (function () {
     { id: 'kantong', nama: 'Kantong', aksi: ['month', 'tx.', 'budget.', 'kantong.', 'kategori.', 'talangan.', 'buku.'] },
     { id: 'agenda', nama: 'Agenda', aksi: ['todo.', 'kalender.', 'siklus.'] },   // Siklus = lapisan di Kalender Agenda
     { id: 'komitmen', nama: 'Komitmen', aksi: ['komitmen.', 'pengesahan.'] },
-    { id: 'mood', nama: 'Daily Mood', aksi: ['jurnal.'] }
+    { id: 'mood', nama: 'Daily Mood', aksi: ['jurnal.', 'cj.'] }   // cj. = Couple Journaling
   ];
   function fiturDariAksi(action) {
     action = String(action || '');
@@ -1333,6 +1335,621 @@ var KantongCore = (function () {
     throw err('Aksi tidak dikenal: ' + action);
   }
 
+  // ---------- Couple Journaling (tabel jurnal_pasangan, aksi cj.*) ----------
+  // Evaluasi harian / mingguan / bulanan untuk pasangan. Bukan penentu hubungan: hasilnya jadi bahan fokus bulan berikutnya.
+  // Aturan dijalankan di server (bukan hanya tampilan):
+  //  * aktif hanya kalau KEDUA pasangan setuju (cj|pref|<user>.setuju).
+  //  * isian harian privat sampai pemiliknya membagikan (cj.bagikan). Item privat (kesehatan) & catatannya tidak pernah dikirim ke pasangan.
+  //  * isian mingguan/bulanan terlihat pasangan setelah pemiliknya menekan Selesai. Mood (H7) privat kecuali bagikan_mood.
+  //  * set pertanyaan: draft -> persetujuan pasangan (kalau menyentuh item yang bukan milik pengusul) -> publish, berlaku periode berikutnya.
+  var CJ_SKALA = {
+    frekuensi: [
+      { v: 4, label: 'Selalu', arti: 'Dilakukan setiap ada kesempatan' },
+      { v: 3, label: 'Hampir selalu', arti: 'Sebagian besar kesempatan, sesekali terlewat' },
+      { v: 2, label: 'Sedang', arti: 'Kadang dilakukan, kadang tidak' },
+      { v: 1, label: 'Hampir tidak', arti: 'Jarang sekali dilakukan' },
+      { v: 0, label: 'Tidak dilakukan', arti: 'Tidak dilakukan sama sekali' }
+    ],
+    kejadian: [
+      { v: 'ya', label: 'Ya', arti: 'Dilakukan / terjadi' },
+      { v: 'tidak', label: 'Tidak', arti: 'Seharusnya dilakukan, tapi tidak' },
+      { v: 'belum', label: 'Belum muncul', arti: 'Situasinya belum terjadi, jadi tidak dinilai' }
+    ]
+  };
+  var CJ_KESIMPULAN = {
+    selaras: { label: 'Selaras', lanjut: 'Pertahankan' },
+    hampir: { label: 'Hampir selaras', lanjut: 'Cukup dicatat' },
+    perlu: { label: 'Perlu dibicarakan', lanjut: 'Masuk agenda check-in mingguan' }
+  };
+  var CJ_PERIODE = ['harian', 'mingguan', 'bulanan'];
+  var CJ_KODE = { harian: 'H', mingguan: 'M', bulanan: 'B' };
+  var CJ_DARI_KODE = { H: 'harian', M: 'mingguan', B: 'bulanan' };
+  var CJ_CATATAN_MAKS = 280;
+  var CJ_MAKS_ITEM = 60;
+  var CJ_MUNDUR = { harian: 7, mingguan: 2, bulanan: 1 };   // isian boleh menyusul: 7 hari / 2 minggu / 1 bulan ke belakang
+  var CJ_SESI_MENIT = 30;
+
+  function cjQ(id, periode, teks, o) {
+    var q = { id: id, teks: teks, periode: periode, jenis: 'bersama', skala: 'frekuensi', wajib: false, tampil: false, catatan: true,
+      privat: false, observer: false, sumber: '', topik: false, penanda: false, milik: 'bersama', bawaan: true };
+    Object.keys(o || {}).forEach(function (k) { q[k] = o[k]; });
+    if (q.wajib) q.tampil = true;
+    return q;
+  }
+  // Template bawaan (brief Couple Journaling, 24 Nov 2026). Item opsional tersembunyi sampai dimunculkan.
+  var CJ_TEMPLATE = [
+    cjQ('H1', 'harian', 'Hari ini saya merasa tenang', { wajib: true }),
+    cjQ('H2', 'harian', 'Hari ini saya merasa didengar', { wajib: true }),
+    cjQ('H3', 'harian', 'Ada hal yang ingin dibahas minggu ini?', { wajib: true, skala: 'kejadian', topik: true }),
+    cjQ('H4', 'harian', 'Mengabari sesuai kesepakatan yang dibuat saat berjauhan', { skala: 'kejadian' }),
+    cjQ('H5', 'harian', 'Janji kecil hari ini ditepati', { skala: 'kejadian' }),
+    cjQ('H6', 'harian', 'Perawatan diri berjalan (obat, tidur, olahraga; pilih sendiri)', { skala: 'kejadian', jenis: 'personal', privat: true }),
+    cjQ('H7', 'harian', 'Mood hari ini', { skala: 'otomatis', jenis: 'personal', sumber: 'mood', tampil: true, catatan: false }),
+    cjQ('M1', 'mingguan', 'Satu topik tuntas sebelum ganti topik', { wajib: true }),
+    cjQ('M2', 'mingguan', 'Pendengar merangkum ulang sebelum merespons', { wajib: true }),
+    cjQ('M3', 'mingguan', 'Tiap masalah punya tindak lanjut dan PIC', { wajib: true }),
+    cjQ('M4', 'mingguan', 'Target pengembangan diri saya', { wajib: true, jenis: 'personal', observer: true, sumber: 'target1' }),
+    cjQ('M5', 'mingguan', 'Kritik disampaikan dengan fakta → dampak → permintaan'),
+    cjQ('M6', 'mingguan', 'Tugas rumah tangga dilakukan'),
+    cjQ('M7', 'mingguan', 'Berbagi progres pembelajaran', { skala: 'kejadian' }),
+    cjQ('M8', 'mingguan', 'Waktu mandiri dihargai (tanpa telepon berulang)'),
+    // tampil = ya, tapi hanya muncul kalau orangnya punya target kedua
+    cjQ('M9', 'mingguan', 'Target pengembangan diri kedua', { jenis: 'personal', observer: true, sumber: 'target2', tampil: true }),
+    cjQ('M10', 'mingguan', 'Ada kondisi berat minggu ini (misal perubahan obat)', { skala: 'kejadian', jenis: 'personal', privat: true, penanda: true }),
+    cjQ('B1', 'bulanan', 'Keputusan rumah tangga diambil berimbang', { wajib: true }),
+    cjQ('B2', 'bulanan', 'Langkah menuju harapan jangka panjang berjalan', { wajib: true }),
+    cjQ('B3', 'bulanan', 'Daftar peran & keputusan rumah tangga ditinjau', { skala: 'kejadian' }),
+    cjQ('B4', 'bulanan', 'Pengeluaran sesuai anggaran'),
+    cjQ('B5', 'bulanan', 'Rekap target personal', { skala: 'otomatis', jenis: 'personal', sumber: 'rekap', tampil: true, catatan: false })
+  ];
+  // contoh pertanyaan tambahan (Atur pertanyaan > Tambah dari template)
+  var CJ_TEMPLATE_TAMBAHAN = [
+    { periode: 'harian', teks: 'Saya mengucapkan terima kasih ke pasangan', skala: 'kejadian', jenis: 'bersama' },
+    { periode: 'harian', teks: 'Ada waktu berdua tanpa gawai', skala: 'kejadian', jenis: 'bersama' },
+    { periode: 'harian', teks: 'Ibadah harian berjalan', skala: 'kejadian', jenis: 'personal' },
+    { periode: 'mingguan', teks: 'Ada waktu berkualitas berdua (kencan, jalan, ngobrol panjang)', skala: 'kejadian', jenis: 'bersama' },
+    { periode: 'mingguan', teks: 'Pengasuhan anak terasa terbagi adil', skala: 'frekuensi', jenis: 'bersama' },
+    { periode: 'mingguan', teks: 'Saling menginspirasi lewat bidang keahlian masing-masing', skala: 'frekuensi', jenis: 'bersama' },
+    { periode: 'mingguan', teks: 'Ibadah atau aktivitas spiritual bersama', skala: 'frekuensi', jenis: 'bersama' },
+    { periode: 'bulanan', teks: 'Silaturahmi dengan keluarga besar terjaga', skala: 'frekuensi', jenis: 'bersama' },
+    { periode: 'bulanan', teks: 'Rencana keuangan ditinjau bersama', skala: 'kejadian', jenis: 'bersama' },
+    { periode: 'bulanan', teks: 'Ada waktu istirahat/liburan yang cukup', skala: 'frekuensi', jenis: 'bersama' }
+  ];
+  function cjTemplate() { return CJ_TEMPLATE.map(function (q) { return clone(q); }); }
+  function cjBawaan(id) { for (var i = 0; i < CJ_TEMPLATE.length; i++) if (CJ_TEMPLATE[i].id === id) return CJ_TEMPLATE[i]; return null; }
+  // item bawaan yang perilakunya khusus (target, mood, rekap, topik, penanda): skala/periode/jenis tidak bisa diubah
+  function cjKhusus(q) { return !!(q.sumber || q.topik || q.penanda || q.observer); }
+
+  // ---- periode ----
+  function cjMinggu(iso) {   // ISO 8601: minggu mulai Senin, minggu ke-1 memuat Kamis pertama
+    var p = iso.split('-'), d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    var h = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - h);
+    var y = d.getUTCFullYear(), w = Math.ceil(((d - Date.UTC(y, 0, 1)) / 86400000 + 1) / 7);
+    return y + '-W' + (w < 10 ? '0' : '') + w;
+  }
+  function cjSenin(w) {
+    var y = +w.slice(0, 4), n = +w.slice(6), j4 = new Date(Date.UTC(y, 0, 4)), h = j4.getUTCDay() || 7;
+    return addDays(j4.toISOString().slice(0, 10), 1 - h + (n - 1) * 7);
+  }
+  function cjHariDalam(w) { var s = cjSenin(w), out = []; for (var i = 0; i < 7; i++) out.push(addDays(s, i)); return out; }
+  function cjMingguGeser(w, n) { return cjMinggu(addDays(cjSenin(w), 7 * n)); }
+  function cjBulanGeser(m, n) {
+    var y = +m.slice(0, 4), b = +m.slice(5, 7) - 1 + n;
+    y += Math.floor(b / 12); b = ((b % 12) + 12) % 12;
+    return y + '-' + (b < 9 ? '0' : '') + (b + 1);
+  }
+  function cjBulanDariMinggu(w) { return addDays(cjSenin(w), 3).slice(0, 7); }   // bulan hari Kamis
+  function cjMingguDalamBulan(m) {
+    var out = [], w = cjMinggu(m + '-01');
+    if (cjBulanDariMinggu(w) < m) w = cjMingguGeser(w, 1);
+    while (cjBulanDariMinggu(w) === m) { out.push(w); w = cjMingguGeser(w, 1); }
+    return out;
+  }
+  function isMinggu(s) { return typeof s === 'string' && /^\d{4}-W(0[1-9]|[1-4]\d|5[0-3])$/.test(s); }
+  // 'H:2026-11-24' -> { periode:'harian', nilai:'2026-11-24' }
+  function cjUraiKunci(k) {
+    k = String(k || ''); var kode = k.slice(0, 1), nilai = k.slice(2), periode = CJ_DARI_KODE[kode];
+    if (k.charAt(1) !== ':' || !periode) return null;
+    if (periode === 'harian' && !isDate(nilai)) return null;
+    if (periode === 'mingguan' && !isMinggu(nilai)) return null;
+    if (periode === 'bulanan' && !isMonth(nilai)) return null;
+    return { periode: periode, nilai: nilai };
+  }
+  function cjSekarang(periode, today) { return periode === 'harian' ? today : periode === 'mingguan' ? cjMinggu(today) : today.slice(0, 7); }
+  function cjBerikut(periode, today) {
+    return periode === 'harian' ? addDays(today, 1) : periode === 'mingguan' ? cjMingguGeser(cjMinggu(today), 1) : cjBulanGeser(today.slice(0, 7), 1);
+  }
+  function cjMundur(periode, today) {
+    var n = CJ_MUNDUR[periode];
+    return periode === 'harian' ? addDays(today, -n) : periode === 'mingguan' ? cjMingguGeser(cjMinggu(today), -n) : cjBulanGeser(today.slice(0, 7), -n);
+  }
+
+  // ---- set pertanyaan ----
+  // sets: daftar versi terbit { versi, pertanyaan, berlaku: {harian, mingguan, bulanan} }. Set yang berlaku untuk periode itu.
+  function cjSetUntuk(sets, periode, nilai) {
+    var s = (sets || []).slice().sort(function (a, b) { return a.versi - b.versi; }), hit = s[0] || null;
+    s.forEach(function (x) { if (x.berlaku && x.berlaku[periode] <= nilai) hit = x; });
+    return hit;
+  }
+  function cjPunyaTarget(targets, uid, sumber) {
+    var t = targets && targets[uid];
+    if (sumber === 'target1') return !!(t && t.t1 && t.t1.teks);
+    if (sumber === 'target2') return !!(t && t.t2 && t.t2.teks);
+    return true;
+  }
+  // pertanyaan yang dijawab uid untuk dirinya sendiri
+  function cjItem(set, periode, uid, targets) {
+    return ((set && set.pertanyaan) || []).filter(function (q) {
+      return q.tampil && q.periode === periode && (q.milik === 'bersama' || q.milik === uid) && cjPunyaTarget(targets, uid, q.sumber);
+    });
+  }
+  // pertanyaan personal milik pasangan yang dinilai uid sebagai observer
+  function cjItemObserver(set, periode, pasanganId, targets) {
+    if (!pasanganId) return [];
+    return ((set && set.pertanyaan) || []).filter(function (q) {
+      return q.tampil && q.observer && q.periode === periode && (q.milik === 'bersama' || q.milik === pasanganId) && cjPunyaTarget(targets, pasanganId, q.sumber);
+    });
+  }
+  function cjTeksItem(q, targets, uid) {   // teks M4/M9 = target orangnya
+    var t = targets && targets[uid];
+    if (q.sumber === 'target1' && t && t.t1 && t.t1.teks) return t.t1.teks;
+    if (q.sumber === 'target2' && t && t.t2 && t.t2.teks) return t.t2.teks;
+    return q.teks;
+  }
+  function cjNilaiValid(q, v) {
+    if (q.skala === 'frekuensi') return typeof v === 'number' && v >= 0 && v <= 4 && Math.floor(v) === v;
+    if (q.skala === 'kejadian') return q.topik ? (v === 'ya' || v === 'tidak') : (v === 'ya' || v === 'tidak' || v === 'belum');
+    return false;
+  }
+  function cjLabelNilai(q, v) {
+    var sk = CJ_SKALA[q.skala] || [];
+    for (var i = 0; i < sk.length; i++) if (sk[i].v === v) return sk[i].label;
+    return '';
+  }
+  // selisih kategori diri vs pasangan -> selaras | hampir | perlu
+  function cjKesimpulan(diri, pasangan) {
+    if (typeof diri !== 'number' || typeof pasangan !== 'number') return '';
+    var d = Math.abs(diri - pasangan);
+    return d === 0 ? 'selaras' : d === 1 ? 'hampir' : 'perlu';
+  }
+  // bandingkan item personal (observer) dua isian mingguan/bulanan: isi[uid] = isian uid (bentuk view)
+  function cjBanding(set, periode, isi, ids, targets) {
+    var out = [];
+    ids.forEach(function (uid) {
+      var lain = ids[0] === uid ? ids[1] : ids[0];
+      cjItemObserver(set, periode, uid, targets).forEach(function (q) {
+        var a = isi[uid] && isi[uid].jawaban && isi[uid].jawaban[q.id], b = isi[lain] && isi[lain].observer && isi[lain].observer[q.id];
+        if (!a || !b) return;
+        out.push({ qid: q.id, pemilik: uid, teks: cjTeksItem(q, targets, uid), diri: a.n, pasangan: b.n, hasil: cjKesimpulan(a.n, b.n) });
+      });
+    });
+    return out;
+  }
+  function cjSamaItem(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  // perubahan draft menyentuh item yang bukan milik pengusul? -> perlu persetujuan pasangan
+  function cjPerluSetuju(baru, lama, oleh) {
+    var ma = {}, mb = {}, ids = {};
+    (lama || []).forEach(function (q) { ma[q.id] = q; ids[q.id] = 1; });
+    (baru || []).forEach(function (q) { mb[q.id] = q; ids[q.id] = 1; });
+    var urutLama = (lama || []).filter(function (q) { return q.milik !== oleh; }).map(function (q) { return q.id; }).join(',');
+    var urutBaru = (baru || []).filter(function (q) { return q.milik !== oleh; }).map(function (q) { return q.id; }).join(',');
+    if (urutLama !== urutBaru) return true;
+    return Object.keys(ids).some(function (id) {
+      var a = ma[id], b = mb[id];
+      if (a && b && cjSamaItem(a, b)) return false;
+      return (a && a.milik !== oleh) || (b && b.milik !== oleh);
+    });
+  }
+  // bersihkan satu pertanyaan dari app. lama = versi sebelumnya (id sama) kalau ada.
+  function cjBersihItem(q, lama, oleh, ids) {
+    if (!q || typeof q !== 'object') throw err('Pertanyaan tidak valid');
+    var id = String(q.id || ''), b = cjBawaan(id), teks = String(q.teks || '').replace(/\s+/g, ' ').trim();
+    if (!b && !/^q-[a-z0-9]{3,16}$/.test(id)) throw err('ID pertanyaan tidak valid');
+    if (!teks) throw err('Teks pertanyaan tidak boleh kosong');
+    if (teks.length > 160) throw err('Teks pertanyaan maksimal 160 karakter');
+    var o;
+    if (b) {
+      o = clone(b);
+      if (!cjKhusus(b)) {
+        if (CJ_PERIODE.indexOf(q.periode) >= 0) o.periode = q.periode;
+        if (q.skala === 'frekuensi' || q.skala === 'kejadian') o.skala = q.skala;
+        if (q.jenis === 'bersama' || q.jenis === 'personal') o.jenis = q.jenis;
+      }
+      o.privat = b.privat || (o.jenis === 'personal' && bool(q.privat));
+    } else {
+      if (CJ_PERIODE.indexOf(q.periode) < 0) throw err('Frekuensi pertanyaan tidak valid');
+      if (q.skala !== 'frekuensi' && q.skala !== 'kejadian') throw err('Skala pertanyaan tidak valid');
+      if (q.jenis !== 'bersama' && q.jenis !== 'personal') throw err('Jenis pertanyaan tidak valid');
+      var milik = lama ? lama.milik : (q.milik === oleh ? oleh : 'bersama');
+      if (milik !== 'bersama' && ids.indexOf(milik) < 0) milik = 'bersama';
+      o = cjQ(id, q.periode, teks, { skala: q.skala, jenis: q.jenis, milik: milik, bawaan: false });
+      o.privat = o.jenis === 'personal' && bool(q.privat);
+      o.observer = o.jenis === 'personal' && o.skala === 'frekuensi' && !o.privat && bool(q.observer);
+    }
+    o.teks = teks;
+    o.tampil = bool(q.tampil);
+    o.catatan = o.skala === 'otomatis' ? false : (o.topik ? true : bool(q.catatan));
+    return o;
+  }
+  function cjBersihSet(list, lama, oleh, ids) {
+    if (!Array.isArray(list)) throw err('Daftar pertanyaan tidak valid');
+    if (list.length > CJ_MAKS_ITEM) throw err('Maksimal ' + CJ_MAKS_ITEM + ' pertanyaan');
+    var ml = {}; (lama || []).forEach(function (q) { ml[q.id] = q; });
+    var lihat = {}, out = list.map(function (q) {
+      var x = cjBersihItem(q, ml[q && q.id], oleh, ids);
+      if (lihat[x.id]) throw err('Ada pertanyaan ganda');
+      lihat[x.id] = 1;
+      return x;
+    });
+    // item bawaan tidak bisa dihapus, hanya disembunyikan
+    CJ_TEMPLATE.forEach(function (b) { if (!lihat[b.id]) { var x = clone(ml[b.id] || b); x.tampil = false; out.push(x); } });
+    return out;
+  }
+
+  // ---- baris ----
+  function cjBaca(row) { if (!row || row.dihapus) return null; try { return JSON.parse(row.isi || '{}'); } catch (e) { return {}; } }
+  function cjPut(store, db, id, jenis, pemilik, kunci, isi, nowIso) {
+    var ex = byId(db.JurnalPasangan || [])[id];
+    var row = { id: id, jenis: jenis, pemilik: pemilik, kunci: kunci, isi: JSON.stringify(isi), dibuat: ex && !ex.dihapus && ex.dibuat ? ex.dibuat : nowIso, diubah: nowIso, dihapus: '' };
+    store.upsert('JurnalPasangan', row);
+    db.JurnalPasangan = (db.JurnalPasangan || []).filter(function (r) { return r.id !== id; }).concat([row]);
+    return row;
+  }
+  function cjHapus(store, db, id, nowIso) {
+    var ex = byId(db.JurnalPasangan || [])[id];
+    if (!ex || ex.dihapus) return;
+    var row = { id: id, jenis: ex.jenis, pemilik: ex.pemilik, kunci: ex.kunci, isi: '', dibuat: ex.dibuat, diubah: nowIso, dihapus: nowIso };
+    store.upsert('JurnalPasangan', row);
+    db.JurnalPasangan = (db.JurnalPasangan || []).filter(function (r) { return r.id !== id; }).concat([row]);
+  }
+  function cjAmbil(db, id) { return cjBaca(byId(db.JurnalPasangan || [])[id]); }
+  function cjSemua(db, jenis) {
+    return (db.JurnalPasangan || []).filter(function (r) { return r.jenis === jenis && !r.dihapus; })
+      .map(function (r) { var o = cjBaca(r) || {}; o._id = r.id; o._pemilik = r.pemilik; o._kunci = r.kunci; o._diubah = r.diubah; return o; });
+  }
+  function cjPasanganDari(db, uid) { return (db.Users || []).filter(function (u) { return u.id !== uid; })[0] || null; }
+  function cjSets(db) {
+    return cjSemua(db, 'set').map(function (s) { return { versi: num(s.versi), pertanyaan: s.pertanyaan || [], berlaku: s.berlaku || {}, oleh: s.oleh || '', disetujui: s.disetujui || '', terbit_at: s.terbit_at || '' }; })
+      .sort(function (a, b) { return a.versi - b.versi; });
+  }
+  function cjTargets(db) {
+    var t = {}; cjSemua(db, 'target').forEach(function (x) { t[x._pemilik] = { t1: x.t1 || null, t2: x.t2 || null, riwayat: x.riwayat || [] }; });
+    return t;
+  }
+  function cjPref(db, uid) { var p = cjAmbil(db, 'cj|pref|' + uid) || {}; return { setuju: p.setuju || '', bagikan_mood: !!p.bagikan_mood }; }
+  function cjAktif(db, uid) {
+    var ps = cjPasanganDari(db, uid);
+    return !!(ps && cjPref(db, uid).setuju && cjPref(db, ps.id).setuju);
+  }
+  // isian dalam bentuk yang boleh dilihat viewer
+  function cjSaringIsian(row, viewer, sets, prefPemilik) {
+    var o = cjBaca(row); if (!o) return null;
+    var k = cjUraiKunci(row.kunci); if (!k) return null;
+    var set = cjSetUntuk(sets, k.periode, k.nilai), pq = {};
+    ((set && set.pertanyaan) || []).forEach(function (q) { pq[q.id] = q; });
+    var berat = Object.keys(o.jawaban || {}).some(function (id) { return pq[id] && pq[id].penanda && o.jawaban[id] && o.jawaban[id].n === 'ya'; });
+    var v = { id: row.id, pemilik: row.pemilik, kunci: row.kunci, periode: k.periode, nilai: k.nilai, selesai_at: o.selesai_at || '', terisi: !!o.selesai_at,
+      dibagikan: !!o.dibagikan, berat: berat, diubah: row.diubah };
+    if (row.pemilik === viewer) { v.jawaban = o.jawaban || {}; v.observer = o.observer || {}; v.mood = o.mood || 0; return v; }
+    var boleh = k.periode === 'harian' ? !!(o.dibagikan && o.selesai_at) : !!o.selesai_at;
+    if (!boleh) return v;   // hanya status: sudah/belum mengisi
+    v.jawaban = {};
+    Object.keys(o.jawaban || {}).forEach(function (id) { if (pq[id] && !pq[id].privat) v.jawaban[id] = o.jawaban[id]; });
+    v.observer = o.observer || {};
+    v.mood = prefPemilik.bagikan_mood ? (o.mood || 0) : 0;
+    return v;
+  }
+  function cjView(db, user, nowIso) {
+    var today = nowIso.slice(0, 10), ps = cjPasanganDari(db, user.id), aku = cjPref(db, user.id), dia = ps ? cjPref(db, ps.id) : { setuju: '', bagikan_mood: false };
+    var v = {
+      today: today, minggu: cjMinggu(today), bulan: today.slice(0, 7),
+      aktif: cjAktif(db, user.id),
+      saya: { id: user.id, nama: user.nama, setuju: aku.setuju, bagikan_mood: aku.bagikan_mood },
+      pasangan: ps ? { id: ps.id, nama: ps.nama, setuju: dia.setuju, bagikan_mood: dia.bagikan_mood, ada: true } : { id: '', nama: 'Pasangan', setuju: '', ada: false }
+    };
+    if (!v.aktif) return v;
+    var atur = cjAmbil(db, 'cj|atur') || {}, sets = cjSets(db), draft = cjAmbil(db, 'cj|draft');
+    v.fondasi = atur.fondasi || { tujuan: '', visi: '', misi: [] };
+    v.hari = atur.hari == null ? 0 : num(atur.hari);
+    v.konselor = atur.konselor || { nama: '', kontak: '' };
+    v.atur_oleh = atur.oleh || ''; v.atur_diubah = atur.diubah || '';
+    v.sets = sets;
+    if (draft) {
+      var akhir = sets[sets.length - 1];
+      v.draft = { pertanyaan: draft.pertanyaan || [], oleh: draft.oleh || '', diubah: draft.diubah || '', dari_versi: num(draft.dari_versi),
+        setuju_oleh: draft.setuju_oleh || '', perlu_setuju: cjPerluSetuju(draft.pertanyaan, akhir ? akhir.pertanyaan : [], draft.oleh) };
+    } else v.draft = null;
+    v.target = cjTargets(db);
+    var prefPs = dia;
+    v.isian = (db.JurnalPasangan || []).filter(function (r) { return r.jenis === 'isian' && !r.dihapus && (r.pemilik === user.id || (ps && r.pemilik === ps.id)); })
+      .map(function (r) { return cjSaringIsian(r, user.id, sets, r.pemilik === user.id ? aku : prefPs); }).filter(Boolean);
+    v.topik = cjSemua(db, 'topik').map(function (t) { t.id = t._id; delete t._id; delete t._pemilik; delete t._kunci; return t; });
+    v.sesi = cjSemua(db, 'sesi').map(function (s) { s.minggu = s._kunci; delete s._id; delete s._pemilik; delete s._kunci; return s; });
+    v.bulanan = cjSemua(db, 'bulan').map(function (b) { b.bulan = b._kunci; delete b._id; delete b._pemilik; delete b._kunci; return b; });
+    return v;
+  }
+  function cjTeks(s, maks, nama) {
+    var t = String(s == null ? '' : s).trim();
+    if (t.length > maks) throw err((nama || 'Catatan') + ' maksimal ' + maks + ' karakter');
+    return t;
+  }
+  function cjAksi(store, db, user, action, payload, nowIso) {
+    var today = nowIso.slice(0, 10), ps = cjPasanganDari(db, user.id), ids = [user.id].concat(ps ? [ps.id] : []);
+    function selesai() { return cjView(db, user, nowIso); }
+    function wajibAktif() { if (!cjAktif(db, user.id)) throw err('Couple Journaling belum aktif. Kedua pasangan perlu menyetujui dulu.'); }
+
+    if (action === 'cj.state') return selesai();
+
+    if (action === 'cj.setuju') {
+      if (!ps) throw err('Belum ada akun pasangan. Minta admin membuatkan akun dulu.');
+      var pref = cjPref(db, user.id);
+      pref.setuju = bool(payload.setuju) ? (pref.setuju || nowIso) : '';
+      cjPut(store, db, 'cj|pref|' + user.id, 'pref', user.id, '', pref, nowIso);
+      // pertama kali aktif: terbitkan template bawaan, berlaku mulai hari ini
+      if (cjAktif(db, user.id) && !cjSets(db).length) {
+        cjPut(store, db, 'cj|set|1', 'set', '', '1', { versi: 1, pertanyaan: cjTemplate(), oleh: user.id, disetujui: 'template',
+          terbit_at: nowIso, berlaku: { harian: today, mingguan: cjMinggu(today), bulanan: today.slice(0, 7) } }, nowIso);
+      }
+      return selesai();
+    }
+    if (action === 'cj.pref') {
+      var pf = cjPref(db, user.id);
+      if ('bagikan_mood' in payload) pf.bagikan_mood = bool(payload.bagikan_mood);
+      cjPut(store, db, 'cj|pref|' + user.id, 'pref', user.id, '', pf, nowIso);
+      return selesai();
+    }
+
+    wajibAktif();
+    var sets = cjSets(db), targets = cjTargets(db);
+
+    if (action === 'cj.fondasi') {
+      var atur = cjAmbil(db, 'cj|atur') || {};
+      if (payload.fondasi) {
+        var f = payload.fondasi, misi = Array.isArray(f.misi) ? f.misi : [];
+        if (misi.length > 6) throw err('Misi maksimal 6 butir');
+        atur.fondasi = { tujuan: cjTeks(f.tujuan, 200, 'Tujuan'), visi: cjTeks(f.visi, 200, 'Visi'),
+          misi: misi.map(function (m) { return cjTeks(m, 200, 'Misi'); }).filter(Boolean) };
+      }
+      if ('hari' in payload) {
+        var hr = num(payload.hari);
+        if (hr < 0 || hr > 6 || Math.floor(hr) !== hr) throw err('Hari check-in tidak valid');
+        atur.hari = hr;
+      }
+      if (payload.konselor) atur.konselor = { nama: cjTeks(payload.konselor.nama, 80, 'Nama konselor'), kontak: cjTeks(payload.konselor.kontak, 80, 'Kontak konselor') };
+      atur.oleh = user.id; atur.diubah = nowIso;
+      cjPut(store, db, 'cj|atur', 'atur', '', '', atur, nowIso);
+      return selesai();
+    }
+
+    if (action === 'cj.target') {
+      var lamaT = cjAmbil(db, 'cj|target|' + user.id) || {}, baruT = { t1: lamaT.t1 || null, t2: lamaT.t2 || null, riwayat: lamaT.riwayat || [] };
+      ['t1', 't2'].forEach(function (k) {
+        if (!(k in payload)) return;
+        var teks = cjTeks(payload[k], 120, 'Target');
+        var cur = baruT[k];
+        if (cur && cur.teks === teks) return;
+        if (cur && cur.teks) baruT.riwayat = baruT.riwayat.concat([{ slot: k, teks: cur.teks, sejak: cur.sejak, sampai: today }]).slice(-20);
+        baruT[k] = teks ? { teks: teks, sejak: today } : null;
+      });
+      if (!baruT.t1 && baruT.t2) { baruT.t1 = baruT.t2; baruT.t2 = null; }
+      cjPut(store, db, 'cj|target|' + user.id, 'target', user.id, '', baruT, nowIso);
+      return selesai();
+    }
+
+    if (action === 'cj.isi') {
+      var k = cjUraiKunci(payload.kunci);
+      if (!k) throw err('Periode isian tidak valid');
+      if (k.nilai > cjSekarang(k.periode, today)) throw err('Belum bisa mengisi periode yang akan datang');
+      if (k.nilai < cjMundur(k.periode, today)) throw err('Periode ini sudah lewat terlalu lama untuk diisi');
+      var set = cjSetUntuk(sets, k.periode, k.nilai);
+      var items = cjItem(set, k.periode, user.id, targets), obsItems = cjItemObserver(set, k.periode, ps && ps.id, targets);
+      var idIsi = 'cj|isi|' + user.id + '|' + CJ_KODE[k.periode] + ':' + k.nilai;
+      var lamaI = cjAmbil(db, idIsi) || {};
+      function bersihJawaban(src, daftar) {
+        var out = {}; src = src && typeof src === 'object' ? src : {};
+        daftar.forEach(function (q) {
+          if (q.skala === 'otomatis') return;
+          var a = src[q.id]; if (!a || typeof a !== 'object') return;
+          var n = q.skala === 'frekuensi' && typeof a.n === 'string' && a.n !== '' ? Number(a.n) : a.n;
+          if (!cjNilaiValid(q, n)) return;
+          var c = q.catatan ? cjTeks(a.c, CJ_CATATAN_MAKS, 'Catatan') : '';
+          out[q.id] = c ? { n: n, c: c } : { n: n };
+        });
+        return out;
+      }
+      var jaw = bersihJawaban(payload.jawaban, items), obs = bersihJawaban(payload.observer, obsItems);
+      var mood = 0;
+      if (k.periode === 'harian' && items.some(function (q) { return q.sumber === 'mood'; })) {
+        mood = num(payload.mood); if (mood < 1 || mood > 5 || Math.floor(mood) !== mood) mood = 0;
+      }
+      var tutup = bool(payload.selesai) || !!lamaI.selesai_at;
+      if (tutup) {
+        var kurang = items.filter(function (q) { return q.wajib && q.skala !== 'otomatis' && !jaw[q.id]; });
+        if (kurang.length) throw err('Lengkapi dulu: ' + cjTeksItem(kurang[0], targets, user.id));
+        if (obsItems.some(function (q) { return q.wajib && !obs[q.id]; })) throw err('Lengkapi dulu penilaianmu untuk target pasangan');
+        var topikQ = items.filter(function (q) { return q.topik; })[0];
+        if (topikQ && jaw[topikQ.id] && jaw[topikQ.id].n === 'ya' && !jaw[topikQ.id].c) throw err('Tulis singkat hal yang ingin dibahas');
+      }
+      cjPut(store, db, idIsi, 'isian', user.id, CJ_KODE[k.periode] + ':' + k.nilai,
+        { jawaban: jaw, observer: obs, mood: mood, selesai_at: tutup ? (lamaI.selesai_at || nowIso) : '', dibagikan: !!lamaI.dibagikan }, nowIso);
+      // H3: "ada yang ingin dibahas" -> antrian topik check-in minggu itu
+      if (k.periode === 'harian') {
+        items.filter(function (q) { return q.topik; }).forEach(function (q) {
+          var idT = 'cj|topik|h|' + user.id + '|' + k.nilai, lamaTp = cjAmbil(db, idT), a = jaw[q.id];
+          if (a && a.n === 'ya' && a.c && tutup) {
+            if (lamaTp && lamaTp.status !== 'antri') return;
+            cjPut(store, db, idT, 'topik', user.id, cjMinggu(k.nilai), { judul: a.c, dari: user.id, sumber: 'harian', tanggal: k.nilai,
+              minggu: cjMinggu(k.nilai), status: 'antri', dibuat: lamaTp ? lamaTp.dibuat : nowIso }, nowIso);
+          } else if (lamaTp && lamaTp.status === 'antri') cjHapus(store, db, idT, nowIso);
+        });
+      }
+      // mingguan: dua-duanya selesai -> beda persepsi >= 2 tingkat otomatis masuk agenda minggu berikutnya
+      if (k.periode === 'mingguan' && tutup && ps) {
+        var isiPs = cjAmbil(db, 'cj|isi|' + ps.id + '|M:' + k.nilai);
+        if (isiPs && isiPs.selesai_at) {
+          var isiMap = {}; isiMap[user.id] = cjAmbil(db, idIsi); isiMap[ps.id] = isiPs;
+          cjBanding(set, 'mingguan', isiMap, [user.id, ps.id], targets).forEach(function (b) {
+            var idA = 'cj|topik|a|' + k.nilai + '|' + b.qid + '|' + b.pemilik, ada = cjAmbil(db, idA), mgBerikut = cjMingguGeser(k.nilai, 1);
+            var nama = b.pemilik === user.id ? user.nama : ps.nama;
+            if (b.hasil === 'perlu') {
+              if (ada) return;
+              cjPut(store, db, idA, 'topik', '', mgBerikut, { judul: 'Target ' + nama + ': "' + b.teks + '"', dari: '', sumber: 'selisih', qid: b.qid, target_milik: b.pemilik,
+                minggu: mgBerikut, dari_minggu: k.nilai, status: 'antri', dibuat: nowIso }, nowIso);
+            } else if (ada && ada.status === 'antri') cjHapus(store, db, idA, nowIso);
+          });
+        }
+      }
+      return selesai();
+    }
+
+    if (action === 'cj.bagikan') {
+      var w = String(payload.minggu || '');
+      if (!isMinggu(w)) throw err('Minggu tidak valid');
+      var hari = cjHariDalam(w), on = payload.bagikan !== false;
+      hari.forEach(function (d) {
+        var idH = 'cj|isi|' + user.id + '|H:' + d, isiH = cjAmbil(db, idH);
+        if (!isiH || !!isiH.dibagikan === on) return;
+        isiH.dibagikan = on;
+        cjPut(store, db, idH, 'isian', user.id, 'H:' + d, isiH, nowIso);
+      });
+      return selesai();
+    }
+
+    if (action === 'cj.topik') {   // topik manual
+      var tid = String(payload.id || '');
+      if (!/^[a-z0-9-]{4,40}$/.test(tid)) throw err('ID topik tidak valid');
+      var judul = cjTeks(payload.judul, 160, 'Topik');
+      if (!judul) throw err('Tulis topiknya dulu');
+      var idM = 'cj|topik|m|' + tid, exM = cjAmbil(db, idM), mg = isMinggu(payload.minggu) ? payload.minggu : cjMinggu(today);
+      if (exM && exM.dari !== user.id) throw err('Topik ini dibuat pasangan');
+      cjPut(store, db, idM, 'topik', user.id, mg, { judul: judul, dari: user.id, sumber: 'manual', minggu: mg, status: exM ? exM.status : 'antri',
+        dibuat: exM ? exM.dibuat : nowIso }, nowIso);
+      return selesai();
+    }
+
+    if (action === 'cj.topik.update') {
+      var idU = String(payload.id || ''), row = byId(db.JurnalPasangan || [])[idU], tp = cjBaca(row);
+      if (!tp || row.jenis !== 'topik') throw err('Topik tidak ditemukan');
+      ['fakta', 'dampak', 'permintaan', 'rangkum', 'tindakan'].forEach(function (f) { if (f in payload) tp[f] = cjTeks(payload[f], CJ_CATATAN_MAKS, 'Isian'); });
+      if ('pic' in payload) {
+        var pic = String(payload.pic || '');
+        if (pic && pic !== 'berdua' && ids.indexOf(pic) < 0) throw err('PIC tidak valid');
+        tp.pic = pic;
+      }
+      if ('tenggat' in payload) {
+        var tg = String(payload.tenggat || '');
+        if (tg && !isDate(tg)) throw err('Tenggat tidak valid');
+        tp.tenggat = tg;
+      }
+      if ('status' in payload) {
+        var st = String(payload.status);
+        if (['antri', 'dibahas', 'ditunda'].indexOf(st) < 0) throw err('Status topik tidak valid');
+        if (st === 'dibahas' && (!tp.tindakan || !tp.pic)) throw err('Isi tindak lanjut dan PIC dulu');
+        tp.status = st;
+        if (st === 'dibahas') { tp.dibahas_at = nowIso; tp.dibahas_minggu = cjMinggu(today); }
+      }
+      if (payload.hapus) {
+        if (tp.dari !== user.id || tp.status === 'dibahas') throw err('Hanya pembuat yang bisa menghapus topik yang belum dibahas');
+        cjHapus(store, db, idU, nowIso);
+        return selesai();
+      }
+      tp.diubah_oleh = user.id;
+      cjPut(store, db, idU, 'topik', row.pemilik, row.kunci, tp, nowIso);
+      return selesai();
+    }
+
+    if (action === 'cj.sesi') {
+      var ws = String(payload.minggu || '');
+      if (!isMinggu(ws) || ws > cjMinggu(today) || ws < cjMingguGeser(cjMinggu(today), -CJ_MUNDUR.mingguan)) throw err('Minggu check-in tidak valid');
+      var idS = 'cj|sesi|' + ws, ss = cjAmbil(db, idS), aks = String(payload.aksi || '');
+      if (aks === 'mulai') {
+        if (ss && ss.selesai_at) return selesai();
+        cjPut(store, db, idS, 'sesi', '', ws, ss || { mulai_at: nowIso, mulai_oleh: user.id, menit: CJ_SESI_MENIT }, nowIso);
+      } else if (aks === 'selesai') {
+        if (!ss) throw err('Check-in belum dimulai');
+        if (!ss.selesai_at) {
+          ss.selesai_at = nowIso; ss.selesai_oleh = user.id;
+          ss.durasi = Math.max(1, Math.round((Date.parse(nowIso) - Date.parse(ss.mulai_at)) / 60000)) || 1;
+          ss.topik_dibahas = cjSemua(db, 'topik').filter(function (t) { return t.status === 'dibahas' && t.dibahas_minggu === cjMinggu(today); }).length;
+          cjPut(store, db, idS, 'sesi', '', ws, ss, nowIso);
+        }
+      } else if (aks === 'batal') {
+        if (ss && !ss.selesai_at) cjHapus(store, db, idS, nowIso);
+      } else throw err('Aksi check-in tidak dikenal');
+      return selesai();
+    }
+
+    if (action === 'cj.bulan') {
+      var bl = String(payload.bulan || '');
+      if (!isMonth(bl) || bl > today.slice(0, 7) || bl < cjBulanGeser(today.slice(0, 7), -CJ_MUNDUR.bulanan)) throw err('Bulan tidak valid');
+      var idB = 'cj|bulan|' + bl, lb = cjAmbil(db, idB) || {};
+      function daftarTeks(a, maks) {
+        if (!Array.isArray(a)) return [];
+        if (a.length > maks) throw err('Pilih maksimal ' + maks);
+        return a.map(function (x) { return cjTeks(x, 160, 'Isian'); }).filter(Boolean);
+      }
+      var ob = { membaik: daftarTeks(payload.membaik, 2), fokus: daftarTeks(payload.fokus, 2), target: {}, konselor: '', catatan: cjTeks(payload.catatan, CJ_CATATAN_MAKS) };
+      var tgt = payload.target && typeof payload.target === 'object' ? payload.target : {};
+      ids.forEach(function (u) { var x = String(tgt[u] || ''); if (['tetap', 'ganti', 'naik'].indexOf(x) >= 0) ob.target[u] = x; });
+      var ks = String(payload.konselor || '');
+      if (ks && ['ya', 'tidak', 'nanti'].indexOf(ks) < 0) throw err('Pilihan konselor tidak valid');
+      ob.konselor = ks;
+      ob.oleh = user.id;
+      ob.selesai_at = bool(payload.selesai) ? (lb.selesai_at || nowIso) : (lb.selesai_at || '');
+      if (bool(payload.selesai) && (!ob.fokus.length || !ob.konselor)) throw err('Pilih fokus bulan depan dan jawab soal konselor dulu');
+      cjPut(store, db, idB, 'bulan', '', bl, ob, nowIso);
+      return selesai();
+    }
+
+    if (action === 'cj.draft') {
+      var akhirSet = sets[sets.length - 1], lamaD = cjAmbil(db, 'cj|draft');
+      var aks2 = String(payload.aksi || 'simpan');
+      if (aks2 === 'simpan') {
+        var bersih = cjBersihSet(payload.pertanyaan, (lamaD && lamaD.pertanyaan) || (akhirSet ? akhirSet.pertanyaan : []), user.id, ids);
+        cjPut(store, db, 'cj|draft', 'draft', '', '', { pertanyaan: bersih, oleh: user.id, diubah: nowIso, dari_versi: akhirSet ? akhirSet.versi : 0, setuju_oleh: '' }, nowIso);
+      } else if (aks2 === 'pulihkan') {
+        var vs = num(payload.versi), sv = sets.filter(function (s) { return s.versi === vs; })[0];
+        if (!sv) throw err('Versi tidak ditemukan');
+        cjPut(store, db, 'cj|draft', 'draft', '', '', { pertanyaan: sv.pertanyaan, oleh: user.id, diubah: nowIso, dari_versi: akhirSet ? akhirSet.versi : 0, setuju_oleh: '', pulih_dari: vs }, nowIso);
+      } else if (aks2 === 'setuju') {
+        if (!lamaD) throw err('Tidak ada draft');
+        if (lamaD.oleh === user.id) throw err('Persetujuan diberikan oleh pasangan');
+        lamaD.setuju_oleh = user.id; lamaD.setuju_at = nowIso;
+        cjPut(store, db, 'cj|draft', 'draft', '', '', lamaD, nowIso);
+      } else if (aks2 === 'batal') {
+        cjHapus(store, db, 'cj|draft', nowIso);
+      } else if (aks2 === 'publish') {
+        if (!lamaD) throw err('Tidak ada draft');
+        var perlu = cjPerluSetuju(lamaD.pertanyaan, akhirSet ? akhirSet.pertanyaan : [], lamaD.oleh);
+        if (perlu && (!lamaD.setuju_oleh || lamaD.setuju_oleh === lamaD.oleh)) throw err('Perubahan item Bersama perlu persetujuan pasangan dulu');
+        if (!perlu && lamaD.oleh !== user.id) throw err('Perubahan ini hanya bisa diterbitkan pemiliknya');
+        // belum ada isian sama sekali: langsung berlaku. Selain itu mulai periode berikutnya agar data lama tetap sebanding.
+        var segar = !(db.JurnalPasangan || []).some(function (r) { return r.jenis === 'isian' && !r.dihapus; });
+        var berlaku = {};
+        CJ_PERIODE.forEach(function (p) { berlaku[p] = segar ? cjSekarang(p, today) : cjBerikut(p, today); });
+        var versi = (akhirSet ? akhirSet.versi : 0) + 1;
+        cjPut(store, db, 'cj|set|' + versi, 'set', '', String(versi), { versi: versi, pertanyaan: lamaD.pertanyaan, oleh: lamaD.oleh,
+          disetujui: perlu ? lamaD.setuju_oleh : '', terbit_at: nowIso, berlaku: berlaku }, nowIso);
+        cjHapus(store, db, 'cj|draft', nowIso);
+      } else throw err('Aksi draft tidak dikenal');
+      return selesai();
+    }
+
+    if (action === 'cj.hapus_saya') {   // hapus semua isian milikku (target & pengaturan bersama tetap)
+      (db.JurnalPasangan || []).filter(function (r) { return r.jenis === 'isian' && r.pemilik === user.id && !r.dihapus; })
+        .forEach(function (r) { cjHapus(store, db, r.id, nowIso); });
+      return selesai();
+    }
+    throw err('Aksi tidak dikenal: ' + action);
+  }
+  var CJ = { SKALA: CJ_SKALA, KESIMPULAN: CJ_KESIMPULAN, PERIODE: CJ_PERIODE, KODE: CJ_KODE, CATATAN_MAKS: CJ_CATATAN_MAKS, MAKS_ITEM: CJ_MAKS_ITEM,
+    SESI_MENIT: CJ_SESI_MENIT, MUNDUR: CJ_MUNDUR, TEMPLATE_TAMBAHAN: CJ_TEMPLATE_TAMBAHAN,
+    template: cjTemplate, bawaan: cjBawaan, khusus: cjKhusus, minggu: cjMinggu, senin: cjSenin, hariDalam: cjHariDalam, mingguGeser: cjMingguGeser,
+    bulanGeser: cjBulanGeser, bulanDariMinggu: cjBulanDariMinggu, mingguDalamBulan: cjMingguDalamBulan, uraiKunci: cjUraiKunci, sekarang: cjSekarang,
+    berikut: cjBerikut, mundur: cjMundur, setUntuk: cjSetUntuk, item: cjItem, itemObserver: cjItemObserver, teksItem: cjTeksItem, nilaiValid: cjNilaiValid,
+    labelNilai: cjLabelNilai, kesimpulan: cjKesimpulan, banding: cjBanding, perluSetuju: cjPerluSetuju, bersihSet: cjBersihSet, view: cjView };
+
   // ---------- API handler (dipakai server & mode demo) ----------
   // store: { all(table) -> array, upsert(table, obj) -> obj, calendar?: { upsert, remove } }
   function handle(store, user, action, payload, nowIso) {
@@ -1643,6 +2260,7 @@ var KantongCore = (function () {
         if (String(action).indexOf('pengesahan.') === 0) return pengesahanAksi(store, db, user, action, payload || {}, nowIso);
         if (String(action).indexOf('jurnal.') === 0) return jurnalAksi(store, db, user, action, payload, nowIso);
         if (String(action).indexOf('siklus.') === 0) return siklusAksi(store, db, user, action, payload, nowIso);
+        if (String(action).indexOf('cj.') === 0) return cjAksi(store, db, user, action, payload, nowIso);
         throw err('Aksi tidak dikenal: ' + action);
     }
   }
@@ -1690,7 +2308,8 @@ var KantongCore = (function () {
     isTime: isTime, TODO_BERSAMA: TODO_BERSAMA, TODO_DURASI: TODO_DURASI, TODO_SELESAI_EVENT: TODO_SELESAI_EVENT,
     TODO_TIPE: TODO_TIPE, todoTipe: todoTipe, evaluasiPengingat: evaluasiPengingat, EVALUASI_JUDUL: EVALUASI_JUDUL,
     EVALUASI_PENGINGAT_JAM: EVALUASI_PENGINGAT_JAM,
-    Siklus: Siklus, siklusView: siklusView, SIKLUS_PEMILIK: SIKLUS_PEMILIK, SIKLUS_VERSI_TEKS: SIKLUS_VERSI_TEKS
+    Siklus: Siklus, siklusView: siklusView, SIKLUS_PEMILIK: SIKLUS_PEMILIK, SIKLUS_VERSI_TEKS: SIKLUS_VERSI_TEKS,
+    CJ: CJ
   };
 })();
 export default KantongCore;

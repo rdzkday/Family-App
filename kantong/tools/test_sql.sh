@@ -199,5 +199,12 @@ echo "✓ template kategori: kolom induk/pos/manajer, nama dobel ditolak, multi-
 if psql -qtA -v ON_ERROR_STOP=1 "$PGURL" -c "set role anon; select kantong_muat()" >/dev/null 2>&1; then echo "anon tidak boleh memanggil kantong_muat"; exit 1; fi
 if psql -qtA -v ON_ERROR_STOP=1 "$PGURL" -c "set role authenticated; select kantong_buat_kode('riki','https://x')" >/dev/null 2>&1; then echo "authenticated tidak boleh membuat kode"; exit 1; fi
 echo "✓ RLS & hak akses: anon/authenticated ditolak"
+
+# Couple Journaling: tabel jurnal_pasangan lewat kantong_simpan, ikut snapshot kantong_muat, anon ditolak
+CJ='[{"tabel":"jurnal_pasangan","baris":{"id":"cj|isi|riki|H:2026-11-24","jenis":"isian","pemilik":"riki","kunci":"H:2026-11-24","isi":"{\"jawaban\":{}}","dibuat":"x","diubah":"x","dihapus":""}}]'
+[ "$(q "select kantong_simpan('$CJ'::jsonb)")" = "1" ] || { echo "jurnal_pasangan harus bisa disimpan"; exit 1; }
+[ "$(q "select jsonb_array_length(kantong_muat()->'jurnal_pasangan')")" = "1" ] || { echo "jurnal_pasangan harus ada di kantong_muat"; exit 1; }
+[ "$(psql -qtA "$PGURL" -c "set role anon; select count(*) from jurnal_pasangan" 2>&1 | tr -d '\n' | grep -c 'permission denied\|^0$')" = "1" ] || { echo "anon harus ditolak di jurnal_pasangan"; exit 1; }
+echo "✓ couple journaling: jurnal_pasangan tersimpan, ikut snapshot, anon ditolak"
 echo
 echo "semua tes SQL lulus"

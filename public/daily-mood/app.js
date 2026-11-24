@@ -133,7 +133,8 @@
   // Minta browser tidak menghapus data otomatis (terutama Safari/iPhone)
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
 
-  let tab = 'today';
+  // ?tab=berdua atau #berdua (dari Pengaturan) membuka Couple Journaling
+  let tab = (new URLSearchParams(location.search).get('tab') === 'berdua' || location.hash === '#berdua') ? 'berdua' : 'today';
   let onboardStep = 0;
   let draftProfile = {name:'', age:'', conditions:[], extraTags:[]};
   let calMonth = new Date(); calMonth.setDate(1);
@@ -397,7 +398,8 @@
     if (!state.profile){ renderOnboard(); return; }
     tabsEl.classList.remove('hidden');
     document.querySelectorAll('nav.tabs button').forEach(b => { if (b.dataset.tab===tab) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
-    ({today:renderToday, calendar:renderCalendar})[tab]();
+    // tab Berdua = Couple Journaling (berdua.js)
+    ({today:renderToday, calendar:renderCalendar, berdua:() => window.Berdua.render(view)})[tab]();
   }
 
   function editableProfile(){ return state.profile || draftProfile; }

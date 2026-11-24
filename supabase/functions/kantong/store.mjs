@@ -11,7 +11,7 @@ export const TABEL = {
   Buku: 'buku', Users: 'users', Kategori: 'kategori', Kantong: 'kantong', Budget: 'budget', Transaksi: 'transaksi', Todo: 'todo',
   KomitmenBab: 'komitmen_bab', KomitmenPasal: 'komitmen_pasal', KomitmenVersi: 'komitmen_versi',
   KomitmenKeterangan: 'komitmen_keterangan', Pengesahan: 'pengesahan', Evaluasi: 'evaluasi', Jurnal: 'jurnal',
-  Siklus: 'siklus', SiklusAtur: 'siklus_atur'
+  Siklus: 'siklus', SiklusAtur: 'siklus_atur', JurnalPasangan: 'jurnal_pasangan'
 };
 const KOLOM_TANGGAL = { tanggal: 1, per_tanggal: 1, mulai: 1, akhir: 1 };
 const KOLOM_BOOL = { hitung: 1, aktif: 1, reimburse: 1, selesai: 1, terkunci: 1, abaikan_jarak: 1, bagikan_jadwal: 1, bagikan_catatan: 1, tampil: 1 };
