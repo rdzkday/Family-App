@@ -46,6 +46,7 @@ function renderShell() {
   app.innerHTML = (S.conn.mode === 'demo' ? '<div class="demo-bar">Mode demo, data hanya di HP ini. <button data-act="leave-demo">Keluar</button></div>' : '') +
     '<main id="view" class="br-view' + (PAGE === 'beranda' ? '' : ' br-narrow') + '"></main>' + Fitur.navHtml(PAGE);
   renderView();
+  if (typeof Onboarding !== 'undefined') Onboarding.otomatis();   // pengenalan fitur, sekali per HP
 }
 function renderView() {
   var el = $('#view'); if (!el) return;

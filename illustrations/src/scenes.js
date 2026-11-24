@@ -116,6 +116,27 @@ const scenes = [
     },
   },
   {
+    slug: 'onboarding-siklus', cat: 'Onboarding', feature: 'siklus',
+    title: 'Kalender siklus dengan perkiraan, Riki membawakan teh hangat untuk Febie',
+    use: 'Onboarding — Siklus: kalender haid di Agenda (privat, diatur pemiliknya).',
+    draw: (T) => {
+      const haid = [1, 2, 3], kira = [11, 12, 13];
+      const cell = (i, cx, cy) => {
+        if (haid.includes(i)) return P.drop(T, cx, cy + 1, 5.5);
+        if (kira.includes(i)) return circle(cx, cy, 6.5, 'none', `stroke="${T.roseD}" stroke-width="2" stroke-dasharray="2.4 2.6"`);
+        return null;
+      };
+      return backdrop(T, 'siklus', { seed: 49 }) +
+        P.calendar(T, 98, 36, 126, 122, T.rose, { cols: 5, rows: 3, cell }) +
+        P.padlock(T, 222, 44, 20, T.lav, T.lavD) +
+        shadow(T, 72, GROUND, 28) + shadow(T, 256, GROUND, 28) +
+        koin(T, { x: 72, y: 172, who: 'febie', mood: 'calm', look: 1, arms: { l: 110, r: { a: -35, len: 0.85 } } }) +
+        koin(T, { x: 256, y: 172, who: 'riki', mood: 'smile', look: -1, arms: { l: { a: -5, len: 0.85 }, r: 70 },
+          hands: { l: { behind: (x, y) => rect(x - 11, y - 24, 18, 20, 5, T.sky) + stroke(`M${x - 11} ${y - 19}q-7 0 -7 6t7 6`, T.sky, 3) + stroke(`M${x - 6} ${y - 30}q3 -4 0 -8`, T.sub, 2) + stroke(`M${x + 1} ${y - 30}q3 -4 0 -8`, T.sub, 2) } } }) +
+        heart(240, 116, 11, T.coral) + sparkle(54, 70, 6, T.amber) + sparkle(276, 84, 5, T.amber) + circle(160, 186, 3, T.rose);
+    },
+  },
+  {
     slug: 'onboarding-04-komitmen', cat: 'Onboarding', feature: 'komit',
     title: 'Lembar kesepakatan ditandatangani berdua',
     use: 'Onboarding 4 — Komitmen: pasal & tanda tangan berdua.',

@@ -51,7 +51,10 @@ if (fs.existsSync(gal)) {
 const PAKAI = [
   'auth-masuk', 'auth-keluar', 'auth-sesi-berakhir',
   'kosong-transaksi', 'kosong-todo', 'kosong-catatan', 'kosong-jadwal', 'kosong-komitmen', 'kosong-pencarian',
-  'status-offline', 'status-404', 'onboarding-05-daily-mood',
+  'status-offline', 'status-404',
+  // onboarding (shared/onboarding.js)
+  'onboarding-01-selamat-datang', 'onboarding-02-kantong', 'onboarding-03-agenda', 'onboarding-siklus',
+  'onboarding-04-komitmen', 'onboarding-05-daily-mood', 'onboarding-06-offline',
 ];
 for (const theme of ['light', 'dark']) {
   const dst = path.join(ROOT, '..', 'public', 'ilustrasi', theme);

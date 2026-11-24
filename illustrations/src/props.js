@@ -31,6 +31,8 @@ function calendar(T, x, y, w, h, accent = T.sky, o = {}) {
     const gx = w * 0.12, gy = hd + h * 0.1, cw = (w * 0.76) / (cols - 1), ch = (h - hd - h * 0.24) / (rows - 1);
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const i = r * cols + c, cx = gx + c * cw, cy = gy + r * ch;
+      const custom = o.cell && o.cell(i, cx, cy);
+      if (custom) { s += custom; continue; }
       if (i === heartAt) s += heart(cx, cy, 11, T.coral);
       else if (marks.includes(i)) s += circle(cx, cy, 6, accent);
       else s += circle(cx, cy, 3, T.sub);
@@ -254,7 +256,15 @@ function hourglass(T, cx, cy, s) {
   return g(o, `transform="translate(${f(cx)} ${f(cy)})"`);
 }
 
+// tetes (Siklus): titik (cx,cy) = tengah bulatan bawah
+function drop(T, cx, cy, s, color = T.rose, shade = T.roseD) {
+  const d = (k) => `M${f(cx)} ${f(cy - s * 1.25 * k)}C${f(cx + s * 0.35 * k)} ${f(cy - s * 0.7 * k)} ${f(cx + s * k)} ${f(cy - s * 0.25 * k)} ${f(cx + s * k)} ${f(cy + s * 0.2 * k)}A${f(s * k)} ${f(s * k)} 0 0 1 ${f(cx - s * k)} ${f(cy + s * 0.2 * k)}C${f(cx - s * k)} ${f(cy - s * 0.25 * k)} ${f(cx - s * 0.35 * k)} ${f(cy - s * 0.7 * k)} ${f(cx)} ${f(cy - s * 1.25 * k)}Z`;
+  return path(d(1), shade, `transform="translate(0 ${f(s * 0.12)})"`) + path(d(1), color) +
+    ellipse(cx - s * 0.38, cy + s * 0.05, s * 0.16, s * 0.26, '#fff', 'opacity=".55"');
+}
+
 module.exports = {
+  drop,
   cloud, phone, calendar, padlock, key, magnifier, openBook, pencil, signature, confetti, clock, bubble, zz, door, plant,
   giftbox, donut, shield, moodFace, question, checkBadge, xBadge, arrowsCycle, plug, socket, signpost, hourglass, MOOD,
 };

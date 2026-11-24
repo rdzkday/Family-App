@@ -1,0 +1,38 @@
+/* Onboarding (shared/onboarding.js). --c = warna fitur slide aktif. */
+body.ob-open { overflow: hidden; }
+.ob { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--br-bg); color: var(--br-text);
+  padding: calc(var(--safe-t) + 8px) max(20px, env(safe-area-inset-right, 0px)) calc(var(--safe-b) + 20px) max(20px, env(safe-area-inset-left, 0px)); }
+.ob-top, .ob-body { width: 100%; max-width: 460px; margin: 0 auto; }
+.ob-top { display: flex; justify-content: space-between; align-items: center; min-height: 48px; }
+.ob-step { font-size: 13px; font-weight: 700; color: var(--br-muted); font-variant-numeric: tabular-nums; }
+.ob-skip { min-height: 44px; padding: 0 12px; margin-right: -12px; border-radius: 12px; font-weight: 800; font-size: 15px; color: var(--br-muted); }
+.ob-skip[hidden] { display: block !important; visibility: hidden; }
+.ob-body { flex: 1; display: flex; flex-direction: column; }
+
+.ob-stage { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 20px; padding: clamp(8px, 5vh, 48px) 0 8px; }
+.ob-art .ilus { width: min(320px, 90%); }
+.ob-txt { display: flex; flex-direction: column; gap: 12px; }
+.ob-chip { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; border-radius: 999px;
+  background: var(--br-surface); background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c); font-weight: 800; font-size: 13px; }
+.ob-chip svg { width: 18px; height: 18px; }
+.ob h1 { margin: 0; font-size: 28px; font-weight: 900; line-height: 1.15; letter-spacing: -0.02em; text-wrap: balance; outline: none; }
+.ob-isi { margin: 0; color: var(--br-muted); font-size: 16px; line-height: 1.55; }
+.ob-poin { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ob-poin li { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; line-height: 1.45; }
+.ob-poin svg { flex: none; width: 22px; height: 22px; padding: 3px; border-radius: 50%; color: var(--c);
+  background: var(--br-surface); background: color-mix(in srgb, var(--c) 18%, transparent); }
+
+.ob-bot { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
+.ob-dots { display: flex; justify-content: center; gap: 6px; }
+.ob-dots i { width: 6px; height: 6px; border-radius: 99px; background: var(--br-border); transition: width .25s, background-color .25s; }
+.ob-dots i.on { width: 22px; background: var(--c); }
+.ob-btns { display: flex; gap: 10px; }
+.ob-btns .btn { margin: 0; }
+.ob-btns .btn.ghost { flex: none; width: auto; padding: 0 20px; }
+body .ob .btn.ob-next { flex: 1; background: var(--c); color: var(--br-on-accent); }
+
+.ob-in { animation: ob-in .32s ease both; }
+@keyframes ob-in { from { opacity: 0; transform: translateX(14px); } }
+@media (prefers-reduced-motion: reduce) { .ob-in { animation: none; } .ob-dots i { transition: none; } }
+@media (max-height: 700px) { .ob-art .ilus { width: min(230px, 66%); } .ob h1 { font-size: 24px; } .ob-stage { gap: 14px; } }

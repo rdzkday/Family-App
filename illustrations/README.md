@@ -1,6 +1,6 @@
 # Ilustrasi Family App
 
-Paket ilustrasi flat untuk Family App. **12 ilustrasi sudah dipasang di app** (daftar `PAKAI` di `src/build.js`), sisanya cadangan.
+Paket ilustrasi flat untuk Family App. **18 ilustrasi sudah dipasang di app** (daftar `PAKAI` di `src/build.js`), sisanya cadangan.
 
 ## Yang sudah dipasang
 
@@ -13,12 +13,13 @@ Paket ilustrasi flat untuk Family App. **12 ilustrasi sudah dipasang di app** (d
 | `kosong-catatan` / `kosong-jadwal` | Agenda › Catatan kosong, agenda mendatang kosong |
 | `kosong-komitmen` | Komitmen › belum ada kesepakatan |
 | `status-offline` | Komitmen dibuka pertama kali tanpa internet |
-| `onboarding-05-daily-mood` | Daily Mood › Kenalan dulu |
+| `onboarding-01…06`, `onboarding-siklus` | Onboarding app (`shared/onboarding.js`): tampil sekali sesudah masuk, slide ikut fitur aktif, buka lagi di Pengaturan › Umum › Panduan aplikasi |
+| `onboarding-05-daily-mood` | Juga di Daily Mood › Kenalan dulu |
 | `status-404` | `public/404.html` |
 
 Cara kerja: `public/shared/ilustrasi.js` (`ilus()`, `emptyIl()`) + `ilustrasi.css` memilih versi gelap/terang otomatis. Tambah ilustrasi: masukkan slug ke `PAKAI`, jalankan `node illustrations/src/build.js`, panggil `ilus('slug')`, tambah ke `SHELL` di `public/sw.js`.
 
-- **30 ilustrasi** × 2 tema (terang & gelap) + 1 lembar karakter
+- **31 ilustrasi** × 2 tema (terang & gelap) + 1 lembar karakter
 - **3 beranimasi** (loading), otomatis diam saat *reduce motion* aktif
 - Format **SVG** (tajam di semua ukuran, total ±480 KB untuk 62 file)
 
@@ -49,6 +50,7 @@ Cara kerja: `public/shared/ilustrasi.js` (`ilus()`, `emptyIl()`) + `ilustrasi.cs
 | Onboarding | `onboarding-01-selamat-datang` | Selamat datang |
 | | `onboarding-02-kantong` | Kantong: uang & budget berdua |
 | | `onboarding-03-agenda` | Agenda: to-do, catatan, jadwal |
+| | `onboarding-siklus` | Siklus: kalender haid (privat) |
 | | `onboarding-04-komitmen` | Komitmen: pasal & TTD berdua |
 | | `onboarding-05-daily-mood` | Daily Mood: jurnal pribadi |
 | | `onboarding-06-offline` | Offline & sinkron otomatis |
