@@ -44,7 +44,7 @@ var HomeView = {
     var out = list.reduce(function (s, x) { return s + (isCounted(x) ? x.nominal : 0); }, 0);
     $('#today-total', el).textContent = out ? 'Keluar ' + rp(out) : '';
     todayEl.innerHTML = list.length ? '<div class="list">' + list.sort(function (a, b) { return String(b.dibuat || '9').localeCompare(String(a.dibuat || '9')); })
-      .map(function (x) { return txRow(x, null); }).join('') + '</div>' : '<div class="list"><div class="empty">Hari ini masih bersih. Catat jajan pertamamu di atas.</div></div>';
+      .map(function (x) { return txRow(x, null); }).join('') + '</div>' : '<div class="list">' + emptyIl('kosong-transaksi', 'Hari ini masih bersih. Catat jajan pertamamu di atas.', { size: 'sm' }) + '</div>';
     bindTxRows(todayEl);
     renderTalangan($('#home-utang', el), null);
     var waits = [];

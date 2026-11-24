@@ -29,7 +29,7 @@ var CatatanView = {
     var notes = todos().filter(function (t) { return C.todoTipe(t) === 'catatan' && todoMatch(t, f); })
       .sort(function (a, b) { return String(b.diubah || b.dibuat || '').localeCompare(String(a.diubah || a.dibuat || '')); });
     box.innerHTML = notes.length ? '<div class="list todo-list">' + notes.map(catatanRow).join('') + '</div>'
-      : '<div class="list"><div class="empty">Belum ada catatan. Pilih "Bersama" saat menulis supaya bisa dibaca berdua.</div></div>';
+      : '<div class="list">' + emptyIl('kosong-catatan', 'Belum ada catatan. Pilih "Bersama" saat menulis supaya bisa dibaca berdua.') + '</div>';
     bindTodoRows(box);
   }
 };
@@ -141,7 +141,7 @@ var KalenderView = {
     var lewat = buka.filter(function (t) { return t.tanggal < today; });
     var datang = buka.filter(function (t) { return t.tanggal >= today; }).slice(0, 8);
     box.innerHTML = lewat.length || datang.length ? agendaGrup(lewat.concat(datang), today)
-      : '<div class="list"><div class="empty">Belum ada agenda mendatang. Tap tanggal di kalender, lalu tambah agenda.</div></div>';
+      : '<div class="list">' + emptyIl('kosong-jadwal', 'Belum ada agenda mendatang. Tap tanggal di kalender, lalu tambah agenda.') + '</div>';
     bindTodoRows(box);
   }
 };

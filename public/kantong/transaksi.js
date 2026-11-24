@@ -56,7 +56,7 @@ function openKategoriPicker(f, opts, onPick) {
       html += list.length ? '<div class="list kp-list">' + list.map(function (k) {
         var sub = !!(k.induk && byK[k.induk]);
         return '<button type="button" class="kp-row' + (sub && !q ? ' sub' : '') + '" data-k="' + esc(k.id) + '" style="--c:' + k.warna + '"><span class="dot"></span><span class="name">' + esc(q ? label(k) : k.nama) + '</span>' + (f.kategori === k.id ? '<span class="chk">✓</span>' : '') + '</button>';
-      }).join('') + '</div>' : '<div class="empty">Tidak ada kategori "' + esc(qRaw) + '".</div>';
+      }).join('') + '</div>' : emptyIl('kosong-pencarian', 'Tidak ada kategori "' + esc(qRaw) + '".', { size: 'sm' });
       if (opts.allowAdd) html += '<button type="button" class="btn ghost" id="kp-add" style="margin-top:12px">+ Kategori baru' + (qRaw ? ' "' + esc(qRaw) + '"' : '') + '</button>';
       box.innerHTML = html;
       $$('[data-k]', box).forEach(function (b) { b.addEventListener('click', function () { onPick(b.getAttribute('data-k')); sh.close(); }); });

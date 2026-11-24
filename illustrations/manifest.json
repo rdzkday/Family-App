@@ -1,0 +1,272 @@
+[
+  {
+    "slug": "loading-kantong",
+    "kategori": "Loading",
+    "judul": "Koin berjatuhan masuk ke Kantong",
+    "pakai_untuk": "Layar memuat penuh (splash / \"Memuat data…\").",
+    "warna_latar": "kantong",
+    "ukuran": "320x240",
+    "animasi": true
+  },
+  {
+    "slug": "loading-sinkron",
+    "kategori": "Loading",
+    "judul": "Riki dan Febie mengoper koin bolak-balik",
+    "pakai_untuk": "Sedang sinkron antrean offline ke server.",
+    "warna_latar": "agenda",
+    "ukuran": "320x240",
+    "animasi": true
+  },
+  {
+    "slug": "loading-mini",
+    "kategori": "Loading",
+    "judul": "Dua koin memantul bergantian",
+    "pakai_untuk": "Loader kecil di tombol/kartu (ganti spinner). Ukuran 120×56.",
+    "warna_latar": "transparan",
+    "ukuran": "120x56",
+    "animasi": true
+  },
+  {
+    "slug": "onboarding-01-selamat-datang",
+    "kategori": "Onboarding",
+    "judul": "Riki dan Febie menyapa di depan Kantong",
+    "pakai_untuk": "Onboarding 1 — \"Selamat datang di Family App\".",
+    "warna_latar": "kantong",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "onboarding-02-kantong",
+    "kategori": "Onboarding",
+    "judul": "Riki memasukkan koin ke Kantong, kartu budget melayang",
+    "pakai_untuk": "Onboarding 2 — Kantong: catat uang & budget berdua.",
+    "warna_latar": "kantong",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "onboarding-03-agenda",
+    "kategori": "Onboarding",
+    "judul": "Daftar to-do bersama, Febie mencentang dengan pensil besar",
+    "pakai_untuk": "Onboarding 3 — Agenda: to-do, catatan, jadwal.",
+    "warna_latar": "agenda",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "onboarding-04-komitmen",
+    "kategori": "Onboarding",
+    "judul": "Lembar kesepakatan ditandatangani berdua",
+    "pakai_untuk": "Onboarding 4 — Komitmen: pasal & tanda tangan berdua.",
+    "warna_latar": "komit",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "onboarding-05-daily-mood",
+    "kategori": "Onboarding",
+    "judul": "Febie duduk menulis jurnal, wajah mood melayang",
+    "pakai_untuk": "Onboarding 5 — Daily Mood: jurnal mood harian (pribadi).",
+    "warna_latar": "catat",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "onboarding-06-offline",
+    "kategori": "Onboarding",
+    "judul": "HP tetap mencatat, data naik ke awan saat online",
+    "pakai_untuk": "Onboarding 6 — Offline & sinkron otomatis.",
+    "warna_latar": "agenda",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "onboarding-07-siap",
+    "kategori": "Onboarding",
+    "judul": "Riki dan Febie melompat gembira, konfeti",
+    "pakai_untuk": "Onboarding terakhir / setup selesai — \"Siap mulai!\".",
+    "warna_latar": "kantong",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "auth-masuk",
+    "kategori": "Login & Akun",
+    "judul": "Riki membawa kunci besar ke Kantong yang digembok",
+    "pakai_untuk": "Halaman login / hubungkan akun.",
+    "warna_latar": "agenda",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "auth-keluar",
+    "kategori": "Login & Akun",
+    "judul": "Riki di ambang pintu melambai, Febie membalas",
+    "pakai_untuk": "Konfirmasi / sesudah keluar akun (logout) — \"Sampai jumpa\".",
+    "warna_latar": "catat",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "auth-sesi-berakhir",
+    "kategori": "Login & Akun",
+    "judul": "Riki tertidur di samping jam pasir",
+    "pakai_untuk": "Sesi habis / perlu login ulang.",
+    "warna_latar": "neutral",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "auth-ganti-password",
+    "kategori": "Login & Akun",
+    "judul": "Febie memegang kunci baru di depan perisai",
+    "pakai_untuk": "Ganti password / password berhasil diubah.",
+    "warna_latar": "kantong",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "kosong-transaksi",
+    "kategori": "Empty state",
+    "judul": "Riki mengintip ke dalam Kantong yang masih kosong",
+    "pakai_untuk": "Kantong › Riwayat kosong (\"Belum ada transaksi\").",
+    "warna_latar": "kantong",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "kosong-todo",
+    "kategori": "Empty state",
+    "judul": "Febie bersantai, semua to-do beres",
+    "pakai_untuk": "Agenda › To-do kosong / semua selesai.",
+    "warna_latar": "agenda",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "kosong-catatan",
+    "kategori": "Empty state",
+    "judul": "Riki berpikir di samping catatan kosong",
+    "pakai_untuk": "Agenda › Catatan kosong.",
+    "warna_latar": "agenda",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "kosong-jadwal",
+    "kategori": "Empty state",
+    "judul": "Riki duduk santai di atas kalender kosong",
+    "pakai_untuk": "Agenda › Jadwal kosong.",
+    "warna_latar": "agenda",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "kosong-komitmen",
+    "kategori": "Empty state",
+    "judul": "Febie siap menulis di buku kesepakatan yang masih kosong",
+    "pakai_untuk": "Komitmen › belum ada pasal / hasil pencarian pasal kosong.",
+    "warna_latar": "komit",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "kosong-mood",
+    "kategori": "Empty state",
+    "judul": "Slot mood hari ini masih kosong, Febie menunjuk",
+    "pakai_untuk": "Daily Mood › belum ada entri / kalender mood kosong.",
+    "warna_latar": "catat",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "kosong-pencarian",
+    "kategori": "Empty state",
+    "judul": "Riki mencari dengan kaca pembesar",
+    "pakai_untuk": "Pencarian tidak ditemukan (Riwayat, Komitmen, Agenda).",
+    "warna_latar": "neutral",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "status-offline",
+    "kategori": "Status sistem",
+    "judul": "Riki memegang steker yang terlepas, awan redup",
+    "pakai_untuk": "Banner/halaman offline — \"Kamu offline, data disimpan dulu di HP\".",
+    "warna_latar": "neutral",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "status-gagal",
+    "kategori": "Status sistem",
+    "judul": "Koin retak ditambal plester, Febie menenangkan",
+    "pakai_untuk": "Error umum — \"Gagal menyimpan, coba lagi\".",
+    "warna_latar": "bad",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "status-tersimpan",
+    "kategori": "Status sistem",
+    "judul": "Centang besar dan Febie bersorak",
+    "pakai_untuk": "Sukses — transaksi/catatan tersimpan.",
+    "warna_latar": "kantong",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "status-sinkron-selesai",
+    "kategori": "Status sistem",
+    "judul": "HP Riki dan HP Febie tersambung ke awan",
+    "pakai_untuk": "Sinkron selesai — \"Data kalian sudah sama di kedua HP\".",
+    "warna_latar": "agenda",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "status-404",
+    "kategori": "Status sistem",
+    "judul": "Riki bingung di depan papan penunjuk jalan",
+    "pakai_untuk": "Halaman tidak ditemukan.",
+    "warna_latar": "neutral",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "status-update",
+    "kategori": "Status sistem",
+    "judul": "Kotak hadiah terbuka berisi kilau, Febie terkejut senang",
+    "pakai_untuk": "Versi baru tersedia / \"Apa yang baru\".",
+    "warna_latar": "catat",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "status-budget-lewat",
+    "kategori": "Status sistem",
+    "judul": "Kantong menggembung, koin tumpah, Riki cemas",
+    "pakai_untuk": "Peringatan budget terlampaui.",
+    "warna_latar": "bad",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "momen-ttd-sah",
+    "kategori": "Momen khusus",
+    "judul": "Lembar Pengesahan bertanda tangan berdua, Riki dan Febie berpelukan",
+    "pakai_untuk": "Komitmen › Lembar Pengesahan sah (TTD kedua masuk).",
+    "warna_latar": "komit",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
+    "slug": "momen-evaluasi-bulanan",
+    "kategori": "Momen khusus",
+    "judul": "Riki dan Febie duduk berhadapan, ngobrol evaluasi bulanan",
+    "pakai_untuk": "Pengingat / sesi evaluasi bulanan.",
+    "warna_latar": "komit",
+    "ukuran": "320x240",
+    "animasi": false
+  }
+]
