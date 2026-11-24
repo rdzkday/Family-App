@@ -46,3 +46,17 @@ if (fs.existsSync(gal)) {
   );
   fs.writeFileSync(gal, html);
 }
+
+// salin ilustrasi yang DIPAKAI app ke public/ilustrasi/ (dipanggil lewat shared/ilustrasi.js)
+const PAKAI = [
+  'auth-masuk', 'auth-keluar', 'auth-sesi-berakhir',
+  'kosong-transaksi', 'kosong-todo', 'kosong-catatan', 'kosong-jadwal', 'kosong-komitmen', 'kosong-pencarian',
+  'status-offline', 'status-404', 'onboarding-05-daily-mood',
+];
+for (const theme of ['light', 'dark']) {
+  const dst = path.join(ROOT, '..', 'public', 'ilustrasi', theme);
+  fs.mkdirSync(dst, { recursive: true });
+  for (const f of fs.readdirSync(dst)) if (!PAKAI.includes(f.replace(/\.svg$/, ''))) fs.unlinkSync(path.join(dst, f));
+  for (const slug of PAKAI) fs.copyFileSync(path.join(ROOT, 'svg', theme, `${slug}.svg`), path.join(dst, `${slug}.svg`));
+}
+console.log(`${PAKAI.length} ilustrasi disalin ke public/ilustrasi/`);

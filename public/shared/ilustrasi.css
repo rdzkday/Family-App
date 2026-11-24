@@ -1,0 +1,14 @@
+/* Ilustrasi: pilih versi sesuai tema. Gelap = default (tanpa data-theme). */
+.ilus { display: block; width: min(200px, 64%); margin: 0 auto; }
+.ilus.sm { width: min(140px, 46%); }
+.ilus.lg { width: min(260px, 78%); }
+.ilus img { display: block; width: 100%; height: auto; }
+.ilus .il-l { display: none; }
+:root[data-theme="light"] .ilus .il-l { display: block; }
+:root[data-theme="light"] .ilus .il-d { display: none; }
+
+.empty-il { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.empty-il p { margin: 0; max-width: 32ch; text-wrap: balance; }
+
+/* layar login: rata kiri mengikuti teks */
+.connect .ilus { margin: 0 0 20px -10px; width: min(240px, 72%); }

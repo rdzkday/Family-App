@@ -1,6 +1,22 @@
 # Ilustrasi Family App
 
-Paket ilustrasi flat untuk Family App. **Belum dipakai di app** — folder ini untuk dipilih dulu. File di `public/` tidak disentuh.
+Paket ilustrasi flat untuk Family App. **12 ilustrasi sudah dipasang di app** (daftar `PAKAI` di `src/build.js`), sisanya cadangan.
+
+## Yang sudah dipasang
+
+| Ilustrasi | Tempat di app |
+|---|---|
+| `auth-masuk` / `auth-keluar` / `auth-sesi-berakhir` | Layar login, sesudah Keluar akun, sesudah sesi habis |
+| `kosong-transaksi` | Kantong › Riwayat kosong, Catat › "Hari ini masih bersih" |
+| `kosong-pencarian` | Cari kategori Kantong, cari pasal Komitmen |
+| `kosong-todo` | Agenda › To-do kosong / semua beres |
+| `kosong-catatan` / `kosong-jadwal` | Agenda › Catatan kosong, agenda mendatang kosong |
+| `kosong-komitmen` | Komitmen › belum ada kesepakatan |
+| `status-offline` | Komitmen dibuka pertama kali tanpa internet |
+| `onboarding-05-daily-mood` | Daily Mood › Kenalan dulu |
+| `status-404` | `public/404.html` |
+
+Cara kerja: `public/shared/ilustrasi.js` (`ilus()`, `emptyIl()`) + `ilustrasi.css` memilih versi gelap/terang otomatis. Tambah ilustrasi: masukkan slug ke `PAKAI`, jalankan `node illustrations/src/build.js`, panggil `ilus('slug')`, tambah ke `SHELL` di `public/sw.js`.
 
 - **30 ilustrasi** × 2 tema (terang & gelap) + 1 lembar karakter
 - **3 beranimasi** (loading), otomatis diam saat *reduce motion* aktif
