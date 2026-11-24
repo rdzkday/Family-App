@@ -373,3 +373,50 @@ textarea.input { resize: vertical; min-height: 96px; line-height: 1.5; font-fami
 .ph-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-2); font-weight: 600; }
 .page-tabs { margin-bottom: 14px; }
 .ph-actions { display: flex; gap: 8px; align-items: center; flex: none; }
+
+/* ---------- Template kategori, manajer keuangan, budget 40:30:20:10 (kantong/template.js) ---------- */
+.tpl { margin-top: 12px; }
+.tpl-step { font-size: 12px; font-weight: 800; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+.tpl-title { font-size: 20px; font-weight: 800; margin: 6px 0 6px; line-height: 1.25; }
+.tpl-lead { color: var(--text-2); font-size: 14px; line-height: 1.5; margin: 0 0 16px; }
+.tpl-note { font-size: 12.5px; margin: 8px 0 0; line-height: 1.5; }
+.tpl-warn { color: var(--over); font-size: 13px; font-weight: 700; margin: 8px 0; }
+.tpl-levels { display: grid; gap: 10px; margin-bottom: 12px; }
+.tpl-level { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; text-align: left; padding: 14px 16px; border-radius: 16px; background: var(--surface-2); border: 2px solid transparent; }
+.tpl-level .t1 { font-weight: 800; font-size: 16px; }
+.tpl-level .t2 { grid-column: 1; color: var(--text-2); font-size: 13px; font-weight: 600; }
+.tpl-level .n { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 13px; font-weight: 800; color: var(--text-2); }
+.tpl-level[aria-pressed="true"] { border-color: var(--br-kantong); background: var(--br-kantong-bg); }
+.tpl-nav { display: flex; gap: 8px; margin-top: 16px; }
+.tpl-nav .btn { margin: 0; }
+.tpl-prev { background: var(--surface-2); border-radius: 16px; padding: 8px 14px; max-height: 52dvh; overflow-y: auto; }
+.tpl-row { display: flex; align-items: center; gap: 10px; min-height: 38px; font-weight: 700; font-size: 14px; }
+.tpl-row .dot { width: 10px; height: 10px; border-radius: 4px; flex: none; }
+.tpl-row .nm { flex: 1; }
+.tpl-row.sub { min-height: 30px; padding-left: 4px; font-weight: 600; color: var(--text-2); font-size: 13px; }
+.tpl-row.sub .ln { width: 10px; height: 10px; border-left: 2px solid var(--line); border-bottom: 2px solid var(--line); border-radius: 0 0 0 4px; margin: -8px 4px 0 2px; flex: none; }
+.tpl-h { font-size: 12px; font-weight: 800; color: var(--text-3); margin: 12px 0 2px; text-transform: uppercase; letter-spacing: .04em; }
+.tag.pos-kebutuhan { background: color-mix(in srgb, #7DD3A8 22%, transparent); }
+.tag.pos-cicilan { background: color-mix(in srgb, #F2B544 24%, transparent); }
+.tag.pos-tabungan { background: color-mix(in srgb, #93C5FD 24%, transparent); }
+.tag.pos-sosial { background: color-mix(in srgb, #F28DB5 24%, transparent); }
+.tpl-rasio { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
+.tpl-rasio label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 800; color: var(--text-2); margin: 0; }
+.tpl-rasio .pin { display: flex; align-items: center; gap: 4px; }
+.tpl-rasio .input { text-align: center; padding: 0 4px; min-height: 44px; }
+.tpl-pos { margin-top: 14px; padding-left: 12px; border-left: 4px solid var(--c, var(--line)); }
+.tpl-pos.pos-kebutuhan { --c: #7DD3A8; } .tpl-pos.pos-cicilan { --c: #F2B544; } .tpl-pos.pos-tabungan { --c: #93C5FD; } .tpl-pos.pos-sosial { --c: #F28DB5; }
+.tpl-pos-h { display: flex; justify-content: space-between; font-weight: 800; font-size: 15px; margin-bottom: 2px; }
+.tpl-pilih { display: grid; gap: 8px; }
+.tpl-user { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: var(--surface-2); text-align: left; min-height: 60px; }
+.tpl-user .av { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--br-kantong); color: var(--ink); flex: none; }
+.tpl-user .main { flex: 1; font-weight: 800; }
+.tpl-user svg { width: 18px; height: 18px; color: var(--text-3); }
+.tpl-user[aria-current="true"] { outline: 2px solid var(--br-kantong); }
+.tpl-user .chk { color: var(--in); font-weight: 900; }
+.tpl-wait { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 16px; background: var(--surface-2); font-size: 13.5px; color: var(--text-2); margin-top: 12px; }
+.tpl-wait .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.wallet.kat-sub { padding-left: 22px; min-height: 48px; }
+.wallet.kat-sub .t1 { font-weight: 600; }
+.kp-row.sub { padding-left: 24px; min-height: 44px; font-weight: 600; }
+.kp-row.sub .dot { width: 8px; height: 8px; }

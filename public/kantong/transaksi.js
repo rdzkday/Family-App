@@ -49,9 +49,13 @@ function openKategoriPicker(f, opts, onPick) {
         }).join('') + '</div>';
         html += '<div class="kp-h">Semua kategori</div>';
       }
-      var list = q ? all.filter(function (k) { return k.nama.toLowerCase().indexOf(q) >= 0; }) : all;
+      // dikelompokkan per induk: induk bisa dipilih, sub menjorok di bawahnya. Saat mencari: daftar datar "Induk › Sub".
+      var byK = C.byId(all);
+      var label = function (k) { var ik = k.induk && byK[k.induk]; return ik ? ik.nama + ' › ' + k.nama : k.nama; };
+      var list = q ? all.filter(function (k) { return label(k).toLowerCase().indexOf(q) >= 0; }) : katUrutPohon(all);
       html += list.length ? '<div class="list kp-list">' + list.map(function (k) {
-        return '<button type="button" class="kp-row" data-k="' + esc(k.id) + '" style="--c:' + k.warna + '"><span class="dot"></span><span class="name">' + esc(k.nama) + '</span>' + (f.kategori === k.id ? '<span class="chk">✓</span>' : '') + '</button>';
+        var sub = !!(k.induk && byK[k.induk]);
+        return '<button type="button" class="kp-row' + (sub && !q ? ' sub' : '') + '" data-k="' + esc(k.id) + '" style="--c:' + k.warna + '"><span class="dot"></span><span class="name">' + esc(q ? label(k) : k.nama) + '</span>' + (f.kategori === k.id ? '<span class="chk">✓</span>' : '') + '</button>';
       }).join('') + '</div>' : '<div class="empty">Tidak ada kategori "' + esc(qRaw) + '".</div>';
       if (opts.allowAdd) html += '<button type="button" class="btn ghost" id="kp-add" style="margin-top:12px">+ Kategori baru' + (qRaw ? ' "' + esc(qRaw) + '"' : '') + '</button>';
       box.innerHTML = html;

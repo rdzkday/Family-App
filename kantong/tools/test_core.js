@@ -84,7 +84,7 @@ function utangAntara(store, bersama, pribadi) {
 }
 
 // ---------------------------------------------------------------- versi & salinan core
-eq('versi core naik ke 1.8.0', C.VERSION, '1.8.0');
+eq('versi core naik ke 1.9.0', C.VERSION, '1.9.0');
 (function () {
   // core.mjs (Edge Function Supabase) harus persis hasil build_core.js
   var fs = require('fs'), build = require(path.join(__dirname, 'build_core.js'));
@@ -918,6 +918,121 @@ function komCall(st, uid, action, payload) {
   eq('pembuka.setelah sah: 2 berlaku', L2.berlaku, 2);
   eq('pembuka.setelah sah: pembuka tetap', L2.pasal[1].pembuka, 'Apabila ISC terjadi, maka :');
   eq('pembuka.tanggal berlaku = TTD kedua', L2.pasal[0].berlaku_sejak, NOW);
+})();
+
+// ---------------------------------------------------------------- template kategori, sub, budget 40:30:20:10, manajer
+(function () {
+  console.log('\nTemplate kategori');
+  function kosong() {
+    var s = seed(); s.Kategori = []; s.Budget = []; s.Transaksi = [];
+    s.Buku[2].manajer = 'u-febie';
+    return C.memoryStore(s);
+  }
+  function h(st, uid, action, p) { return C.handle(st, usr(st, uid), action, p || {}, NOW); }
+  function katBuku(st, b) { return st.all('Kategori').filter(function (k) { return C.scopeOf(k).indexOf(b) >= 0; }); }
+
+  var st = kosong();
+  eq('buku kosong di awal', C.bukuKosong(dbOf(st), 'riki'), true);
+  h(st, 'u-riki', 'bootstrap');   // bikin kategori sistem setoran
+  eq('kategori sistem tidak bikin buku tidak kosong', C.bukuKosong(dbOf(st), 'riki'), true);
+  eq('rt juga masih kosong', C.bukuKosong(dbOf(st), 'rt'), true);
+
+  var n1 = C.templateDaftar('pribadi', 'simpel').length, n2 = C.templateDaftar('pribadi', 'menengah').length, n3 = C.templateDaftar('pribadi', 'detail').length;
+  ok('jumlah naik per level', n1 < n2 && n2 < n3, [n1, n2, n3].join(','));
+  eq('simpel pribadi = 8 induk + 2 pemasukan', n1, 10);
+  ok('template rt tidak membuat Setoran', !C.templateDaftar('rt', 'detail').some(function (x) { return /setoran/i.test(x.nama); }));
+
+  var r1 = h(st, 'u-riki', 'kategori.template', { buku: 'riki', level: 'menengah' });
+  eq('template dibuat', r1.dibuat, n2);
+  eq('buku riki tidak kosong lagi', C.bukuKosong(dbOf(st), 'riki'), false);
+  var r2 = h(st, 'u-riki', 'kategori.template', { buku: 'riki', level: 'menengah' });
+  eq('template 2x tidak dobel', r2.dibuat, 0);
+  eq('template 2x: semua dilewati', r2.dilewati.length, n2);
+  eq('jumlah kategori riki tetap', katBuku(st, 'riki').filter(function (k) { return !C.isSistem(k); }).length, n2);
+  var r3 = h(st, 'u-riki', 'kategori.template', { buku: 'riki', level: 'detail' });
+  eq('naik ke detail: hanya tambahan', r3.dibuat, n3 - n2);
+  ok('kategori template hanya 1 buku', katBuku(st, 'riki').filter(function (k) { return !C.isSistem(k); }).every(function (k) { return k.buku === 'riki'; }));
+
+  var kat = st.all('Kategori'), by = {};
+  kat.forEach(function (k) { if (k.buku === 'riki') by[(k.induk ? C.byId(kat)[k.induk].nama + ' > ' : '') + k.nama] = k; });
+  ok('sub punya induk', by['Makan & jajan > Kopi & jajan'] && by['Makan & jajan > Kopi & jajan'].induk === by['Makan & jajan'].id);
+  eq('sub mewarisi pos dari template', by['Cicilan & utang > Paylater'].pos, 'cicilan');
+  eq('pemasukan tanpa pos', by['Gaji'].pos, '');
+
+  lempar('template buku orang lain ditolak', function () { h(st, 'u-febie', 'kategori.template', { buku: 'riki', level: 'simpel' }); });
+  try { h(st, 'u-riki', 'kategori.template', { buku: 'rt', level: 'simpel' }); ok('template rt oleh non-manajer ditolak', false); }
+  catch (e) { eq('template rt oleh non-manajer ditolak', e.message, 'Hanya manajer keuangan yang bisa mengatur ini'); }
+  eq('template rt oleh manajer boleh', h(st, 'u-febie', 'kategori.template', { buku: 'rt', level: 'simpel' }).dibuat, 9);
+  lempar('level tidak dikenal ditolak', function () { h(st, 'u-riki', 'kategori.template', { buku: 'riki', level: 'super' }); });
+
+  console.log('\nAnti dobel & sub-kategori');
+  lempar('nama sama beda kapital/spasi ditolak', function () { h(st, 'u-riki', 'kategori.save', { nama: '  makan   &  JAJAN ', tipe: 'Pengeluaran', buku: 'riki' }); });
+  var lain = h(st, 'u-febie', 'kategori.save', { nama: 'Makan & jajan', tipe: 'Pengeluaran', buku: 'istri' });
+  ok('nama sama di buku lain boleh', !!lain.kategori);
+  var subBaru = h(st, 'u-riki', 'kategori.save', { nama: 'Bakso', tipe: 'Pengeluaran', buku: 'riki', induk: by['Makan & jajan'].id, pos: 'sosial' });
+  eq('sub manual mewarisi pos induk', subBaru.kategori.pos, 'kebutuhan');
+  lempar('sub dari sub ditolak', function () { h(st, 'u-riki', 'kategori.save', { nama: 'Bakso urat', tipe: 'Pengeluaran', buku: 'riki', induk: subBaru.kategori.id }); });
+  lempar('nama sub dobel di induk sama ditolak', function () { h(st, 'u-riki', 'kategori.save', { nama: 'bakso', tipe: 'Pengeluaran', buku: 'riki', induk: by['Makan & jajan'].id }); });
+  ok('nama sub sama di induk lain boleh', !!h(st, 'u-riki', 'kategori.save', { nama: 'Bakso', tipe: 'Pengeluaran', buku: 'riki', induk: by['Hiburan'].id }).kategori);
+  lempar('induk yang punya sub tidak bisa jadi sub', function () { h(st, 'u-riki', 'kategori.save', { id: by['Hiburan'].id, nama: 'Hiburan', tipe: 'Pengeluaran', buku: 'riki', induk: by['Makan & jajan'].id }); });
+  lempar('sub beda tipe dengan induk ditolak', function () { h(st, 'u-riki', 'kategori.save', { nama: 'Bonus makan', tipe: 'Pemasukan', buku: 'riki', induk: by['Makan & jajan'].id }); });
+  h(st, 'u-riki', 'kategori.save', { id: by['Hiburan'].id, nama: 'Hiburan', tipe: 'Pengeluaran', buku: 'riki', pos: 'sosial' });
+  eq('ubah pos induk -> sub ikut', C.byId(st.all('Kategori'))[by['Hiburan > Nongkrong'].id].pos, 'sosial');
+  h(st, 'u-riki', 'kategori.save', { id: by['Hiburan'].id, nama: 'Hiburan', tipe: 'Pengeluaran', buku: 'riki', pos: 'kebutuhan' });
+
+  console.log('\nBudget 40:30:20:10');
+  var b1 = h(st, 'u-riki', 'budget.rencana', { buku: 'riki', penghasilan: 10000000, rasio: '40,30,20,10', bulan: BL });
+  var belum = b1.belum_dialokasikan.reduce(function (t, x) { return t + x.nominal; }, 0);
+  eq('total budget = penghasilan - belum dialokasikan', b1.total, 10000000 - belum);
+  eq('semua pos punya kategori -> tidak ada sisa', belum, 0);
+  eq('pos kebutuhan 4jt', b1.pos[0].nominal, 4000000);
+  var itemsK = b1.pos[0].kategori.map(function (k) { return b1.items[k]; });
+  ok('dibagi rata, dibulatkan ke ribuan', itemsK.slice(1).every(function (v) { return v % 1000 === 0; }), itemsK.join(','));
+  eq('sisa pembulatan ke induk pertama', itemsK.reduce(function (a, b) { return a + b; }, 0), 4000000);
+  var eff = C.effectiveBudget(dbOf(st), BL).riki.items;
+  eq('budget tersimpan', eff[by['Cicilan & utang'].id], 3000000);
+  ok('budget hanya di induk', Object.keys(eff).every(function (k) { var kk = C.byId(st.all('Kategori'))[k]; return !kk || !kk.induk; }));
+  eq('rencana tersimpan di buku', C.byId(st.all('Buku')).riki.penghasilan, 10000000);
+  eq('bootstrap kirim rencana', h(st, 'u-riki', 'bootstrap').rencana.riki.rasio, '40,30,20,10');
+  lempar('rasio tidak 100 ditolak', function () { h(st, 'u-riki', 'budget.rencana', { buku: 'riki', penghasilan: 10000000, rasio: '40,30,20,20' }); });
+  lempar('rasio bukan 4 angka ditolak', function () { h(st, 'u-riki', 'budget.rencana', { buku: 'riki', penghasilan: 10000000, rasio: '50,50' }); });
+  lempar('budget otomatis buku orang lain ditolak', function () { h(st, 'u-febie', 'budget.rencana', { buku: 'riki', penghasilan: 1000000 }); });
+  lempar('budget otomatis rt oleh non-manajer ditolak', function () { h(st, 'u-riki', 'budget.rencana', { buku: 'rt', penghasilan: 1000000 }); });
+  var ubah = {}; ubah[by['Hiburan'].id] = 123000;
+  var b2 = h(st, 'u-riki', 'budget.rencana', { buku: 'riki', penghasilan: 10000000, items: ubah, bulan: BL });
+  eq('nominal per kategori bisa diubah', b2.items[by['Hiburan'].id], 123000);
+
+  // pos tanpa kategori -> belum_dialokasikan, tidak disimpan
+  var b3 = C.bagiRencana([{ key: 'a', pos: 'kebutuhan' }, { key: 'b', pos: 'kebutuhan' }, { key: 'c', pos: 'kebutuhan' }], 10000000, '40,30,20,10');
+  eq('pos kosong dikembalikan', b3.belum_dialokasikan.length, 3);
+  eq('total = penghasilan - belum dialokasikan', Object.keys(b3.items).reduce(function (t, k) { return t + b3.items[k]; }, 0), 10000000 - 6000000);
+  eq('dibagi 3: induk pertama dapat sisa', b3.items.a, 4000000 - 2 * 1333000);
+
+  console.log('\nLaporan: sub dijumlah ke induk');
+  var bl = C.effectiveBudget(dbOf(st), BL);
+  st.upsert('Transaksi', tx({ id: 's1', tipe: 'Pengeluaran', nominal: 50000, buku: 'riki', kategori: by['Makan & jajan > Kopi & jajan'].id, kantong: 'bca' }));
+  st.upsert('Transaksi', tx({ id: 's2', tipe: 'Pengeluaran', nominal: 30000, buku: 'riki', kategori: by['Makan & jajan'].id, kantong: 'bca' }));
+  var rs = ringkas(st, 'riki');
+  var mk = rs.perKategori.filter(function (k) { return k.id === by['Makan & jajan'].id; })[0];
+  eq('pengeluaran sub masuk induk', mk && mk.total, 80000);
+  ok('sub tidak tampil sendiri', !rs.perKategori.some(function (k) { return k.id === by['Makan & jajan > Kopi & jajan'].id; }));
+  eq('rincian sub tersedia', mk.sub.length, 2);
+  eq('sisa budget induk dihitung dari sub', mk.sisa, bl.riki.items[by['Makan & jajan'].id] - 80000);
+  var c = h(st, 'u-riki', 'tx.save', { id: 's3', tanggal: BL + '-06', tipe: 'Pengeluaran', nominal: 10000, buku: 'riki', kategori: by['Makan & jajan > Makan'].id, kantong: 'bca' });
+  ok('catat transaksi di sub boleh', !!c.tx);
+  // budget lama di kategori tanpa induk tetap jalan
+  eq('budget lama tetap jalan', ringkas(setup([]), 'riki').budgetTotal, 6000000);
+
+  console.log('\nManajer keuangan');
+  var sm = C.memoryStore(seed());
+  lempar('manajer hanya untuk buku bersama', function () { h(sm, 'u-riki', 'buku.manajer', { buku: 'riki', user: 'u-riki' }); });
+  lempar('user tidak ada ditolak', function () { h(sm, 'u-riki', 'buku.manajer', { buku: 'rt', user: 'x' }); });
+  lempar('rt tanpa manajer: template ditolak', function () { h(sm, 'u-riki', 'kategori.template', { buku: 'rt', level: 'simpel' }); });
+  eq('siapa pun boleh pilih manajer pertama', h(sm, 'u-riki', 'buku.manajer', { buku: 'rt', user: 'u-febie' }).buku.manajer, 'u-febie');
+  lempar('bukan manajer tidak bisa ganti', function () { h(sm, 'u-riki', 'buku.manajer', { buku: 'rt', user: 'u-riki' }); });
+  eq('manajer saat ini bisa ganti', h(sm, 'u-febie', 'buku.manajer', { buku: 'rt', user: 'u-riki' }).buku.manajer, 'u-riki');
+  ok('anggota tetap bisa tambah kategori manual di rt', !!h(sm, 'u-febie', 'kategori.save', { nama: 'Jajan anak', tipe: 'Pengeluaran', buku: 'rt' }).kategori);
+  eq('aksi buku.* milik kantong', C.fiturDariAksi('buku.manajer').id, 'kantong');
 })();
 
 console.log('\n' + lulus + ' cek lulus, ' + gagal + ' gagal.');

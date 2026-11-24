@@ -15,7 +15,7 @@ export const TABEL = {
 };
 const KOLOM_TANGGAL = { tanggal: 1, per_tanggal: 1, mulai: 1, akhir: 1 };
 const KOLOM_BOOL = { hitung: 1, aktif: 1, reimburse: 1, selesai: 1, terkunci: 1, abaikan_jarak: 1, bagikan_jadwal: 1, bagikan_catatan: 1, tampil: 1 };
-const KOLOM_ANGKA = { nominal: 1, saldo_awal: 1, limit: 1, urutan: 1, durasi: 1, versi: 1, versi_teks: 1 };
+const KOLOM_ANGKA = { nominal: 1, penghasilan: 1, saldo_awal: 1, limit: 1, urutan: 1, durasi: 1, versi: 1, versi_teks: 1 };
 // kolom yang tipenya beda per tabel: nomor pasal = angka, nomor bab = teks (I, II, ...)
 const KOLOM_ANGKA_TABEL = { KomitmenPasal: { nomor: 1 } };
 const angka = (tabel, h) => KOLOM_ANGKA[h] || (KOLOM_ANGKA_TABEL[tabel] && KOLOM_ANGKA_TABEL[tabel][h]);

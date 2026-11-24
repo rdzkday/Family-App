@@ -351,6 +351,24 @@ function mockGoogle() {
     const hapus = db.tabel.siklus.find((x) => x.id === 'sk-1');
     assert.deepStrictEqual([hapus.mulai, hapus.akhir, hapus.catatan], [null, null, ''], 'hapus: tanggal null, catatan kosong');
   });
+  await t('template kategori lewat Edge Function: manajer, template, budget 40:30:20:10 tersimpan dengan tipe benar', async () => {
+    assert.strictEqual(ok(await call(R, 'bootstrap', {})).buku.find((b) => b.id === 'rt').manajer, '', 'kolom lama kosong = belum ada manajer');
+    const g = await call(R, 'kategori.template', { buku: 'rt', level: 'simpel' });
+    assert.strictEqual(g.ok, false); assert.strictEqual(g.error, 'Pilih dulu manajer keuangan rumah tangga');
+    ok(await call(I, 'buku.manajer', { buku: 'rt', user: 'istri' }));
+    assert.strictEqual(db.tabel.buku.find((b) => b.id === 'rt').manajer, 'istri');
+    const n = await call(R, 'kategori.template', { buku: 'rt', level: 'simpel' });
+    assert.strictEqual(n.error, 'Hanya manajer keuangan yang bisa mengatur ini');
+    const tp = ok(await call(R, 'kategori.template', { buku: 'riki', level: 'menengah' }));
+    assert.ok(tp.dibuat > 10);
+    const sub = db.tabel.kategori.find((k) => k.buku === 'riki' && k.induk);
+    assert.ok(sub && sub.pos, 'induk & pos tersimpan di Postgres');
+    const rb = ok(await call(R, 'budget.rencana', { buku: 'riki', penghasilan: 10000000, bulan: '2026-11' }));
+    assert.strictEqual(rb.total, 10000000);
+    const br = db.tabel.buku.find((b) => b.id === 'riki');
+    assert.strictEqual(br.penghasilan, 10000000, 'penghasilan = angka (bigint)'); assert.strictEqual(br.rasio, '40,30,20,10');
+    assert.strictEqual(ok(await call(R, 'bootstrap', {})).rencana.riki.penghasilan, 10000000);
+  });
   resetTokenCache();
   console.log(`\n${lulus} test lulus`);
 })().catch((e) => { console.error('GAGAL:', e); process.exit(1); });

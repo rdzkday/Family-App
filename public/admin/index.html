@@ -57,6 +57,8 @@ dialog h2 { margin: 0 0 4px; font-size: 18px; }
 .toast.on { opacity: 1; }
 h2.sec { font-size: 16px; font-weight: 800; margin: 28px 0 10px; }
 h2.sec:first-of-type { margin-top: 0; }
+.mj { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); margin: 0; }
+.mj select { min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface, transparent); color: inherit; font: inherit; }
 .fitur { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 24px; }
 .fitur label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 12px 0; border-top: 1px solid var(--border); cursor: pointer; }
 .fitur label span b { display: block; color: var(--text); font-size: 15px; }
@@ -110,10 +112,11 @@ h2.sec:first-of-type { margin-top: 0; }
 'use strict';
 var API = window.KANTONG_API || 'https://serskylzlevhjidqrvjm.supabase.co/functions/v1/kantong';
 var KEY = 'admin_token';
-var S = { token: get(), saya: '', akun: [], fitur: null };
+var S = { token: get(), saya: '', akun: [], fitur: null, manajer: null };
 function get() { try { return sessionStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
 function put(v) { try { v ? sessionStorage.setItem(KEY, v) : sessionStorage.removeItem(KEY); } catch (e) {} }
 function $(s) { return document.querySelector(s); }
+function $$mj() { return Array.prototype.slice.call(document.querySelectorAll('[data-mj]')); }
 function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
 function toast(m) { var t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function () { t.classList.remove('on'); }, 2400); }
 function waktu(iso) {
@@ -198,8 +201,9 @@ function renderGantiPw(lama, wajib) {
 
 // ---------- muat: fitur + akun ----------
 function muat() {
-  return Promise.all([admin('list'), admin('fitur').catch(function () { return { fitur: null }; })]).then(function (r) {
-    S.saya = r[0].saya; S.akun = r[0].akun; S.fitur = r[1].fitur; renderDaftar();
+  return Promise.all([admin('list'), admin('fitur').catch(function () { return { fitur: null }; }),
+    admin('manajer').catch(function () { return null; })]).then(function (r) {
+    S.saya = r[0].saya; S.akun = r[0].akun; S.fitur = r[1].fitur; S.manajer = r[2]; renderDaftar();
   }).catch(function (e) { if (e.code !== 'AUTH') toast(e.message); });
 }
 // Fitur aktif untuk seluruh rumah tangga. Daftar & keterangan dari registry yang sama dengan app (shared/fitur.js).
@@ -210,6 +214,22 @@ function fiturHtml() {
       return '<label><span><b>' + esc(f.nama) + '</b><small class="muted">' + esc(f.ket) + '</small></span>' +
         '<input type="checkbox" class="sw" data-fitur="' + f.id + '"' + (S.fitur[f.id] !== false ? ' checked' : '') + ' aria-label="' + esc(f.nama) + ' aktif"></label>';
     }).join('') + '</div></div>';
+}
+// Manajer keuangan buku Bersama: hanya dia yang memilih template kategori & budget 40:30:20:10 buku itu.
+function manajerHtml() {
+  if (!S.manajer) return '<div class="card"><p class="muted" style="margin:0">Setelan manajer keuangan belum tersedia di server (jalankan migrasi template kategori).</p></div>';
+  return '<div class="card"><p class="muted" style="margin:0 0 8px;font-size:14px">Manajer memilih template kategori dan mengatur budget 40:30:20:10 buku bersama. Kosongkan untuk memunculkan lagi layar pilih manajer di app.</p>' +
+    S.manajer.buku.map(function (b) {
+      return '<label class="mj"><b>' + esc(b.nama) + '</b><select data-mj="' + esc(b.id) + '"><option value="">Belum dipilih</option>' +
+        S.manajer.users.map(function (u) { return '<option value="' + esc(u.id) + '"' + (u.id === b.manajer ? ' selected' : '') + '>' + esc(u.nama || u.id) + '</option>'; }).join('') + '</select></label>';
+    }).join('') + '</div>';
+}
+function ubahManajer(ev) {
+  var sel = ev.target.closest('[data-mj]'); if (!sel) return;
+  sel.disabled = true;
+  admin('manajer', { buku: sel.dataset.mj, user: sel.value }).then(function (d) {
+    S.manajer = d; sel.disabled = false; toast('Manajer keuangan disimpan. Berlaku di HP setelah sinkron berikutnya.');
+  }).catch(function (e) { sel.disabled = false; toast(e.message); muat(); });
 }
 function ubahFitur(ev) {
   var c = ev.target.closest('[data-fitur]'); if (!c) return;
@@ -244,6 +264,7 @@ function renderDaftar() {
   $('#app').innerHTML = '<div class="top"><div><h1>Panel Admin</h1><p class="muted" style="margin:0">Family App</p></div>' +
     '<div class="act"><button class="btn" id="ubahpw">Ubah password saya</button><button class="btn" id="keluar">Keluar</button></div></div>' +
     '<h2 class="sec">Fitur</h2>' + fiturHtml() +
+    '<h2 class="sec" style="margin-top:28px">Manajer keuangan</h2>' + manajerHtml() +
     '<div class="top" style="margin:28px 0 10px"><div><h2 class="sec" style="margin:0">Akun</h2><p class="muted" style="margin:0;font-size:14px">' + S.akun.length + ' user · ' +
       S.akun.filter(function (a) { return a.aktif; }).length + ' aktif</p></div><button class="btn primary" id="tambah">+ Tambah akun</button></div>' +
     '<div class="card"><table><thead><tr><th>User</th><th>Username</th><th>Status</th><th>Sesi · terakhir aktif</th><th></th></tr></thead>' +
@@ -253,6 +274,7 @@ function renderDaftar() {
   $('#keluar').onclick = function () { call('logout').catch(function () {}); put(''); S.token = ''; renderLogin(); };
   $('#app').querySelector('tbody').addEventListener('click', aksiBaris);
   var fl = $('#app').querySelector('.fitur'); if (fl) fl.addEventListener('change', ubahFitur);
+  $$mj().forEach(function (x) { x.addEventListener('change', ubahManajer); });
 }
 function cari(id) { return S.akun.filter(function (a) { return a.user_id === id; })[0]; }
 
