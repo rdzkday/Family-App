@@ -5,7 +5,15 @@
 // ---------- Catat (home) ----------
 var HomeView = {
   render: function (el) {
-    el.innerHTML = fiturHead(longToday()) +
+    // belum ada manajer keuangan / buku masih kosong: tampilkan onboarding dulu (kantong/template.js)
+    var g = kantongGate();
+    this.gate = g ? g.kind : '';
+    if (g) {
+      el.innerHTML = fiturHead(longToday()) + menungguTemplateHtml() + '<div id="tpl-box">' + g.html + '</div>';
+      g.bind($('#tpl-box', el));
+      return;
+    }
+    el.innerHTML = fiturHead(longToday()) + menungguTemplateHtml() +
       '<div id="home-budget"></div>' +
       '<section class="section"><div class="entry" id="entry"></div></section>' +
       '<div id="home-utang"></div><div id="home-reim"></div>' +
@@ -14,6 +22,9 @@ var HomeView = {
     this.update(el);
   },
   update: function (el) {
+    var g = kantongGate();
+    if ((g ? g.kind : '') !== (this.gate || '')) return this.render(el);
+    if (g) return;   // jangan gambar ulang wizard saat sinkron (isian bisa hilang)
     var m = ensureMonth(thisMonth());
     var budgetEl = $('#home-budget', el), todayEl = $('#today', el);
     if (!m) { budgetEl.innerHTML = '<div class="skeleton"></div>'; todayEl.innerHTML = skeleton(2); return; }

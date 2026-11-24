@@ -107,14 +107,15 @@ var AturUmum = {
 // ---------- Kantong ----------
 var AturKantongFitur = {
   render: function (el) {
-    var nKat = db().Kategori.filter(function (k) { return C.bool(k.aktif) && k.id !== C.KAT_REIMBURSE; }).length;
-    el.innerHTML = aturBaris('Budget bulanan', 'Atur budget per kategori, bulan berikutnya ikut otomatis', '', ' data-ak="budget"') +
+    var nKat = db().Kategori.filter(function (k) { return C.bool(k.aktif) && !C.isSistem(k); }).length;
+    el.innerHTML = manajerAturHtml() + aturBaris('Budget bulanan', 'Atur budget per kategori, bulan berikutnya ikut otomatis', '', ' data-ak="budget"') +
       toggleHtml('ak-setoran', 'Tampilkan setoran Rumah Tangga di grafik', 'Ringkasan Kantong', showSetoran()) +
       '<div class="atur-lbl">Kantong</div><div id="ak-kantong"></div>' +
       '<div class="atur-lbl">Kategori <span class="faint">· ' + nKat + ' aktif</span></div><div id="ak-kategori"></div>';
     AturKantong.render($('#ak-kantong', el));
     AturKategori.render($('#ak-kategori', el));
     $('[data-ak="budget"]', el).addEventListener('click', openBudgetSheet);
+    bindManajerAtur(el);
     $('#ak-setoran', el).addEventListener('click', function () { setSetoran(!showSetoran()); this.setAttribute('aria-checked', String(showSetoran())); });
   }
 };
