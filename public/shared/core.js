@@ -7,9 +7,11 @@ var KantongCore = (function () {
   'use strict';
 
   var SCHEMA = {
-    Buku: ['id', 'nama', 'tipe', 'pemilik', 'urutan'],
+    // manajer = id user manajer keuangan (hanya buku Bersama). penghasilan/rasio/rencana_diubah = rencana budget 40:30:20:10
+    Buku: ['id', 'nama', 'tipe', 'pemilik', 'urutan', 'manajer', 'penghasilan', 'rasio', 'rencana_diubah'],
     Users: ['id', 'nama', 'buku'],
-    Kategori: ['id', 'nama', 'tipe', 'buku', 'warna', 'hitung', 'aktif', 'urutan'],
+    // induk = id kategori induk ('' = induk). pos = kebutuhan | cicilan | tabungan | sosial | ''
+    Kategori: ['id', 'nama', 'tipe', 'buku', 'warna', 'hitung', 'aktif', 'urutan', 'induk', 'pos'],
     Kantong: ['id', 'nama', 'jenis', 'buku', 'saldo_awal', 'per_tanggal', 'limit', 'aktif', 'urutan'],
     Budget: ['id', 'bulan', 'buku', 'kategori', 'nominal'],
     Transaksi: ['id', 'tanggal', 'tipe', 'nominal', 'buku', 'kategori', 'kantong', 'kantong_tujuan',
@@ -39,7 +41,7 @@ var KantongCore = (function () {
   var KAT_SETORAN_MASUK = 'setoran-rt-in'; // pemasukan otomatis di sisi dompet bersama
   var TIPE_TX = ['Pengeluaran', 'Pemasukan', 'Transfer'];
   var JENIS_KANTONG = ['Cash', 'Debit', 'E-wallet', 'Kredit'];
-  var VERSION = '1.8.0';
+  var VERSION = '1.9.0';
   // ---------- to-do ----------
   var TODO_BERSAMA = 'bersama';          // pemilik to-do bersama (selain itu: id user)
   var TODO_DURASI = 30;                  // menit, dipakai kalau jam diisi tapi durasi kosong
@@ -57,7 +59,7 @@ var KantongCore = (function () {
   // Fitur yang bisa dinyalakan/dimatikan admin (tabel app_setting, kunci 'fitur'). Beranda & Pengaturan selalu ada.
   // aksi: prefiks/nama aksi milik fitur itu. Fitur nonaktif = aksinya ditolak.
   var FITUR = [
-    { id: 'kantong', nama: 'Kantong', aksi: ['month', 'tx.', 'budget.', 'kantong.', 'kategori.', 'talangan.'] },
+    { id: 'kantong', nama: 'Kantong', aksi: ['month', 'tx.', 'budget.', 'kantong.', 'kategori.', 'talangan.', 'buku.'] },
     { id: 'agenda', nama: 'Agenda', aksi: ['todo.', 'kalender.', 'siklus.'] },   // Siklus = lapisan di Kalender Agenda
     { id: 'komitmen', nama: 'Komitmen', aksi: ['komitmen.', 'pengesahan.'] },
     { id: 'mood', nama: 'Daily Mood', aksi: ['jurnal.'] }
@@ -184,7 +186,7 @@ var KantongCore = (function () {
     var kmap = byId(db.Kategori);
     var s = { pemasukan: 0, pengeluaran: 0, reimburse: 0, reimburseMenunggu: 0, transferMasuk: 0, transferKeluar: 0,
       setoran: 0, setoranMasuk: 0, budgetTotal: 0, perKategori: [], perMasuk: [] };
-    var spend = {}, inc = {};
+    var spend = {}, inc = {}, rinci = {};
     monthTx.forEach(function (t) {
       if (t.dihapus) return;
       var n = num(t.nominal), k = kmap[t.kategori];
@@ -193,10 +195,14 @@ var KantongCore = (function () {
         if (bool(t.reimburse) && t.terbayar) { s.reimburse += n; return; }
         if (bool(t.reimburse)) s.reimburseMenunggu += n;
         if (k && !bool(k.hitung)) return;
-        s.pengeluaran += n; spend[t.kategori] = (spend[t.kategori] || 0) + n;
+        // pengeluaran di sub dijumlah ke induknya; rincian per sub disimpan terpisah
+        var ki = indukDari(kmap, t.kategori);
+        s.pengeluaran += n; spend[ki] = (spend[ki] || 0) + n;
+        rinci[ki] = rinci[ki] || {}; rinci[ki][t.kategori] = (rinci[ki][t.kategori] || 0) + n;
       } else if (t.tipe === 'Pemasukan' && inSet(t.buku)) {
         if (k && !bool(k.hitung)) return;
-        s.pemasukan += n; inc[t.kategori] = (inc[t.kategori] || 0) + n;
+        var km = indukDari(kmap, t.kategori);
+        s.pemasukan += n; inc[km] = (inc[km] || 0) + n;
       } else if (t.tipe === 'Transfer') {
         var src = inSet(t.buku), dst = inSet(bukuOfKantong(db, t.kantong_tujuan));
         // src && dst berarti kedua sisi ada di tampilan ini (mis. buku 'all' atau pindah dalam buku):
@@ -216,7 +222,8 @@ var KantongCore = (function () {
     Object.keys(budgets || {}).forEach(function (b) {
       if (!inSet(b)) return;
       var items = budgets[b].items || {};
-      Object.keys(items).forEach(function (kid) { bud[kid] = (bud[kid] || 0) + num(items[kid]); });
+      // budget hanya di induk; kalau ada budget lama di sub, ikut ke induknya
+      Object.keys(items).forEach(function (kid) { var ki = indukDari(kmap, kid); bud[ki] = (bud[ki] || 0) + num(items[kid]); });
     });
     var ids = {};
     Object.keys(spend).forEach(function (k) { ids[k] = 1; });
@@ -225,8 +232,12 @@ var KantongCore = (function () {
       var k = kmap[kid] || katBawaan(kid);
       var total = spend[kid] || 0, b = bud[kid] || 0;
       s.budgetTotal += b;
+      var sub = Object.keys(rinci[kid] || {}).map(function (sid) {
+        var sk = kmap[sid] || katBawaan(sid);
+        return { id: sid, nama: sk.nama, warna: sk.warna, total: rinci[kid][sid], langsung: sid === kid };
+      }).sort(function (a, b) { return b.total - a.total; });
       return { id: kid, nama: k.nama, warna: k.warna, total: total, budget: b, sisa: b - total,
-        pct: s.pengeluaran > 0 ? total / s.pengeluaran : 0 };
+        pct: s.pengeluaran > 0 ? total / s.pengeluaran : 0, pos: k.pos || '', sub: sub };
     }).sort(function (a, b) { return b.total - a.total || b.budget - a.budget; });
     s.perMasuk = Object.keys(inc).map(function (kid) {
       var k = kmap[kid] || katBawaan(kid);
@@ -235,6 +246,180 @@ var KantongCore = (function () {
     s.selisih = s.pemasukan - s.pengeluaran;
     s.sisaBudget = s.budgetTotal - s.pengeluaran;
     return s;
+  }
+
+  // ---------- template kategori, sub-kategori, rencana budget 40:30:20:10 ----------
+  // Template disimpan di kode (bukan database) supaya gampang diedit. Tiap baris: [nama, level minimal, pos, sub].
+  // Level: s = Simpel, m = Menengah, d = Detail. Level lebih tinggi selalu memuat isi level di bawahnya.
+  // Pos: K = kebutuhan, C = cicilan, T = tabungan, S = sosial. Sub: [nama, level minimal]. Kategori Pemasukan tanpa pos & budget.
+  var TEMPLATE_KATEGORI = {
+    pribadi: {
+      pengeluaran: [
+        ['Makan & jajan', 's', 'K', [['Makan', 'm'], ['Kopi & jajan', 'm'], ['Makan siang kantor', 'd']]],
+        ['Transportasi', 's', 'K', [['Bensin', 'm'], ['Ojek & transport umum', 'm'], ['Parkir & tol', 'm'], ['Servis kendaraan', 'd']]],
+        ['Pulsa & internet', 's', 'K', []],
+        ['Kebutuhan pribadi', 's', 'K', [['Perawatan diri', 'm'], ['Pakaian', 'm'], ['Kesehatan', 'm'], ['Potong rambut', 'd'], ['Olahraga', 'd']]],
+        ['Pengembangan diri', 'd', 'K', [['Buku', 'd'], ['Kursus', 'd']]],
+        ['Hiburan', 's', 'K', [['Langganan', 'm'], ['Nongkrong', 'm'], ['Hobi', 'd'], ['Liburan', 'd']]],
+        ['Cicilan & utang', 's', 'C', [['Kartu kredit', 'm'], ['Paylater', 'm'], ['Cicilan gadget', 'd'], ['Pinjaman', 'd']]],
+        ['Tabungan & investasi', 's', 'T', [['Dana darurat', 'm'], ['Investasi', 'm'], ['Tabungan tujuan', 'd'], ['Reksa dana', 'd'], ['Emas', 'd']]],
+        ['Sosial & sedekah', 's', 'S', [['Sedekah', 'm'], ['Hadiah', 'm'], ['Zakat', 'd'], ['Kondangan', 'd'], ['Bantu keluarga', 'd']]]
+      ],
+      pemasukan: [['Gaji', 's'], ['Bonus', 'm'], ['Freelance', 'm'], ['THR', 'd'], ['Hasil investasi', 'd'], ['Pemasukan lain', 's']]
+    },
+    rt: {
+      pengeluaran: [
+        ['Belanja dapur', 's', 'K', [['Sayur & lauk', 'm'], ['Bumbu & sembako', 'm'], ['Galon & gas', 'm']]],
+        ['Tagihan rumah', 's', 'K', [['Listrik', 'm'], ['Air', 'm'], ['Internet', 'm'], ['IPL/iuran', 'd'], ['Asuransi', 'd']]],
+        ['Kebutuhan rumah', 's', 'K', [['Kebersihan', 'm'], ['Perlengkapan rumah', 'm'], ['Perbaikan rumah', 'd'], ['ART/laundry', 'd']]],
+        ['Transportasi keluarga', 's', 'K', []],
+        ['Kesehatan keluarga', 's', 'K', [['Obat', 'm'], ['Dokter', 'm']]],
+        ['Anak', 'd', 'K', [['Kebutuhan anak', 'd'], ['Pendidikan', 'd']]],
+        ['Hiburan keluarga', 'd', 'K', [['Makan di luar', 'd'], ['Langganan', 'd']]],
+        ['Cicilan', 's', 'C', [['Cicilan rumah', 'm'], ['Cicilan kendaraan', 'm']]],
+        ['Tabungan bersama', 's', 'T', [['Dana darurat', 'm'], ['Liburan', 'm'], ['Pendidikan anak', 'd'], ['Investasi', 'd']]],
+        ['Sosial & keluarga besar', 's', 'S', [['Orang tua', 'm'], ['Sedekah', 'm'], ['Kondangan', 'd'], ['Zakat', 'd']]]
+      ],
+      // Setoran dari pribadi dibuat otomatis oleh sistem, jadi tidak ada di sini
+      pemasukan: [['Pemasukan lain', 's']]
+    }
+  };
+  var TEMPLATE_LEVEL = ['simpel', 'menengah', 'detail'];
+  var POS = ['kebutuhan', 'cicilan', 'tabungan', 'sosial'];          // urutan = urutan rasio
+  var POS_NAMA = { kebutuhan: 'Kebutuhan', cicilan: 'Cicilan', tabungan: 'Tabungan', sosial: 'Sosial' };
+  var POS_KODE = { K: 'kebutuhan', C: 'cicilan', T: 'tabungan', S: 'sosial' };
+  var RASIO_BAKU = '40,30,20,10';
+  var TEMPLATE_WARNA = ['#FFC2B0', '#B8D4FF', '#A8E0E8', '#C9B8FF', '#FFE29A', '#FFC6DA', '#F4B8B8', '#B8E6CF', '#E3C6F2', '#FFD6A5'];
+  var WARNA_MASUK = ['#34D399', '#5EEAD4', '#6EE7B7', '#A7F3D0', '#99F6E4', '#86EFAC'];
+  var KAT_SISTEM = [KAT_REIMBURSE, KAT_SETORAN, KAT_SETORAN_MASUK];
+
+  // nama dibandingkan tanpa beda huruf besar/kecil & spasi (sama dengan index unik di database)
+  function normNama(s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+  function isSistem(k) { return KAT_SISTEM.indexOf(k && k.id) >= 0; }
+  function jenisTemplate(b) { return b && b.tipe === 'Bersama' ? 'rt' : 'pribadi'; }
+
+  // Daftar datar isi template: [{ nama, tipe, pos, induk (nama induk, '' = induk), warna }]
+  function templateDaftar(jenis, level) {
+    var t = TEMPLATE_KATEGORI[jenis], lv = TEMPLATE_LEVEL.indexOf(level);
+    if (!t || lv < 0) throw err('Level template tidak dikenal');
+    var ikut = function (x) { return TEMPLATE_LEVEL.indexOf({ s: 'simpel', m: 'menengah', d: 'detail' }[x]) <= lv; };
+    var out = [];
+    t.pengeluaran.forEach(function (r, i) {
+      if (!ikut(r[1])) return;
+      var pos = POS_KODE[r[2]] || '', w = TEMPLATE_WARNA[i % TEMPLATE_WARNA.length];
+      out.push({ nama: r[0], tipe: 'Pengeluaran', pos: pos, induk: '', warna: w });
+      (r[3] || []).forEach(function (sb) { if (ikut(sb[1])) out.push({ nama: sb[0], tipe: 'Pengeluaran', pos: pos, induk: r[0], warna: w }); });
+    });
+    t.pemasukan.forEach(function (r, i) {
+      if (ikut(r[1])) out.push({ nama: r[0], tipe: 'Pemasukan', pos: '', induk: '', warna: WARNA_MASUK[i % WARNA_MASUK.length] });
+    });
+    return out;
+  }
+
+  // Siapa boleh memilih template & mengatur budget otomatis: pemilik buku pribadi, atau manajer keuangan buku bersama.
+  function bolehAturRencana(db, user, bukuId) {
+    var b = byId(db.Buku)[bukuId];
+    if (!b || !user) return false;
+    if (b.tipe === 'Bersama') return !!b.manajer && b.manajer === user.id;
+    return b.pemilik === user.id;
+  }
+  function cekAturRencana(db, user, bukuId) {
+    var b = byId(db.Buku)[bukuId];
+    if (!b) throw err('Buku tidak valid');
+    if (bolehAturRencana(db, user, bukuId)) return b;
+    if (b.tipe === 'Bersama') throw err(b.manajer ? 'Hanya manajer keuangan yang bisa mengatur ini' : 'Pilih dulu manajer keuangan rumah tangga');
+    throw err('Hanya pemilik buku yang bisa mengatur ini');
+  }
+  // Buku "kosong" = belum punya kategori sendiri. Kategori sistem (setoran, reimburse) tidak dihitung.
+  function bukuKosong(db, bukuId) {
+    return !(db.Kategori || []).some(function (k) { return !isSistem(k) && scopeOf(k).indexOf(bukuId) >= 0; });
+  }
+  // kategori lain yang namanya sama di buku & induk yang sama (aturan anti dobel)
+  function kategoriKembar(db, nama, bukuList, induk, kecualiId) {
+    var n = normNama(nama);
+    return (db.Kategori || []).filter(function (k) {
+      if (k.id === kecualiId || !bool(k.aktif) || String(k.induk || '') !== String(induk || '') || normNama(k.nama) !== n) return false;
+      return scopeOf(k).some(function (b) { return bukuList.indexOf(b) >= 0; });
+    })[0] || null;
+  }
+  // id kategori -> id induknya (atau dirinya sendiri)
+  function indukDari(kmap, kid) {
+    var k = kmap[kid];
+    return k && k.induk && kmap[k.induk] ? k.induk : kid;
+  }
+  function parseRasio(v) {
+    var a = (Object.prototype.toString.call(v) === '[object Array]' ? v : String(v == null || v === '' ? RASIO_BAKU : v).split(','))
+      .map(function (x) { return String(x).trim(); });
+    if (a.length !== 4 || a.some(function (x) { return !/^\d+$/.test(x); })) throw err('Rasio harus 4 angka, mis. 40,30,20,10');
+    var n = a.map(Number);
+    if (n[0] + n[1] + n[2] + n[3] !== 100) throw err('Total rasio harus 100');
+    return n;
+  }
+  // Pembagian murni (dipakai server & layar pratinjau). induk: [{ key, pos }] berurutan.
+  // Nominal pos dibagi rata ke induk di pos itu, dibulatkan ke ribuan; sisa pembulatan masuk ke induk pertama pos itu.
+  function bagiRencana(induk, penghasilan, rasio) {
+    var r = parseRasio(rasio), total = Math.max(0, Math.round(num(penghasilan)));
+    var out = { penghasilan: total, rasio: r.join(','), pos: [], items: {}, belum_dialokasikan: [] };
+    POS.forEach(function (p, i) {
+      var nom = Math.round(total * r[i] / 100);
+      var anggota = induk.filter(function (x) { return x.pos === p; });
+      out.pos.push({ pos: p, nama: POS_NAMA[p], persen: r[i], nominal: nom, kategori: anggota.map(function (x) { return x.key; }) });
+      if (!anggota.length) { if (nom > 0) out.belum_dialokasikan.push({ pos: p, nama: POS_NAMA[p], nominal: nom }); return; }
+      var tiap = Math.floor(nom / anggota.length / 1000) * 1000;
+      anggota.forEach(function (x, j) { out.items[x.key] = j === 0 ? nom - tiap * (anggota.length - 1) : tiap; });
+    });
+    return out;
+  }
+  // induk Pengeluaran di buku ini yang ikut rencana budget
+  function indukRencana(db, bukuId) {
+    return sortBy((db.Kategori || []).filter(function (k) {
+      return k.tipe === 'Pengeluaran' && !k.induk && !isSistem(k) && bool(k.aktif) && bool(k.hitung) &&
+        POS.indexOf(k.pos) >= 0 && scopeOf(k).indexOf(bukuId) >= 0;
+    }), 'urutan').map(function (k) { return { key: k.id, pos: k.pos, nama: k.nama }; });
+  }
+  function rencanaBuku(b) {
+    return { penghasilan: num(b.penghasilan), rasio: String(b.rasio || RASIO_BAKU), diubah: String(b.rencana_diubah || '') };
+  }
+
+  // id kategori dari template: '<buku>-<nama>' atau '<buku>-<induk>-<nama>', unik
+  function idTemplate(ada, bukuId, indukNama, nama) {
+    var base = slug(bukuId + ' ' + (indukNama ? indukNama + ' ' : '') + nama), id = base, n = 2;
+    while (ada[id]) id = base.slice(0, 36) + '-' + (n++);
+    return id;
+  }
+  function terapkanTemplate(store, db, user, bukuId, level) {
+    var b = cekAturRencana(db, user, bukuId);
+    var daftar = templateDaftar(jenisTemplate(b), level);
+    var ada = byId(db.Kategori), dibuat = 0, dilewati = [], idInduk = {};
+    var urut = (db.Kategori || []).reduce(function (m, k) { return Math.max(m, num(k.urutan)); }, 0);
+    // nama yang sudah ada (aktif atau nonaktif) di buku ini dilewati, tidak error. Aman dipanggil 2x.
+    function cari(nama, induk) {
+      var n = normNama(nama);
+      return (db.Kategori || []).filter(function (k) {
+        return !isSistem(k) && String(k.induk || '') === induk && normNama(k.nama) === n && scopeOf(k).indexOf(bukuId) >= 0;
+      })[0];
+    }
+    daftar.forEach(function (x) {
+      var indukId = '';
+      if (x.induk) {
+        indukId = idInduk[normNama(x.induk)] || '';
+        if (!indukId) { dilewati.push(x.induk + ' › ' + x.nama); return; }
+      }
+      var kembar = cari(x.nama, indukId);
+      if (kembar) {
+        if (!x.induk) idInduk[normNama(x.nama)] = kembar.id;
+        dilewati.push(x.induk ? x.induk + ' › ' + x.nama : x.nama);
+        return;
+      }
+      var id = idTemplate(ada, bukuId, x.induk, x.nama);
+      var kat = { id: id, nama: x.nama, tipe: x.tipe, buku: bukuId, warna: x.warna, hitung: true, aktif: true,
+        urutan: ++urut, induk: indukId, pos: x.pos };
+      store.upsert('Kategori', kat);
+      db.Kategori.push(kat); ada[id] = kat; dibuat++;
+      if (!x.induk) idInduk[normNama(x.nama)] = id;
+    });
+    db.Kategori = store.all('Kategori');
+    return { dibuat: dibuat, dilewati: dilewati };
   }
 
   // ---------- validasi ----------
@@ -1169,6 +1354,7 @@ var KantongCore = (function () {
           kategori: sortBy(db.Kategori, 'urutan'), kantong: sortBy(db.Kantong, 'urutan'),
           saldo: computeSaldo(db).saldo, bulan: Object.keys(months).sort().reverse(),
           utang: computeUtang(db), talangan: computeTalangan(db),
+          rencana: db.Buku.reduce(function (m, b) { m[b.id] = rencanaBuku(b); return m; }, {}),
           fitur: store.fitur || null
         };
       }
@@ -1323,15 +1509,80 @@ var KantongCore = (function () {
           .concat(old.filter(function (b) { return scope.indexOf(b) < 0; }));
         touched.forEach(function (b) { if (!canWrite(db, user, b)) throw err('Tidak bisa mengubah kategori buku orang lain'); });
         if (kex && !scope.concat(old).some(function (b) { return canWrite(db, user, b); })) throw err('Tidak bisa mengubah kategori ini');
+        // sub-kategori: 2 level saja (induk -> sub). Sub ikut buku & pos induknya.
+        var kmapS = byId(db.Kategori);
+        var induk = kin.induk === undefined ? (kex ? String(kex.induk || '') : '') : String(kin.induk || '');
+        var pos = kin.pos === undefined ? (kex ? String(kex.pos || '') : '') : String(kin.pos || '');
+        if (pos && POS.indexOf(pos) < 0) throw err('Pos budget tidak dikenal');
+        if (induk) {
+          var ik = kmapS[induk];
+          if (!ik) throw err('Induk kategori tidak ditemukan');
+          if (kex && ik.id === kex.id) throw err('Kategori tidak bisa jadi sub dirinya sendiri');
+          if (ik.induk) throw err('Sub-kategori tidak bisa punya sub lagi');
+          if (isSistem(ik)) throw err('Kategori otomatis tidak bisa punya sub');
+          if (ik.tipe !== tipe) throw err('Tipe sub harus sama dengan induknya');
+          if (kex && db.Kategori.some(function (x) { return x.induk === kex.id; })) throw err('Kategori ini punya sub, jadi tidak bisa jadi sub');
+          scope.forEach(function (b) { if (scopeOf(ik).indexOf(b) < 0) throw err('Sub harus di buku yang sama dengan induknya'); });
+          pos = String(ik.pos || '');
+        }
+        if (tipe === 'Pemasukan') pos = '';
+        var aktifBaru = kin.aktif === undefined ? (kex ? bool(kex.aktif) : true) : bool(kin.aktif);
+        if (aktifBaru) {
+          var kembar = kategoriKembar(db, nama, scope, induk, kex ? kex.id : '');
+          if (kembar) throw err('Kategori "' + kembar.nama + '" sudah ada' + (induk ? ' di induk ini' : ' di buku ini'));
+        }
         var id = kex ? kex.id : (String(kin.id || '') || slug(nama));
         if (!kex && byId(db.Kategori)[id]) id = id + '-' + Math.random().toString(36).slice(2, 6);
-        var kat = { id: id, nama: nama, tipe: tipe, buku: scope.join(','),
+        if (!kex) {
+          var urMax = db.Kategori.reduce(function (m, x) { return Math.max(m, num(x.urutan)); }, 0);
+          if (kin.urutan === undefined) kin.urutan = urMax + 1;
+        }
+        var kat = { id: id, nama: nama, tipe: tipe, buku: scope.join(','), induk: induk, pos: pos,
           warna: /^#[0-9a-fA-F]{6}$/.test(kin.warna || '') ? kin.warna : (kex ? kex.warna : '#7C9CFF'),
           hitung: kin.hitung === undefined ? (kex ? bool(kex.hitung) : true) : bool(kin.hitung),
           aktif: kin.aktif === undefined ? (kex ? bool(kex.aktif) : true) : bool(kin.aktif),
           urutan: kin.urutan !== undefined ? num(kin.urutan) : (kex ? num(kex.urutan) : db.Kategori.length + 1) };
         store.upsert('Kategori', kat);
+        // pos induk berubah -> sub ikut
+        if (!induk) db.Kategori.forEach(function (x) {
+          if (x.induk === kat.id && String(x.pos || '') !== kat.pos) { var u = clone(x); u.pos = kat.pos; store.upsert('Kategori', u); }
+        });
         return { kategori: kat };
+      }
+      case 'kategori.template': {
+        var hasilT = terapkanTemplate(store, db, user, String(payload.buku || ''), String(payload.level || ''));
+        hasilT.kategori = sortBy(db.Kategori, 'urutan');
+        return hasilT;
+      }
+      case 'buku.manajer': {
+        var bm = byId(db.Buku)[String(payload.buku || '')];
+        if (!bm || bm.tipe !== 'Bersama') throw err('Manajer keuangan hanya untuk buku bersama');
+        var calon = byId(db.Users || [])[String(payload.user || '')];
+        if (!calon) throw err('Pilih user yang ada');
+        // pertama kali: siapa pun yang login boleh memilih. Setelah itu: hanya manajer saat ini (atau admin lewat Panel Admin)
+        if (bm.manajer && bm.manajer !== user.id) throw err('Hanya manajer keuangan saat ini yang bisa menggantinya');
+        var bu = clone(bm); bu.manajer = calon.id;
+        store.upsert('Buku', bu);
+        return { buku: bu };
+      }
+      case 'budget.rencana': {
+        var bkR = String(payload.buku || ''), blR = String(payload.bulan || today.slice(0, 7));
+        if (!isMonth(blR)) throw err('Bulan tidak valid');
+        var bR = cekAturRencana(db, user, bkR);
+        var gaji = Math.round(num(payload.penghasilan));
+        if (!(gaji > 0) || gaji > 1e12) throw err('Isi penghasilan per bulan');
+        var hasil = bagiRencana(indukRencana(db, bkR), gaji, payload.rasio);
+        // nominal per kategori boleh diubah user sebelum simpan (hanya induk yang ikut rencana)
+        var ubah = payload.items || {};
+        Object.keys(ubah).forEach(function (k) { if (k in hasil.items) hasil.items[k] = Math.max(0, Math.round(num(ubah[k]))); });
+        var bRow = clone(bR); bRow.penghasilan = gaji; bRow.rasio = hasil.rasio; bRow.rencana_diubah = nowIso;
+        store.upsert('Buku', bRow);
+        handle(store, user, 'budget.save', { bulan: blR, buku: bkR, items: hasil.items }, nowIso);
+        db.Budget = store.all('Budget');
+        hasil.bulan = blR; hasil.buku = bkR;
+        hasil.total = Object.keys(hasil.items).reduce(function (t, k) { return t + hasil.items[k]; }, 0);
+        hasil.budget = effectiveBudget(db, blR)[bkR];
+        return hasil;
       }
       case 'kantong.save': {
         var kin2 = payload, kx = byId(db.Kantong)[kin2.id];
@@ -1366,7 +1617,8 @@ var KantongCore = (function () {
         var eff = effectiveBudget(db, bl)[bk].items;
         var all = {};
         Object.keys(eff).forEach(function (k) { all[k] = eff[k]; });
-        Object.keys(items).forEach(function (k) { if (kmap[k]) all[k] = Math.max(0, Math.round(num(items[k]))); });
+        // budget hanya di kategori induk
+        Object.keys(items).forEach(function (k) { if (kmap[k] && !kmap[k].induk) all[k] = Math.max(0, Math.round(num(items[k]))); });
         Object.keys(all).forEach(function (k) {
           store.upsert('Budget', { id: bl + '|' + bk + '|' + k, bulan: bl, buku: bk, kategori: k, nominal: all[k] });
           saved++;
@@ -1427,6 +1679,9 @@ var KantongCore = (function () {
     addDays: addDays, slug: slug, handle: handle, memoryStore: memoryStore, cleanTx: cleanTx,
     computeUtang: computeUtang, computeTalangan: computeTalangan, arahTransfer: arahTransfer,
     KAT_REIMBURSE: KAT_REIMBURSE, KAT_SETORAN: KAT_SETORAN, KAT_SETORAN_MASUK: KAT_SETORAN_MASUK,
+    TEMPLATE_KATEGORI: TEMPLATE_KATEGORI, TEMPLATE_LEVEL: TEMPLATE_LEVEL, POS: POS, POS_NAMA: POS_NAMA, RASIO_BAKU: RASIO_BAKU,
+    templateDaftar: templateDaftar, jenisTemplate: jenisTemplate, bolehAturRencana: bolehAturRencana, bukuKosong: bukuKosong,
+    bagiRencana: bagiRencana, indukRencana: indukRencana, parseRasio: parseRasio, normNama: normNama, isSistem: isSistem, indukDari: indukDari,
     cleanTodo: cleanTodo, canWriteTodo: canWriteTodo, todoEventSpec: todoEventSpec, todoPerluEvent: todoPerluEvent,
     todoSudahLewat: todoSudahLewat, todoSyncMassal: todoSyncMassal, todoTidakDikirimLewat: todoTidakDikirimLewat,
     komitmenView: komitmenView, cariKomitmen: cariKomitmen, hashLembar: hashLembar, lembarItems: lembarItems, nomorDariKueri: nomorDariKueri, normCari: normCari,

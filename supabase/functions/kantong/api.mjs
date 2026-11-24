@@ -110,9 +110,12 @@ export async function handleRequest(rawBody, deps) {
     const p = body.payload || {};
     let r;
     try {
-      r = p.aksi === 'fitur'   // baca / simpan fitur aktif (data.fitur kosong = baca saja)
-        ? await rpc(cfg, 'kantong_admin_fitur', { p_hash: hash, p_fitur: (p.data && p.data.fitur) || null })
-        : await rpc(cfg, 'kantong_admin', { p_hash: hash, p_aksi: String(p.aksi || ''), p_data: p.data || {} });
+      const d = p.data || {};
+      if (p.aksi === 'fitur')   // baca / simpan fitur aktif (data.fitur kosong = baca saja)
+        r = await rpc(cfg, 'kantong_admin_fitur', { p_hash: hash, p_fitur: d.fitur || null });
+      else if (p.aksi === 'manajer')   // baca / ganti manajer keuangan buku bersama (data.buku kosong = baca saja)
+        r = await rpc(cfg, 'kantong_admin_manajer', { p_hash: hash, p_buku: d.buku ? String(d.buku) : null, p_user: String(d.user || '') });
+      else r = await rpc(cfg, 'kantong_admin', { p_hash: hash, p_aksi: String(p.aksi || ''), p_data: d });
     }
     catch (e) { return { ok: false, error: 'Kesalahan server: ' + e.message }; }
     if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'Gagal', code: r && r.code };

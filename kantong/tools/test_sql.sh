@@ -172,6 +172,28 @@ echo "✓ ganti password: wajib ganti setelah generate admin, cek password lama,
 echo "✓ admin: list, buat+generate password, reset, nonaktif, hapus, non-admin ditolak"
 echo "✓ login: bcrypt, sesi, logout, kunci 5x salah, anon ditolak"
 
+# Template kategori: kolom baru, anti dobel nama (index unik), manajer lewat admin
+q "select kantong_simpan('[{\"tabel\":\"kategori\",\"baris\":{\"id\":\"t-makan\",\"nama\":\"Makan & jajan\",\"tipe\":\"Pengeluaran\",\"buku\":\"riki\",\"warna\":\"#FFFFFF\",\"hitung\":true,\"aktif\":true,\"urutan\":1,\"induk\":\"\",\"pos\":\"kebutuhan\"}},{\"tabel\":\"kategori\",\"baris\":{\"id\":\"t-kopi\",\"nama\":\"Kopi\",\"tipe\":\"Pengeluaran\",\"buku\":\"riki\",\"warna\":\"#FFFFFF\",\"hitung\":true,\"aktif\":true,\"urutan\":2,\"induk\":\"t-makan\",\"pos\":\"kebutuhan\"}}]')" >/dev/null
+[ "$(q "select kantong_muat()->'kategori' @> '[{\"id\":\"t-kopi\",\"induk\":\"t-makan\",\"pos\":\"kebutuhan\"}]'")" = "t" ] || { echo "kolom induk/pos harus ikut muat"; exit 1; }
+if q "insert into kategori (id, nama, buku) values ('t-dobel', '  makan   &  JAJAN ', 'riki')" >/dev/null 2>&1; then echo "nama dobel (beda kapital/spasi) harus ditolak"; exit 1; fi
+q "insert into kategori (id, nama, buku) values ('t-istri', 'Makan & jajan', 'istri')" >/dev/null   # buku lain boleh
+q "insert into kategori (id, nama, buku, induk) values ('t-kopi2', 'Kopi', 'riki', 'lain')" >/dev/null   # induk lain boleh
+q "insert into kategori (id, nama, buku, aktif) values ('t-lama', 'Makan & jajan', 'riki', false)" >/dev/null   # nonaktif boleh
+q "insert into kategori (id, nama, buku) values ('t-multi1', 'Lain', 'riki,rt'), ('t-multi2', 'Lain', 'riki,rt')" >/dev/null   # multi-buku dilewati
+q "select kantong_simpan('[{\"tabel\":\"buku\",\"baris\":{\"id\":\"rt\",\"nama\":\"Rumah Tangga\",\"tipe\":\"Bersama\",\"pemilik\":\"\",\"urutan\":3,\"manajer\":\"istri\",\"penghasilan\":10000000,\"rasio\":\"40,30,20,10\",\"rencana_diubah\":\"\"}}]')" >/dev/null
+[ "$(q "select manajer || penghasilan from buku where id='rt'")" = "istri10000000" ] || { echo "manajer & rencana harus tersimpan di buku"; exit 1; }
+[ "$(q "select kantong_admin_manajer('$AH', 'rt', 'riki')->'buku'->0->>'manajer'")" = "riki" ] || { echo "admin harus bisa ganti manajer"; exit 1; }
+[ "$(q "select kantong_admin_manajer('$AH', 'riki', 'riki')->>'ok'")" = "false" ] || { echo "manajer hanya buku bersama"; exit 1; }
+[ "$(q "select kantong_admin_manajer('$TH', null, null)->>'code'")" = "AUTH" ] || { echo "non-admin tidak boleh ganti manajer"; exit 1; }
+# migrasi berhenti dengan pesan jelas kalau data lama sudah dobel
+q "drop index kategori_nama_unik" >/dev/null
+q "insert into kategori (id, nama, buku) values ('t-dobel', 'makan &  jajan', 'riki')" >/dev/null
+OUT="$(psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$ROOT/supabase/migrations/20261124000000_template_kategori.sql" 2>&1 || true)"
+echo "$OUT" | grep -q "Kategori dobel" || { echo "migrasi harus melaporkan kategori dobel: $OUT"; exit 1; }
+q "delete from kategori where id like 't-%'" >/dev/null
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 "$PGURL" -f "$ROOT/supabase/migrations/20261124000000_template_kategori.sql"
+echo "✓ template kategori: kolom induk/pos/manajer, nama dobel ditolak, multi-buku dilewati, data dobel dilaporkan, admin ganti manajer"
+
 # RLS: anon tidak bisa baca apa pun, tidak bisa memanggil RPC
 [ "$(psql -qtA "$PGURL" -c "set role anon; select count(*) from transaksi" 2>&1 | tr -d '\n' | grep -c 'permission denied\|^0$')" = "1" ] || { echo "anon harus ditolak/kosong"; exit 1; }
 if psql -qtA -v ON_ERROR_STOP=1 "$PGURL" -c "set role anon; select kantong_muat()" >/dev/null 2>&1; then echo "anon tidak boleh memanggil kantong_muat"; exit 1; fi

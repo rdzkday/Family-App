@@ -152,7 +152,9 @@ function canWrite(bukuId) { return C.canWrite(db(), me(), bukuId); }
 // ================= API =================
 function demoTables() {
   var saved = LS.get('k_demo', null);
-  if (saved) return saved;
+  var versi = typeof DEMO_VERSI === 'number' ? DEMO_VERSI : 1;
+  if (saved && LS.get('k_demo_v', 1) === versi) return saved;
+  LS.set('k_demo_v', versi);   // data demo versi lama dibuang sekali
   var seed = window.KANTONG_DEMO_SEED || makeDemoSeed();
   return { Buku: seed.buku, Users: seed.users, Kategori: seed.kategori, Kantong: seed.kantong, Budget: seed.budget, Transaksi: seed.transaksi, Todo: seed.todo || [],
     Siklus: seed.siklus || [], SiklusAtur: seed.siklus_atur || [] };
