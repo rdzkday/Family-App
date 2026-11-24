@@ -84,7 +84,7 @@ function utangAntara(store, bersama, pribadi) {
 }
 
 // ---------------------------------------------------------------- versi & salinan core
-eq('versi core naik ke 1.9.0', C.VERSION, '1.9.0');
+eq('versi core naik ke 1.10.0', C.VERSION, '1.10.0');
 (function () {
   // core.mjs (Edge Function Supabase) harus persis hasil build_core.js
   var fs = require('fs'), build = require(path.join(__dirname, 'build_core.js'));

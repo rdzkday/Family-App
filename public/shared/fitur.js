@@ -17,7 +17,7 @@
     { id: 'kantong', nama: 'Kantong', label: 'Kantong', path: 'kantong/', warna: '--br-kantong', bg: '--br-kantong-bg', ket: 'Catatan keuangan' },
     { id: 'agenda', nama: 'Agenda', label: 'Agenda', path: 'agenda/', warna: '--br-agenda', bg: '--br-agenda-bg', ket: 'To-do, catatan, jadwal' },
     { id: 'komitmen', nama: 'Komitmen', label: 'Komitmen', path: 'komitmen/', warna: '--br-komit', bg: '--br-komit-bg', ket: 'Kesepakatan berdua' },
-    { id: 'mood', nama: 'Daily Mood', label: 'Mood', path: 'daily-mood/', warna: '--br-catat', bg: '--br-catat-bg', ket: 'Jurnal mood pribadi' }
+    { id: 'mood', nama: 'Daily Mood', label: 'Mood', path: 'daily-mood/', warna: '--br-catat', bg: '--br-catat-bg', ket: 'Jurnal mood + Couple Journaling' }
   ];
 
   function root() { return window.KANTONG_ROOT != null ? window.KANTONG_ROOT : ''; }

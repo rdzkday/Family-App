@@ -21,6 +21,7 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | ✅ Live | **Siklus** (lapisan di Kalender Agenda + kartu Beranda + Pengaturan › Siklus) | Catatan haid Febie: mulai/selesai/catatan, perkiraan berikutnya (rata-rata 6 jarak terakhir, ±2 hari). Mati secara default; Febie setuju teks privasi lalu memilih bagikan jadwal (default ya) & catatan (default tidak) ke Riki. Tiap orang bisa menampilkan/menyembunyikan Siklus untuk dirinya sendiri. Aturan dijalankan di server |
 | ✅ Live | **Komitmen** (`/komitmen/`) | Baca & cari pasal (Kesepakatan + Definisi A–Z), filter (pranikah, usulan, dicabut). Usul **pasal baru, ubah, cabut, keterangan** (baru/ganti/cabut) → **Lembar Pengesahan** (sebelum vs sesudah + alasan) → **tanda tangan dengan jari** berdua → berlaku. "Diskusikan dulu" menunda item; isi lembar berubah = TTD batal. Riwayat versi per pasal. Pasal pranikah hanya bisa diberi keterangan |
 | ✅ Live | **Daily Mood** (`/daily-mood/`, dulu Ruang Catat) | Jurnal mood harian + prompt (acak/custom), kalender mood, ringkasan periode → unduh/bagikan PDF, cadangan & pulihkan. Data pribadi di Supabase (pasangan tidak bisa baca) |
+| 🆕 Perlu migrasi + deploy | **Couple Journaling** (Daily Mood › tab **Berdua**) | Evaluasi harian (3 tap), check-in mingguan terpandu (timer 30 menit, satu topik per layar, fakta → dampak → permintaan, rangkum ulang, tindakan + PIC), review bulanan (rekap tren, fokus bulan depan, keputusan target, perlu konselor?). Target personal dinilai diri + pasangan → Selaras / Hampir selaras / Perlu dibicarakan (otomatis masuk agenda). Editor pertanyaan draft → preview → persetujuan → publish (berlaku periode berikutnya) + riwayat versi. Pohon tumbuh bersama, streak per minggu, lencana proses, ekspor PDF/teks untuk konselor, tautan Healing119 & 112. Aktif hanya kalau kedua pasangan setuju. Brief: [`claude/couple-journaling-brief.md`](claude/couple-journaling-brief.md) |
 | ✅ Live | **Offline & sinkron** | Input masuk antrean di HP, terkirim otomatis saat online, tanpa data dobel |
 | ✅ Live | **Fitur modular** | Admin menyalakan/mematikan Kantong, Agenda, Komitmen, Daily Mood di Panel Admin › Fitur. Menu, Beranda, dan Pengaturan menyesuaikan; server menolak aksi fitur yang mati |
 | ✅ Live | **Tema & mode demo** | Gelap/terang berlaku di semua fitur. Mode demo mulai kosong, data hanya di HP |
@@ -146,7 +147,7 @@ Data keuangan pribadi tidak disertakan di repo ini.
 | `public/kantong/` | Kantong: `index.html`, `catat.js`, `transaksi.js`, `laporan.js` (Ringkasan/Riwayat), `atur.js` (kantong, kategori, budget; tampil di Beranda) |
 | `public/agenda/` | Agenda: `index.html`, `todo.js` (data, sheet, tab To-do), `agenda.js` (tab Catatan & Kalender), `siklus.js` (lapisan Siklus, Pengaturan › Siklus, kartu Beranda) |
 | `public/komitmen/` | Komitmen: kamus kesepakatan berbentuk pasal |
-| `public/daily-mood/` | Daily Mood (dulu Ruang Catat): jurnal mood, sinkron ke tabel `jurnal`. `data.js` dipakai juga oleh Pengaturan |
+| `public/daily-mood/` | Daily Mood (dulu Ruang Catat): jurnal mood, sinkron ke tabel `jurnal`. `data.js` dipakai juga oleh Pengaturan. `berdua.js` + `berdua.css` = Couple Journaling (tab Berdua, tabel `jurnal_pasangan`, aksi `cj.*`) |
 | `public/shared/` | Dipakai semua halaman: `fitur.js` (registry fitur & menu), `core.js` (logika bersama, disalin ke Edge Function), `base.js` (state, API, antrean offline, registry halaman), `ui.js`, `shell.js` (shell + tab), `connect.js`, `demo.js`, `start.js`, `tokens.css`, `styles.css`, `nav.css` |
 | `supabase/migrations/` | Skema database |
 | `supabase/functions/kantong/` | Edge Function: API + adapter Postgres + Google Calendar |
@@ -156,9 +157,10 @@ Data keuangan pribadi tidak disertakan di repo ini.
 ## Update & tes
 
 ```bash
-node kantong/tools/test_core.js        # 324 cek logika bersama
+node kantong/tools/test_core.js        # 398 cek logika bersama
 node kantong/tools/test_siklus.js      # 75 cek Siklus: perkiraan + aturan privasi
-node kantong/tools/test_supabase.js    # 22 tes Edge Function (DB & Google tiruan)
+node kantong/tools/test_cj.js          # 74 cek Couple Journaling: periode, kesimpulan, privasi, persetujuan
+node kantong/tools/test_supabase.js    # 25 tes Edge Function (DB & Google tiruan)
 bash kantong/tools/test_sql.sh         # skema SQL di Postgres lokal
 ```
 

@@ -11,7 +11,7 @@ var ATUR_BAGIAN = [
   ['agenda', 'Agenda', 'check', '--br-agenda', 'Filter default, Google Calendar, evaluasi', function (b) { AturAgenda.render(b); }],
   ['siklus', 'Siklus', 'drop', '--br-siklus', 'Kalender haid: tampil/sembunyi, berbagi, riwayat', function (b) { AturSiklus.render(b); }],
   ['komitmen', 'Komitmen', 'heart', '--br-komit', 'Kesepakatan & tanda tangan', function (b) { AturKomitmen.render(b); }],
-  ['mood', 'Daily Mood', 'book', '--br-catat', 'Profil, kondisi, prompt, cadangan', function (b) { AturMood.render(b); }]
+  ['mood', 'Daily Mood', 'book', '--br-catat', 'Profil, kondisi, prompt, Couple Journaling', function (b) { AturMood.render(b); }]
 ];
 var ATUR_IKUT = { siklus: 'agenda' };   // bagian yang ikut fitur lain
 function aturDaftar() { return ATUR_BAGIAN.filter(function (f) { return f[0] === 'umum' || Fitur.aktif(ATUR_IKUT[f[0]] || f[0]); }); }
@@ -300,6 +300,7 @@ var AturMood = {
       toggleHtml('dm-acak', 'Tambahkan 1 prompt acak di akhir', '', st.randomToo !== false) +
       '<div class="atur-lbl">Cadangan</div>' +
       aturBaris('Unduh cadangan (JSON)', st.lastBackup ? 'Terakhir ' + esc(st.lastBackup) : 'Salinan semua catatan di HP ini', '', ' data-dm="backup"') +
+      '<div class="atur-lbl">Couple Journaling</div><div id="dm-cj"><p class="br-help">' + (remote ? 'Memuat status…' : 'Mode demo: coba di Daily Mood › Berdua.') + '</p></div>' +
       '<a class="br-btn violet" style="width:100%;margin-top:12px" href="' + Fitur.url('mood') + '">Buka Daily Mood</a>';
 
     function ubah(fn, pesan, gambar) { var s = self.state(); fn(s); self.simpan(s, pesan); if (gambar !== false) self.render(el); }
@@ -332,5 +333,23 @@ var AturMood = {
       ubah(function (x) { x.lastBackup = todayISO(); }, 'Cadangan diunduh');
     });
     this.tarik();
+    this.cj();
+  },
+  // Couple Journaling: aktif hanya kalau kedua pasangan setuju (aksi cj.setuju, aturan di server)
+  cj: function (data) {
+    var box = this.el && $('#dm-cj', this.el), self = this, url = Fitur.url('mood') + '?tab=berdua';
+    if (!box) return;
+    if (!this.remote()) { box.innerHTML += '<a class="br-btn violet" style="width:100%;margin-top:8px" href="' + url + '">Buka Berdua</a>'; return; }
+    if (!data) { rpc('cj.state').then(function (d) { self.cj(d); }, function (e) { box.innerHTML = '<p class="br-help">Belum bisa memuat: ' + esc(e.message) + '</p>'; }); return; }
+    var p = data.pasangan, m = data.saya;
+    box.innerHTML = '<p class="br-help">Evaluasi harian, check-in mingguan, review bulanan berdua. ' +
+      (data.aktif ? 'Aktif.' : m.setuju ? 'Menunggu ' + esc(p.nama) + ' menyetujui.' : 'Belum aktif. Aktif kalau kalian berdua setuju.') + '</p>' +
+      toggleHtml('dm-cj-on', 'Saya setuju memakai Couple Journaling', '', !!m.setuju) +
+      '<a class="br-btn violet" style="width:100%;margin-top:8px" href="' + url + '">' + (data.aktif ? 'Buka Berdua · atur pertanyaan' : 'Pelajari dulu di Berdua') + '</a>';
+    $('#dm-cj-on', box).addEventListener('click', function () {
+      var on = this.getAttribute('aria-checked') !== 'true';
+      if (!on && !confirm('Cabut persetujuan? Couple Journaling nonaktif untuk kalian berdua. Data tetap tersimpan.')) return;
+      rpc('cj.setuju', { setuju: on }).then(function (d) { self.cj(d); toast(on ? 'Persetujuan tersimpan' : 'Persetujuan dicabut'); }, function (e) { toast(e.message); });
+    });
   }
 };
