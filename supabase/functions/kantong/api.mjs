@@ -109,17 +109,23 @@ export async function handleRequest(rawBody, deps) {
   if (body.action === 'admin') {
     const p = body.payload || {};
     let r;
-    try { r = await rpc(cfg, 'kantong_admin', { p_hash: hash, p_aksi: String(p.aksi || ''), p_data: p.data || {} }); }
+    try {
+      r = p.aksi === 'fitur'   // baca / simpan fitur aktif (data.fitur kosong = baca saja)
+        ? await rpc(cfg, 'kantong_admin_fitur', { p_hash: hash, p_fitur: (p.data && p.data.fitur) || null })
+        : await rpc(cfg, 'kantong_admin', { p_hash: hash, p_aksi: String(p.aksi || ''), p_data: p.data || {} });
+    }
     catch (e) { return { ok: false, error: 'Kesalahan server: ' + e.message }; }
     if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'Gagal', code: r && r.code };
     delete r.ok;
     return { ok: true, data: r };
   }
 
-  let store, sesiUser;
+  let store, sesiUser, fitur;
   try {
-    [store, sesiUser] = await Promise.all([createStore(cfg), rpc(cfg, 'kantong_sesi', { p_hash: hash })]);
+    [store, sesiUser, fitur] = await Promise.all([createStore(cfg), rpc(cfg, 'kantong_sesi', { p_hash: hash }),
+      rpc(cfg, 'kantong_fitur', {}).catch(() => null)]);   // null = semua fitur aktif
   } catch (e) { return { ok: false, error: 'Kesalahan server: ' + e.message }; }
+  store.fitur = fitur && typeof fitur === 'object' ? fitur : null;
 
   const ak = store.akses.find((a) => a.token_hash === hash);   // kode koneksi lama (transisi)
   if (sesiUser && sesiUser.wajib_ganti) return { ok: false, error: 'Buat password baru dulu', code: 'GANTI_PW' };
@@ -128,7 +134,10 @@ export async function handleRequest(rawBody, deps) {
   if (!u) return { ok: false, error: 'Sesi berakhir, silakan masuk lagi', code: 'AUTH' };
   const user = { id: u.id, nama: u.nama, buku: u.buku };
 
-  if (typeof body.action === 'string' && body.action.indexOf('kalender.') === 0) return aksiKalender(deps.calendar, body.action, body.payload || {});
+  if (typeof body.action === 'string' && body.action.indexOf('kalender.') === 0) {
+    try { KantongCore.cekFitur(store.fitur, body.action); } catch (e) { return { ok: false, error: e.message }; }
+    return aksiKalender(deps.calendar, body.action, body.payload || {});
+  }
 
   const planner = calendarPlanner();
   if (deps.calendar) store.calendar = planner.sync;

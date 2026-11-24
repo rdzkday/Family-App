@@ -102,7 +102,11 @@ Bayangkan seperti **undang-undang mini rumah tangga**:
 
 ## 7. Import perjanjian pranikah + Keterangan
 
-**Status:** menunggu file dari Riki (PDF atau foto) setelah dokumen fisik ketemu.
+**Status (19 Nov 2026): sudah diimport, menunggu TTD berdua.** Sumber: teks ketikan 2 akta tanggal 4 Mei 2025 (Perjanjian Kawin No. 02 dan Perjanjian No. 03).
+- Hasil: Pasal 1–6 (Akta 02, Bab I), Pasal 7–8 definisi KDRT & Perselingkuhan (Akta 03), Pasal 9–10 (Akta 03, Bab II). Status Usulan + Lembar Pengesahan "Perjanjian Pranikah".
+- Teks ayat disalin persis, termasuk salah ketik di akta. Judul pasal, nama Bab, dan kata kunci ditambahkan Claude karena akta tidak punya judul pasal.
+- Kalimat tanpa nomor (mis. "Apabila … maka :") disimpan sebagai **teks pembuka** supaya nomor ayat sama dengan akta.
+- Identitas (KTP, alamat, tanggal lahir, saksi) tidak dimasukkan. Isi akta tidak ada di repo; skrip: `kantong/tools/import_pranikah.mjs`.
 
 **Cara import (sekali, oleh Claude — bukan fitur di app):**
 1. Riki kirim file ke **chat Claude** (bukan ke repo).
