@@ -20,12 +20,13 @@ const BASE = {
   dark: '#25262E', darkL: '#34353F',
   paper: '#FFFFFF', paperD: '#E4E8F0',
   blush: '#FF9FB8',
+  rose: '#F9A8D4', roseD: '#EC84BC',   // Siklus (tokens.css --br-siklus)
 };
 
 const THEMES = {
   light: {
     ...BASE,
-    bd: { kantong: '#E2F3EA', agenda: '#E6EEFB', komit: '#FCEFC7', catat: '#EEEAFB', bad: '#FDECEC', neutral: '#EAEDF2' },
+    bd: { kantong: '#E2F3EA', agenda: '#E6EEFB', komit: '#FCEFC7', catat: '#EEEAFB', bad: '#FDECEC', neutral: '#EAEDF2', siklus: '#FCE7F3' },
     dot: 0.55,
     shadow: 'rgba(43,47,85,.16)',
     sub: '#C9CFDA',        // garis/teks tiruan di atas kertas
@@ -38,7 +39,7 @@ const THEMES = {
     ...BASE,
     paper: '#F3F4F7', paperD: '#D9DEE8',
     dark: '#30323D', darkL: '#3D3F4B',
-    bd: { kantong: '#1B2A23', agenda: '#1A2433', komit: '#2A2614', catat: '#252137', bad: '#2A1717', neutral: '#1D2129' },
+    bd: { kantong: '#1B2A23', agenda: '#1A2433', komit: '#2A2614', catat: '#252137', bad: '#2A1717', neutral: '#1D2129', siklus: '#2A1C25' },
     dot: 0.35,
     shadow: 'rgba(0,0,0,.38)',
     sub: '#C9CFDA',

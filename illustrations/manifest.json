@@ -54,6 +54,15 @@
     "animasi": false
   },
   {
+    "slug": "onboarding-siklus",
+    "kategori": "Onboarding",
+    "judul": "Kalender siklus dengan perkiraan, Riki membawakan teh hangat untuk Febie",
+    "pakai_untuk": "Onboarding — Siklus: kalender haid di Agenda (privat, diatur pemiliknya).",
+    "warna_latar": "siklus",
+    "ukuran": "320x240",
+    "animasi": false
+  },
+  {
     "slug": "onboarding-04-komitmen",
     "kategori": "Onboarding",
     "judul": "Lembar kesepakatan ditandatangani berdua",

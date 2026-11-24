@@ -89,6 +89,7 @@ var AturUmum = {
         [['dark', 'Gelap'], ['light', 'Terang']].map(function (x) { return '<button type="button" data-theme-set="' + x[0] + '" aria-pressed="' + (themePref() === x[0]) + '">' + x[1] + '</button>'; }).join('') +
       '</div><p class="br-help" style="margin:-6px 0 12px">Berlaku di semua fitur.</p>' +
       aturBaris('Sinkron sekarang', esc(S.lastSync ? 'Terakhir ' + agoLabel(S.lastSync) : 'Belum sinkron di sesi ini') + (S.outbox.length ? ', ' + S.outbox.length + ' belum terkirim' : ''), '', ' data-au="sync"') +
+      aturBaris('Panduan aplikasi', 'Lihat lagi pengenalan fitur', '', ' data-au="tour"') +
       (demo ? '' : aturBaris('Ubah password', 'Perangkat lain otomatis keluar', '', ' data-au="pw"')) +
       aturBaris('<span style="color:var(--over)">' + (demo ? 'Keluar dari mode demo' : 'Keluar dari akun') + '</span>', '', '', ' data-au="out"') +
       '<p class="faint" style="font-size:12px;text-align:center;margin:12px 0 0">Family App v' + esc((S.boot && S.boot.version) || C.VERSION) + '</p>';
@@ -97,6 +98,7 @@ var AturUmum = {
       var a = b.getAttribute('data-au');
       if (a === 'sync') { sync(); toast('Menyinkronkan…'); }
       if (a === 'pw') bukaUbahPassword();
+      if (a === 'tour') Onboarding.buka();
       if (a === 'out' && confirm(demo ? 'Keluar dari mode demo? Data demo dihapus.' : 'Keluar dari akun? Perubahan yang belum terkirim akan hilang dari HP ini.')) disconnect(demo ? '' : 'keluar');
     }); });
   }
